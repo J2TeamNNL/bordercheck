@@ -1,0 +1,86 @@
+// Package checks holds every check bordercheck runs. Each check gathers raw
+// output from the OS in a per-OS file (_darwin.go, _windows.go) and judges it in
+// a portable eval function, so the judging is unit-tested on every platform.
+package checks
+
+import (
+	"context"
+	"errors"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"strings"
+
+	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/policy"
+)
+
+// All returns every check the policy enables, in report order.
+func All(p policy.Policy) []check.Check {
+	c := p.Checks
+	all := []struct {
+		check.Check
+		policy.Common
+	}{
+		{check.Check{ID: "firewall", Title: "Firewall is on",
+			Run: func(ctx context.Context) check.Result { return firewall(ctx, *c.Firewall.RequireStealth) }}, c.Firewall.Common},
+		{check.Check{ID: "disk-encryption", Title: "Disk is encrypted", Run: diskEncryption}, c.DiskEncryption},
+		{check.Check{ID: "listeners", Title: "Nothing listens beyond localhost",
+			Run: func(ctx context.Context) check.Result { return listeners(ctx, c.Listeners.Allow) }}, c.Listeners.Common},
+		{check.Check{ID: "tailscale", Title: "Tailscale blocks incoming connections", Run: tailscale}, c.Tailscale},
+		{check.Check{ID: "docker", Title: "Docker containers stay isolated",
+			Run: func(ctx context.Context) check.Result { return docker(ctx, c.Docker) }}, c.Docker.Common},
+		{check.Check{ID: "secrets", Title: "No plain-text secrets", Run: secrets(c.Secrets)}, c.Secrets.Common},
+	}
+	var out []check.Check
+	for _, a := range all {
+		if a.IsEnabled() {
+			out = append(out, withOnProblem(a.Check, a.OnProblem))
+		}
+	}
+	return out
+}
+
+// withOnProblem makes every problem the check finds report as status on.
+func withOnProblem(c check.Check, on check.Status) check.Check {
+	if on == "" {
+		return c
+	}
+	run := c.Run
+	c.Run = func(ctx context.Context) check.Result {
+		r := run(ctx)
+		if r.Status == check.Fail || r.Status == check.Warn {
+			r.Status = on
+		}
+		return r
+	}
+	return c
+}
+
+// expandHome turns a leading ~ into the home folder.
+func expandHome(p, home string) string {
+	if rest, ok := strings.CutPrefix(p, "~"); ok {
+		return filepath.Join(home, filepath.FromSlash(rest))
+	}
+	return p
+}
+
+var errUnsupported = errors.New("not supported on " + runtime.GOOS + " yet")
+
+func unsupported() check.Result { return check.Skipped("Not supported on " + runtime.GOOS + " yet.") }
+
+func firstLine(s string) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
+	return strings.TrimSpace(line)
+}
+
+func uniqSorted(ss []string) []string {
+	sort.Strings(ss)
+	out := ss[:0]
+	for i, s := range ss {
+		if i == 0 || s != ss[i-1] {
+			out = append(out, s)
+		}
+	}
+	return out
+}

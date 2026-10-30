@@ -1,0 +1,57 @@
+{
+  "name": "Example Org",
+  "report": {
+    "url": "https://bordercheck.example.com/report",
+    "headers": {
+      "Authorization": "Bearer <report-submit-token>"
+    },
+    "interval": "24h",
+    "include_evidence": false,
+    "email_domains": [
+      "example.com"
+    ]
+  },
+  "checks": {
+    "firewall": {
+      "require_stealth": true
+    },
+    "disk-encryption": {},
+    "listeners": {
+      "allow": [
+        {
+          "process": "rapportd"
+        },
+        {
+          "process": "ControlCenter",
+          "port": "7000"
+        }
+      ]
+    },
+    "tailscale": {},
+    "docker": {
+      "allow_containers": [],
+      "allow_mounts": []
+    },
+    "secrets": {
+      "extra_files": [],
+      "ignore_paths": [
+        "~/**/test-fixtures/**"
+      ],
+      "production_keywords": [
+        "prod",
+        "production",
+        "live"
+      ],
+      "show_tail": true,
+      "walk_depth": 5,
+      "extra_patterns": [
+        {
+          "kind": "Example internal token",
+          "regex": "\\bexo_[A-Za-z0-9]{32}\\b",
+          "high": true,
+          "show_tail": true
+        }
+      ]
+    }
+  }
+}

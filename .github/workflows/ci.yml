@@ -1,0 +1,39 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+      # Smoke run on the real OS; exit 1 (a failed check on the runner) is fine, a crash is not.
+      - run: go run . -json > report.json || [ $? -eq 1 ]
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report-${{ matrix.os }}
+          path: report.json
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: scripts/build-all.sh "ci-${GITHUB_SHA::7}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: dist/
