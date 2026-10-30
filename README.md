@@ -71,11 +71,14 @@ Every check takes `enabled` and `on_problem` (`"fail"` or `"warn"`, to override 
 
 ## Install as a service
 
-Hand people a zip with `bordercheck` and your `policies.json`. They run:
+Host your `policies.json` at an HTTPS URL and have people run:
 
 ```sh
-./bordercheck install            # asks for their work email
+./bordercheck install https://bordercheck.acme.com/policies.json   # asks for their work email
 ```
+
+Or hand them a zip with `bordercheck` and `policies.json` side by side and they run `./bordercheck install`.
+`-email you@acme.com` skips the question (for scripted rollouts).
 
 That copies both files to `~/Library/Application Support/bordercheck` (macOS) or
 `%LOCALAPPDATA%\bordercheck` (Windows), registers an hourly per-user service (launchd LaunchAgent / Task
@@ -88,8 +91,6 @@ bordercheck send -force          # send a report now
 bordercheck update               # refresh the policy and install a newer release now
 bordercheck uninstall
 ```
-
-`install -policy https://…/policies.json` installs from your server instead of the file beside the binary.
 
 ## Updates
 

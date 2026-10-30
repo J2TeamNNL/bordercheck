@@ -28,8 +28,9 @@ var version = "dev" // set by -ldflags "-X main.version=..."
 
 const usage = `Usage:
   bordercheck [-policy file] [-json] [-only id,id]   check this machine and print a report
-  bordercheck install [-policy file|https-url] [-email you@work]
-                                                     report to your organisation every hour as a service
+  bordercheck install [policies-url] [-email you@work]
+                                                     report to your organisation every hour as a service;
+                                                     without a URL, uses policies.json beside the binary
   bordercheck status                                 show the install and the last report sent
   bordercheck send [-force]                          what the service runs; -force sends a report now
   bordercheck update                                 refresh the policy and install a newer signed release now
@@ -141,11 +142,25 @@ func loadPolicy(path string) (policy.Policy, error) {
 
 func runAgent(cmd string, args []string) int {
 	fs := flag.NewFlagSet("bordercheck "+cmd, flag.ContinueOnError)
-	policySrc := fs.String("policy", "", "install: policies.json path or https URL (default: policies.json beside this binary)")
 	email := fs.String("email", "", "install: your work email (asked for when omitted)")
 	force := fs.Bool("force", false, "send: send a report now even if one is not due")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	// Flags may come before or after the policies URL.
+	var positional []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			return 2
+		}
+		if args = fs.Args(); len(args) == 0 {
+			break
+		}
+		positional, args = append(positional, args[0]), args[1:]
+	}
+	if max := map[bool]int{true: 1, false: 0}[cmd == "install"]; len(positional) > max {
+		return fail(fmt.Errorf("%s: unexpected argument %q; see bordercheck -h", cmd, positional[max]))
+	}
+	policySrc := ""
+	if len(positional) == 1 {
+		policySrc = positional[0]
 	}
 	dir, err := agent.Dir()
 	if err != nil {
@@ -158,7 +173,7 @@ func runAgent(cmd string, args []string) int {
 	switch cmd {
 	case "install":
 		err = agent.Install(ctx, env, agent.InstallOptions{
-			Policy: *policySrc, Email: *email, In: os.Stdin, Ask: isTerminal(os.Stdin)})
+			Policy: policySrc, Email: *email, In: os.Stdin, Ask: isTerminal(os.Stdin)})
 	case "uninstall":
 		if err = agent.Uninstall(env); err == nil {
 			fmt.Println("Uninstalled.")

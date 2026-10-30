@@ -111,7 +111,7 @@ func writeJSON(path string, v any) error {
 
 // InstallOptions are the answers install needs; Email is asked for when empty.
 type InstallOptions struct {
-	Policy string    // policies.json path or https URL; "" = the one beside this binary
+	Policy string    // https URL (or path) of policies.json; "" = the one beside this binary
 	Email  string    //
 	In     io.Reader // where to read the email from when Email is empty
 	Ask    bool      // In is a terminal, so asking is possible
@@ -174,6 +174,8 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 		env.Dir, email, pol.Report.Interval, hostOf(pol.Report.URL))
 	if pol.Update.PolicyURL != "" {
 		fmt.Fprintf(env.Out, "Policy refreshed from %s.\n", pol.Update.PolicyURL)
+	} else if isURL(source) {
+		fmt.Fprintf(env.Out, "The policy has no update.policy_url, so it stays as installed; set it to %s to refresh it hourly.\n", source)
 	}
 	if pol.Update.Binary {
 		fmt.Fprintf(env.Out, "Updates itself from github.com/%s releases.\n", pol.Update.Repo)
