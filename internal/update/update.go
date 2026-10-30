@@ -29,7 +29,7 @@ import (
 
 // OfficialKey is the base64 ed25519 public key that signs the SHA256SUMS of
 // github.com/ptrinh/bordercheck releases. A policy may name another key for a fork.
-const OfficialKey = ""
+const OfficialKey = "Q5Mw8yJQUgKSEtPNBVNnEP7HiSvhwT2y9Te4mEPOlcs="
 
 // Source is where releases come from.
 type Source struct {
