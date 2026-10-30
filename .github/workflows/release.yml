@@ -15,8 +15,11 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test ./...
-      - run: scripts/build-all.sh "$GITHUB_REF_NAME"
-      # TODO: sign (Developer ID + notarize for macOS, Authenticode for Windows) before announcing widely.
+      - run: test -n "$BORDERCHECK_SIGNING_KEY" && scripts/build-all.sh "$GITHUB_REF_NAME" && test -s dist/SHA256SUMS.sig
+        env:
+          BORDERCHECK_SIGNING_KEY: ${{ secrets.BORDERCHECK_SIGNING_KEY }}
+      # SHA256SUMS.sig is what installed copies trust for self-update.
+      # TODO: also code-sign (Developer ID + notarize for macOS, Authenticode for Windows).
       - run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}

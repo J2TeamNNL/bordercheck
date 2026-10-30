@@ -11,6 +11,13 @@
       "example.com"
     ]
   },
+  "update": {
+    "binary": true,
+    "policy_url": "https://bordercheck.example.com/policies.json",
+    "interval": "24h",
+    "repo": "ptrinh/bordercheck",
+    "public_key": ""
+  },
   "checks": {
     "firewall": {
       "require_stealth": true

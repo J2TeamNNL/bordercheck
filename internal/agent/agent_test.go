@@ -17,7 +17,7 @@ import (
 
 // A policy with every check off, so tests don't depend on the machine they run on.
 const policyFmt = `{"name": "Test", "report": {"url": %q, "headers": {"Authorization": "Bearer t0ken"},
- "interval": "24h", "email_domains": ["acme.com"]},
+ "interval": "24h", "email_domains": ["acme.com"]}, "update": {%s},
  "checks": {"firewall": {"enabled": false}, "disk-encryption": {"enabled": false},
   "listeners": {"enabled": false}, "tailscale": {"enabled": false}, "docker": {"enabled": false},
   "secrets": {"enabled": false}}}`
@@ -25,15 +25,23 @@ const policyFmt = `{"name": "Test", "report": {"url": %q, "headers": {"Authoriza
 func setup(t *testing.T, srv *httptest.Server) (Env, *strings.Builder) {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "policies.json"), fmt.Appendf(nil, policyFmt, srv.URL+"/report"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cfg := Config{Email: "an@acme.com", InstallID: "id1"}
+	cfg := Config{Email: "an@acme.com", InstallID: "id1", UpdateRepo: "ptrinh/bordercheck"}
 	if err := writeJSON(filepath.Join(dir, "config.json"), cfg); err != nil {
 		t.Fatal(err)
 	}
 	out := &strings.Builder{}
-	return Env{Dir: dir, Version: "test", Client: srv.Client(), Out: out}, out
+	env := Env{Dir: dir, Version: "test", Client: srv.Client(), Out: out}
+	setPolicy(t, env, srv, "")
+	return env, out
+}
+
+// setPolicy writes policies.json with the given fields in its "update" section.
+func setPolicy(t *testing.T, env Env, srv *httptest.Server, update string, args ...any) {
+	t.Helper()
+	body := fmt.Sprintf(policyFmt, srv.URL+"/report", fmt.Sprintf(update, args...))
+	if err := os.WriteFile(filepath.Join(env.Dir, "policies.json"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestSendPostsJSONAndRespectsInterval(t *testing.T) {
@@ -103,10 +111,7 @@ func TestPolicyURLFallsBackToSavedCopy(t *testing.T) {
 	}))
 	defer srv.Close()
 	env, out := setup(t, srv)
-	cfg := Config{Email: "an@acme.com", InstallID: "id1", PolicyURL: srv.URL + "/policies.json"}
-	if err := writeJSON(filepath.Join(env.Dir, "config.json"), cfg); err != nil {
-		t.Fatal(err)
-	}
+	setPolicy(t, env, srv, `"policy_url": %q`, srv.URL+"/policies.json")
 	if err := Send(t.Context(), env, false); err != nil || reports != 1 {
 		t.Fatalf("err %v, %d reports", err, reports)
 	}
@@ -141,5 +146,69 @@ func TestAskEmailRetries(t *testing.T) {
 	}
 	if _, err := askEmail(strings.NewReader(""), io.Discard, nil); err == nil {
 		t.Error("empty input should fail")
+	}
+}
+
+func TestPolicyRefreshKeepsPinnedUpdateSource(t *testing.T) {
+	var srv *httptest.Server
+	srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/policies.json" {
+			// The fetched policy renames itself and tries to move updates to another repo and key.
+			fmt.Fprintf(w, policyFmt, srv.URL+"/report", fmt.Sprintf(
+				`"policy_url": %q, "repo": "evil/fork", "public_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="`, srv.URL+"/policies.json"))
+		}
+	}))
+	defer srv.Close()
+	env, out := setup(t, srv)
+	setPolicy(t, env, srv, `"policy_url": %q`, srv.URL+"/policies.json")
+
+	cfg := Config{UpdateRepo: "ptrinh/bordercheck"}
+	pol, err := currentPolicy(t.Context(), env, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pol.Update.Repo != "ptrinh/bordercheck" || pol.Update.PublicKey != "" {
+		t.Errorf("update source not pinned: %+v", pol.Update)
+	}
+	if !strings.Contains(out.String(), "keeping the source pinned") {
+		t.Errorf("log: %s", out)
+	}
+	saved, _ := os.ReadFile(filepath.Join(env.Dir, "policies.json"))
+	if !strings.Contains(string(saved), "evil/fork") {
+		t.Error("the fetched policy should still be saved as-is")
+	}
+}
+
+func TestSendRunsUpdateOnlyWhenOnAndDue(t *testing.T) {
+	var gets int
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/releases/") {
+			gets++
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	env, _ := setup(t, srv)
+	env.GitHub = srv.URL
+	env.Version = "v0.1.0"
+
+	if err := Send(t.Context(), env, true); err != nil || gets != 0 {
+		t.Fatalf("update off: err %v, %d release fetches", err, gets)
+	}
+	setPolicy(t, env, srv, `"binary": true`)
+	cfg := Config{Email: "an@acme.com", InstallID: "id1", UpdateRepo: "o/r", UpdateKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}
+	if err := writeJSON(filepath.Join(env.Dir, "config.json"), cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := Send(t.Context(), env, true); err != nil {
+		t.Fatalf("a failed update must not fail the report: %v", err)
+	}
+	var st State
+	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
+	if gets != 1 || st.UpdateError == "" || st.LastUpdateCheck.IsZero() {
+		t.Fatalf("update on: %d fetches, state %+v", gets, st)
+	}
+	if err := Send(t.Context(), env, true); err != nil || gets != 1 {
+		t.Fatalf("update not due yet: err %v, %d fetches", err, gets)
 	}
 }

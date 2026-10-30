@@ -5,6 +5,7 @@ package policy
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,7 +22,26 @@ import (
 type Policy struct {
 	Name   string `json:"name"`
 	Report Report `json:"report"`
+	Update Update `json:"update"`
 	Checks Checks `json:"checks"`
+}
+
+// Update keeps an installed bordercheck and its policy current.
+type Update struct {
+	Binary    bool   `json:"binary"`     // install newer releases whose SHA256SUMS is signed by the trusted key
+	PolicyURL string `json:"policy_url"` // HTTPS URL this policies.json is refreshed from before each report
+	Interval  string `json:"interval"`   // how often to look for a newer binary, e.g. "24h"
+	// Repo and PublicKey decide what code may run, so an installed bordercheck
+	// keeps the values it was installed with; a policy fetched from PolicyURL
+	// cannot change them.
+	Repo      string `json:"repo"`       // GitHub owner/name
+	PublicKey string `json:"public_key"` // base64 ed25519 key that signs SHA256SUMS; "" = the official key
+}
+
+// Every returns the interval between binary update checks.
+func (u Update) Every() time.Duration {
+	d, _ := time.ParseDuration(u.Interval)
+	return d
 }
 
 // Report says where an installed bordercheck sends its reports.
@@ -120,6 +140,7 @@ func Default() Policy {
 	return Policy{
 		Name:   "built-in",
 		Report: Report{Headers: map[string]string{}, Interval: "24h", EmailDomains: []string{}},
+		Update: Update{Interval: "24h", Repo: "ptrinh/bordercheck"},
 		Checks: Checks{
 			Firewall: Firewall{RequireStealth: ptr(true)},
 			Listeners: Listeners{Allow: []ListenerRule{
@@ -137,6 +158,8 @@ func Default() Policy {
 		},
 	}
 }
+
+var repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
 // FileName is the policy file bordercheck looks for next to its binary.
 const FileName = "policies.json"
@@ -204,6 +227,21 @@ func (p Policy) validate() error {
 	}
 	if d, err := time.ParseDuration(p.Report.Interval); err != nil || d < 15*time.Minute {
 		return fmt.Errorf("report.interval must be a duration of at least 15m, like \"24h\", not %q", p.Report.Interval)
+	}
+	u := p.Update
+	if u.PolicyURL != "" && !strings.HasPrefix(u.PolicyURL, "https://") {
+		return fmt.Errorf("update.policy_url must be an https:// URL, not %q", u.PolicyURL)
+	}
+	if d, err := time.ParseDuration(u.Interval); err != nil || d < time.Hour {
+		return fmt.Errorf("update.interval must be a duration of at least 1h, like \"24h\", not %q", u.Interval)
+	}
+	if !repoRe.MatchString(u.Repo) {
+		return fmt.Errorf("update.repo must look like owner/name, not %q", u.Repo)
+	}
+	if u.PublicKey != "" {
+		if raw, err := base64.StdEncoding.DecodeString(u.PublicKey); err != nil || len(raw) != 32 {
+			return errors.New("update.public_key must be a base64 ed25519 public key")
+		}
 	}
 	c := p.Checks
 	for id, on := range map[string]check.Status{

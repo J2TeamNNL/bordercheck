@@ -1,6 +1,8 @@
-// Package agent installs bordercheck as a per-user service that checks the
-// machine every hour and POSTs a report to the policy's report.url whenever
-// report.interval has passed since the last report that got through.
+// Package agent installs bordercheck as a per-user service that runs every
+// hour. Each run refreshes policies.json from update.policy_url, POSTs a report
+// to report.url whenever report.interval has passed since the last report that
+// got through, and, with update.binary, installs a newer signed release once
+// every update.interval.
 //
 // The install folder holds the binary, policies.json beside it, and:
 //
@@ -33,6 +35,7 @@ import (
 	"github.com/ptrinh/bordercheck/internal/checks"
 	"github.com/ptrinh/bordercheck/internal/policy"
 	"github.com/ptrinh/bordercheck/internal/report"
+	"github.com/ptrinh/bordercheck/internal/update"
 )
 
 // Env is what the agent needs from outside, so tests can swap it.
@@ -41,6 +44,7 @@ type Env struct {
 	Version string
 	Client  *http.Client
 	Out     io.Writer
+	GitHub  string // release host for updates; "" = https://github.com
 }
 
 // Dir is the install folder: ~/Library/Application Support/bordercheck on macOS,
@@ -66,15 +70,18 @@ func binName() string {
 type Config struct {
 	Email     string `json:"email"`
 	InstallID string `json:"install_id"`
-	// PolicyURL, when set, is fetched before each report so IT can change the
-	// policy centrally; the last good copy stays in policies.json.
-	PolicyURL string `json:"policy_url,omitempty"`
+	// Pinned at install from the policy: where updates come from and the key
+	// they must be signed with. A refreshed policy cannot change them.
+	UpdateRepo string `json:"update_repo"`
+	UpdateKey  string `json:"update_public_key,omitempty"`
 }
 
 type State struct {
-	LastSent  time.Time `json:"last_sent,omitzero"`
-	LastTry   time.Time `json:"last_try,omitzero"`
-	LastError string    `json:"last_error,omitempty"`
+	LastSent        time.Time `json:"last_sent,omitzero"`
+	LastTry         time.Time `json:"last_try,omitzero"`
+	LastError       string    `json:"last_error,omitempty"`
+	LastUpdateCheck time.Time `json:"last_update_check,omitzero"`
+	UpdateError     string    `json:"update_error,omitempty"`
 }
 
 func readJSON(path string, v any) error {
@@ -148,10 +155,7 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 	if cfg.InstallID == "" {
 		cfg.InstallID = newID()
 	}
-	cfg.Email, cfg.PolicyURL = email, ""
-	if isURL(source) {
-		cfg.PolicyURL = source
-	}
+	cfg.Email, cfg.UpdateRepo, cfg.UpdateKey = email, pol.Update.Repo, pol.Update.PublicKey
 
 	bin := filepath.Join(env.Dir, binName())
 	if err := copySelf(bin); err != nil {
@@ -166,8 +170,15 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 	if err := registerService(bin, env.Dir); err != nil {
 		return fmt.Errorf("registering the hourly service: %w", err)
 	}
-	fmt.Fprintf(env.Out, "Installed in %s for %s.\nChecking every hour; reporting every %s to %s.\n\n",
+	fmt.Fprintf(env.Out, "Installed in %s for %s.\nChecking every hour; reporting every %s to %s.\n",
 		env.Dir, email, pol.Report.Interval, hostOf(pol.Report.URL))
+	if pol.Update.PolicyURL != "" {
+		fmt.Fprintf(env.Out, "Policy refreshed from %s.\n", pol.Update.PolicyURL)
+	}
+	if pol.Update.Binary {
+		fmt.Fprintf(env.Out, "Updates itself from github.com/%s releases.\n", pol.Update.Repo)
+	}
+	fmt.Fprintln(env.Out)
 	return Send(ctx, env, true)
 }
 
@@ -201,12 +212,21 @@ func Send(ctx context.Context, env Env, force bool) error {
 		return errors.New("the policy has no report.url")
 	}
 	now := time.Now()
-	if !force && now.Sub(st.LastSent) < pol.Report.Every() {
+	if force || now.Sub(st.LastSent) >= pol.Report.Every() {
+		err = sendReport(ctx, env, cfg, pol, &st, now)
+	} else {
 		fmt.Fprintf(env.Out, "%s next report due %s\n", now.Format(time.RFC3339),
 			st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339))
-		return nil
 	}
+	// After the report, so a broken update never costs a report. Its error is
+	// in state.json and the log; the report's error is what Send returns.
+	if pol.Update.Binary && now.Sub(st.LastUpdateCheck) >= pol.Update.Every() {
+		_ = updateBinary(ctx, env, cfg, &st, now)
+	}
+	return errors.Join(err, writeJSON(filepath.Join(env.Dir, "state.json"), st))
+}
 
+func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time) error {
 	rep := report.New(env.Version, pol.Name, check.RunAll(ctx, checks.All(pol)))
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID
 	if !pol.Report.IncludeEvidence {
@@ -215,17 +235,53 @@ func Send(ctx context.Context, env Env, force bool) error {
 		}
 	}
 	st.LastTry = now
-	err = post(ctx, env, pol.Report, rep)
+	err := post(ctx, env, pol.Report, rep)
 	if err != nil {
 		st.LastError = err.Error()
 		fmt.Fprintf(env.Out, "%s report failed: %v\n", now.Format(time.RFC3339), err)
-	} else {
-		st.LastSent, st.LastError = now, ""
-		c := rep.Counts
-		fmt.Fprintf(env.Out, "%s report sent to %s: %d fail, %d warn, %d pass\n",
-			now.Format(time.RFC3339), hostOf(pol.Report.URL), c.Fail, c.Warn, c.Pass)
+		return err
 	}
+	st.LastSent, st.LastError = now, ""
+	c := rep.Counts
+	fmt.Fprintf(env.Out, "%s report sent to %s: %d fail, %d warn, %d pass\n",
+		now.Format(time.RFC3339), hostOf(pol.Report.URL), c.Fail, c.Warn, c.Pass)
+	return nil
+}
+
+// Update refreshes the policy and installs a newer signed release now, whether
+// or not the policy turns automatic updates on.
+func Update(ctx context.Context, env Env) error {
+	var cfg Config
+	if err := readJSON(filepath.Join(env.Dir, "config.json"), &cfg); err != nil {
+		return fmt.Errorf("bordercheck is not installed (%w); run: bordercheck install", err)
+	}
+	var st State
+	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
+	if _, err := currentPolicy(ctx, env, cfg); err != nil {
+		return err
+	}
+	err := updateBinary(ctx, env, cfg, &st, time.Now())
 	return errors.Join(err, writeJSON(filepath.Join(env.Dir, "state.json"), st))
+}
+
+func updateBinary(ctx context.Context, env Env, cfg Config, st *State, now time.Time) error {
+	gh := env.GitHub
+	if gh == "" {
+		gh = "https://github.com"
+	}
+	src := update.Source{GitHub: gh, Repo: cfg.UpdateRepo, PublicKey: cfg.UpdateKey}
+	res, err := update.Run(ctx, env.Client, src, env.Version, filepath.Join(env.Dir, binName()))
+	st.LastUpdateCheck, st.UpdateError = now, ""
+	switch {
+	case err != nil:
+		st.UpdateError = err.Error()
+		fmt.Fprintf(env.Out, "%s update failed: %v\n", now.Format(time.RFC3339), err)
+	case res.Updated:
+		fmt.Fprintf(env.Out, "%s updated %s → %s; the next run uses it\n", now.Format(time.RFC3339), res.Current, res.Latest)
+	default:
+		fmt.Fprintf(env.Out, "%s up to date (%s)\n", now.Format(time.RFC3339), res.Current)
+	}
+	return err
 }
 
 // Status describes the install for `bordercheck status`.
@@ -241,9 +297,9 @@ func Status(env Env) (string, error) {
 		return "", err
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "Installed:  %s\nEmail:      %s\nPolicy:     %s", env.Dir, cfg.Email, pol.Name)
-	if cfg.PolicyURL != "" {
-		fmt.Fprintf(&b, " (from %s)", cfg.PolicyURL)
+	fmt.Fprintf(&b, "Installed:  %s (%s)\nEmail:      %s\nPolicy:     %s", env.Dir, env.Version, cfg.Email, pol.Name)
+	if pol.Update.PolicyURL != "" {
+		fmt.Fprintf(&b, " (refreshed from %s)", pol.Update.PolicyURL)
 	}
 	fmt.Fprintf(&b, "\nReports:    every %s to %s\nService:    %s\n", pol.Report.Interval, hostOf(pol.Report.URL), serviceStatus())
 	if !st.LastSent.IsZero() {
@@ -252,21 +308,46 @@ func Status(env Env) (string, error) {
 	if st.LastError != "" {
 		fmt.Fprintf(&b, "Last error: %s (%s)\n", st.LastError, st.LastTry.Format(time.RFC1123))
 	}
+	if pol.Update.Binary {
+		fmt.Fprintf(&b, "Updates:    every %s from github.com/%s\n", pol.Update.Interval, cfg.UpdateRepo)
+	} else {
+		fmt.Fprintf(&b, "Updates:    off\n")
+	}
+	if !st.LastUpdateCheck.IsZero() {
+		fmt.Fprintf(&b, "Last check: %s\n", st.LastUpdateCheck.Format(time.RFC1123))
+	}
+	if st.UpdateError != "" {
+		fmt.Fprintf(&b, "Update err: %s\n", st.UpdateError)
+	}
 	return b.String(), nil
 }
 
-// currentPolicy refreshes policies.json from PolicyURL when there is one, and
-// falls back to the last good copy if the fetch fails.
+// currentPolicy refreshes policies.json from its update.policy_url, keeping the
+// last good copy if the fetch or the new policy fails, and applies the update
+// source pinned at install.
 func currentPolicy(ctx context.Context, env Env, cfg Config) (policy.Policy, error) {
 	path := filepath.Join(env.Dir, policy.FileName)
-	if cfg.PolicyURL != "" {
-		data, pol, err := readPolicy(ctx, env.Client, cfg.PolicyURL)
-		if err == nil {
-			return pol, writeFile(path, data, 0o600)
-		}
-		fmt.Fprintf(env.Out, "%s using the saved policy: %v\n", time.Now().Format(time.RFC3339), err)
+	pol, err := policy.Load(path)
+	if err != nil {
+		return pol, err
 	}
-	return policy.Load(path)
+	if u := pol.Update.PolicyURL; u != "" {
+		data, fresh, err := readPolicy(ctx, env.Client, u)
+		if err == nil {
+			err = writeFile(path, data, 0o600)
+		}
+		if err != nil {
+			fmt.Fprintf(env.Out, "%s using the saved policy: %v\n", time.Now().Format(time.RFC3339), err)
+		} else {
+			pol = fresh
+		}
+	}
+	if cfg.UpdateRepo != "" && (pol.Update.Repo != cfg.UpdateRepo || pol.Update.PublicKey != cfg.UpdateKey) {
+		fmt.Fprintf(env.Out, "%s policy asks for updates from %s with another key; keeping the source pinned at install (%s)\n",
+			time.Now().Format(time.RFC3339), pol.Update.Repo, cfg.UpdateRepo)
+	}
+	pol.Update.Repo, pol.Update.PublicKey = cfg.UpdateRepo, cfg.UpdateKey
+	return pol, nil
 }
 
 func isURL(s string) bool { return strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://") }

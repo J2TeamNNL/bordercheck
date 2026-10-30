@@ -1,5 +1,7 @@
 #!/bin/sh
-# Cross-compiles release binaries and SHA256SUMS into dist/.
+# Cross-compiles release binaries and SHA256SUMS into dist/, and signs
+# SHA256SUMS when $BORDERCHECK_SIGNING_KEY is set (required for releases:
+# installed copies only update to signed releases).
 # Usage: scripts/build-all.sh [version]
 set -eu
 cd "$(dirname "$0")/.."
@@ -17,4 +19,6 @@ done
 cd dist
 if command -v sha256sum >/dev/null; then sha256sum -- * >../SHA256SUMS; else shasum -a 256 -- * >../SHA256SUMS; fi
 mv ../SHA256SUMS .
-ls -l
+cd ..
+if [ -n "${BORDERCHECK_SIGNING_KEY:-}" ]; then go run ./scripts/sign dist/SHA256SUMS; fi
+ls -l dist

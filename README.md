@@ -48,6 +48,13 @@ beside the binary, else uses the built-in one.
     "include_evidence": false,                      // true also sends file paths, ports, names
     "email_domains": ["acme.com"]                   // emails people may install with
   },
+  "update": {
+    "binary": true,                                 // install newer signed releases
+    "policy_url": "https://bordercheck.acme.com/policies.json",  // refresh this file every hour
+    "interval": "24h",                              // how often to look for a newer binary
+    "repo": "ptrinh/bordercheck",                   // pinned at install, see below
+    "public_key": ""                                // "" = the official release key
+  },
   "checks": {
     "listeners": { "on_problem": "fail", "allow": [{ "process": "rapportd" }] },
     "firewall":  { "require_stealth": false },
@@ -75,14 +82,40 @@ That copies both files to `~/Library/Application Support/bordercheck` (macOS) or
 Scheduler; no admin rights), and sends a first report straight away. The service sends a report whenever
 `report.interval` has passed since the last one that got through, so a failed send retries the next hour.
 
-`install -policy https://…/policies.json` instead fetches the policy from your server before every report,
-keeping the last good copy if the fetch fails: change the policy centrally, no reinstall.
-
 ```sh
-bordercheck status               # email, policy, service, last report, last error
+bordercheck status               # email, policy, service, last report, updates
 bordercheck send -force          # send a report now
+bordercheck update               # refresh the policy and install a newer release now
 bordercheck uninstall
 ```
+
+`install -policy https://…/policies.json` installs from your server instead of the file beside the binary.
+
+## Updates
+
+**Policy.** With `update.policy_url`, every hourly run fetches `policies.json` from that URL and keeps the last
+good copy if the fetch fails or the new file is invalid. Change rules, the report endpoint or the update settings
+in one place; no reinstall.
+
+**Binary.** With `update.binary`, once every `update.interval` the service reads
+`github.com/<repo>/releases/latest/download/SHA256SUMS` (GitHub's CDN, not the rate-limited API) and installs the
+newer binary for its OS and architecture only if:
+
+1. `SHA256SUMS.sig` is a valid ed25519 signature by the trusted key,
+2. the binary matches its line in `SHA256SUMS`,
+3. its version is newer (never a downgrade), and
+4. it runs and reports that version.
+
+Otherwise it keeps the current binary and records why (`bordercheck status`). A failed update never stops a
+report. Development builds (`dev`) never update themselves.
+
+`update.repo` and `update.public_key` decide what code runs on every machine, so they are **pinned at install**:
+a policy fetched from `policy_url` cannot change them, and whoever controls your policy server cannot push a
+binary. Changing them needs a reinstall.
+
+Releases are signed in CI: `go run ./scripts/sign -keygen` makes the key pair; the private half goes in the
+`BORDERCHECK_SIGNING_KEY` repo secret (never in a file) and the public half in `internal/update.OfficialKey`.
+Forks use their own pair and set `update.public_key`.
 
 The report is the same JSON as `bordercheck -json`, plus `email` and `install_id`:
 
@@ -126,7 +159,7 @@ check it against `SHA256SUMS`. Signed binaries, Homebrew and winget are planned.
 
 ## Roadmap
 
-- Signed and notarized binaries; Homebrew tap and winget
+- Code-signed and notarized binaries; Homebrew tap and winget
 - SSH keys without a passphrase; Remote Login / Screen Sharing / RDP on
 - AI agent configs: tokens in MCP config files, agents running without a sandbox
 - Outdated OS, browsers and packages

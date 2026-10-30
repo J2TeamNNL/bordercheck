@@ -32,6 +32,7 @@ const usage = `Usage:
                                                      report to your organisation every hour as a service
   bordercheck status                                 show the install and the last report sent
   bordercheck send [-force]                          what the service runs; -force sends a report now
+  bordercheck update                                 refresh the policy and install a newer signed release now
   bordercheck uninstall
   bordercheck -list | -print-policy | -version
 
@@ -44,7 +45,7 @@ func main() { os.Exit(run(os.Args[1:])) }
 func run(args []string) int {
 	if len(args) > 0 {
 		switch args[0] {
-		case "install", "uninstall", "status", "send":
+		case "install", "uninstall", "status", "send", "update":
 			return runAgent(args[0], args[1:])
 		}
 	}
@@ -68,6 +69,10 @@ func runCheck(args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	if *showVersion { // before the policy: self-update runs this to see that a new binary works
+		fmt.Println("bordercheck", version)
+		return 0
+	}
 
 	pol, err := loadPolicy(*policyPath)
 	if err != nil {
@@ -79,9 +84,6 @@ func runCheck(args []string) int {
 		if err := pol.WriteJSON(os.Stdout); err != nil {
 			return fail(err)
 		}
-		return 0
-	case *showVersion:
-		fmt.Println("bordercheck", version)
 		return 0
 	case *list:
 		for _, c := range all {
@@ -177,6 +179,8 @@ func runAgent(cmd string, args []string) int {
 			env.Out = io.MultiWriter(os.Stdout, f)
 		}
 		err = agent.Send(ctx, env, *force)
+	case "update":
+		err = agent.Update(ctx, env)
 	}
 	if err != nil {
 		return fail(err)
