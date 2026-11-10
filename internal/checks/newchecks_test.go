@@ -199,7 +199,7 @@ func TestGatherAndEvalSSH(t *testing.T) {
 	p.AuthorizedKeys, p.LoosePermissions = false, false
 	p.AllowKeys = []string{"~/keys/*", "~/.ssh/id_open"}
 	r = evalSSHKeys(keys, auth, p)
-	if r.Status != check.Warn || len(r.Evidence) != 1 || !strings.Contains(r.Evidence[0], "~/.ssh/id_ed25519") {
+	if r.Status != check.Warn || len(r.Evidence) != 1 || !strings.Contains(filepath.ToSlash(r.Evidence[0]), "~/.ssh/id_ed25519") {
 		t.Errorf("allow + toggles: %s %q", r.Status, r.Evidence)
 	}
 	p.NoPassphrase = false
