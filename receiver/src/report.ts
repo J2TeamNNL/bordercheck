@@ -3,6 +3,8 @@
 // here and escaped wherever they are shown. Unknown fields are ignored (and
 // kept in the stored raw report); unknown statuses are kept as they are.
 
+import { parseParts, type Part } from "./checktext";
+
 export interface Waiver {
   until: string;
   reason: string;
@@ -17,6 +19,9 @@ export interface Result {
   fix: string;
   evidence: string[];
   waived?: Waiver;
+  // summary and fix as message keys, for showing them translated (checktext.ts).
+  summary_parts?: Part[];
+  fix_parts?: Part[];
 }
 
 export interface Report {
@@ -146,6 +151,10 @@ export function parseReport(raw: unknown): Report {
       fix: str(o.fix, 2000),
       evidence: Array.isArray(o.evidence) ? o.evidence.slice(0, 100).map((e) => str(e, 500)) : [],
     };
+    const sp = parseParts(o.summary_parts);
+    if (sp) res.summary_parts = sp;
+    const fp = parseParts(o.fix_parts);
+    if (fp) res.fix_parts = fp;
     const w = obj(o.waived);
     if (o.waived !== undefined && (w.until !== undefined || w.reason !== undefined)) {
       res.waived = { until: str(w.until, 32), reason: str(w.reason, 500) };

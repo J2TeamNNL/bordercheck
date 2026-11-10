@@ -1,9 +1,11 @@
 package checks
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 )
 
 // The built-in firewalls of macOS and (by default) Windows only filter
@@ -13,24 +15,21 @@ import (
 
 // outboundAdvice is what the suggestion says on one OS.
 type outboundAdvice struct {
-	examples string // "such as …" in the summary
-	fix      string
+	none msg.Part // "no outbound firewall (such as …)", for the summary
+	fix  msg.Part
 }
 
 // outboundApps are the macOS outbound firewalls bordercheck recognises, by
 // their app bundle in /Applications or ~/Applications.
 var outboundApps = []string{"LuLu", "Little Snitch", "Radio Silence", "Vallum"}
 
-var outboundMac = outboundAdvice{examples: "LuLu or Little Snitch",
-	fix: "Install a free outbound firewall such as LuLu from Objective-See " +
-		"(https://objective-see.org/products/lulu.html, open source): it asks before an app connects out, " +
-		"so malware phoning home or a program sending your data somewhere shows up."}
+var outboundMac = outboundAdvice{none: msg.P("outbound.none.mac"), fix: msg.P("outbound.fix.mac")}
 
-var outboundWin = outboundAdvice{examples: "simplewall, or Windows Firewall blocking outgoing connections by default",
-	fix: "Install simplewall (https://github.com/henrypp/simplewall, free and open source). Once its filters " +
-		"are enabled it blocks every app you have not allowed, so it will ask you to allow each app the first " +
-		"time it connects; then malware phoning home or a program sending your data somewhere shows up. " +
-		"Or ask IT to set Windows Firewall to block outgoing connections by default."}
+var outboundWin = outboundAdvice{none: msg.P("outbound.none.win"), fix: msg.P("outbound.fix.win")}
+
+// winFirewallOutbound is how evalWinOutbound names Windows Firewall when it
+// blocks outgoing connections by default.
+const winFirewallOutbound = "Windows Firewall (blocks outgoing connections by default)"
 
 // withOutbound adds the outbound-firewall suggestion to a firewall result when
 // found is empty. A passing firewall becomes a low-severity warn; a warn gains
@@ -39,20 +38,25 @@ var outboundWin = outboundAdvice{examples: "simplewall, or Windows Firewall bloc
 func withOutbound(r check.Result, found []string, adv outboundAdvice) check.Result {
 	if len(found) > 0 {
 		if r.Status == check.Pass {
-			r.Summary = strings.TrimSuffix(r.Summary, ".") + "; outgoing connections are filtered by " +
-				strings.Join(found, ", ") + "."
+			s := slices.Clone(r.SummaryParts)
+			apps := slices.DeleteFunc(slices.Clone(found), func(f string) bool { return f == winFirewallOutbound })
+			if len(apps) > 0 {
+				s = append(s, msg.P("outbound.found", "apps", strings.Join(apps, ", ")))
+			}
+			if len(apps) < len(found) {
+				s = append(s, msg.P("outbound.found.winFw"))
+			}
+			r = r.WithSummary(s)
 		}
 		return r
 	}
-	none := "no outbound firewall (such as " + adv.examples + ") controls which apps connect out."
 	switch r.Status {
 	case check.Pass:
 		r.Status, r.Severity = check.Warn, check.Low
-		r.Summary = strings.TrimSuffix(r.Summary, ".") + ", but " + none
-		r.Fix = adv.fix
+		r = r.WithSummary(append(slices.Clone(r.SummaryParts), adv.none)).WithFix(msg.Text{adv.fix})
 	case check.Warn:
-		r.Summary += " Also, " + none
-		r.Fix += " " + adv.fix
+		r = r.WithSummary(append(slices.Clone(r.SummaryParts), adv.none)).
+			WithFix(append(slices.Clone(r.FixParts), adv.fix))
 	}
 	return r
 }
@@ -165,7 +169,7 @@ func evalWinOutbound(f winOutboundFacts) []string {
 		}
 	}
 	if len(f.Profiles)+len(f.GPO) > 0 && winOutboundBlocked(f) {
-		found = append(found, "Windows Firewall (blocks outgoing connections by default)")
+		found = append(found, winFirewallOutbound)
 	}
 	return found
 }

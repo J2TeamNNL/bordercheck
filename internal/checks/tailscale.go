@@ -3,11 +3,11 @@ package checks
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"runtime"
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
 
@@ -23,15 +23,14 @@ func tailscale(ctx context.Context) check.Result {
 	}
 	bin, ok := sysx.Find("tailscale", fallbacks...)
 	if !ok {
-		return check.Skipped("Tailscale is not installed.")
+		return check.SkippedMsg(msg.Of("tailscale.notInstalled"))
 	}
 	out, err := sysx.Run(ctx, bin, "debug", "prefs")
 	if err != nil && runtime.GOOS == "linux" && strings.Contains(strings.ToLower(err.Error()), "denied") {
-		return check.Skipped("Only root or the Tailscale operator may read Tailscale's settings here. Run " +
-			"sudo tailscale set --operator=$USER once, or sudo bordercheck -only tailscale. (" + err.Error() + ")")
+		return check.SkippedMsg(msg.Of("tailscale.denied", "err", err.Error()))
 	}
 	if err != nil {
-		return check.Skipped("Could not read Tailscale settings; is Tailscale running? (" + err.Error() + ")")
+		return check.SkippedMsg(msg.Of("tailscale.unreadable", "err", err.Error()))
 	}
 	return evalTailscalePrefs(out)
 }
@@ -41,15 +40,11 @@ func tailscale(ctx context.Context) check.Result {
 func evalTailscalePrefs(out string) check.Result {
 	var p struct{ ShieldsUp *bool }
 	if err := json.Unmarshal([]byte(out), &p); err != nil || p.ShieldsUp == nil {
-		return check.Errored(errors.New("unexpected output from `tailscale debug prefs`"))
+		return check.Errored(msg.Err("tailscale.badPrefs"))
 	}
 	if *p.ShieldsUp {
-		return check.Result{Status: check.Pass,
-			Summary: "Shields up: other devices on the tailnet cannot open connections to this machine."}
+		return check.Result{Status: check.Pass}.WithSummary(msg.Of("tailscale.shieldsUp"))
 	}
-	return check.Result{Status: check.Fail, Severity: check.High,
-		Summary: "Tailscale accepts incoming connections. Tailscale traffic may bypass the OS firewall, so any " +
-			"device on the tailnet, including a hacked one, can reach every port this machine listens on.",
-		Fix: "Tailscale → Settings → untick \"Allow incoming connections\". Or: tailscale set --shields-up. " +
-			"Admins: also limit who can reach whom with tailnet ACLs."}
+	return check.Result{Status: check.Fail, Severity: check.High}.
+		WithSummary(msg.Of("tailscale.open")).WithFix(msg.Of("tailscale.open.fix"))
 }

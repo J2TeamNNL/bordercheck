@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
@@ -32,7 +33,7 @@ func screenLock(opts policy.ScreenLock) func(context.Context) check.Result {
 			return check.Errored(err)
 		}
 		if f.Family == "" {
-			return check.Skipped("No desktop whose screen lock bordercheck can read (GNOME and KDE Plasma are supported).")
+			return check.SkippedMsg(msg.Of("screenlock.noDesktop"))
 		}
 		return evalScreenLock(f, opts)
 	}
@@ -54,65 +55,50 @@ func minutesText(d time.Duration) string {
 
 func evalScreenLock(f lockFacts, opts policy.ScreenLock) check.Result {
 	if f.PasswordOnWake == nil && !f.LockKnown {
-		return check.Result{Status: check.Error, Evidence: f.Details,
-			Summary: "Could not tell whether a password is needed after sleep or when the screen locks."}
+		return check.Result{Status: check.Error, Evidence: f.Details}.WithSummary(msg.Of("screenlock.unknown"))
 	}
 	var p issueList
-	var notes []string
+	var notes msg.Text
 	fixes := lockFixes[f.Family]
 	noPassword := f.PasswordOnWake != nil && !*f.PasswordOnWake
 	if opts.RequirePassword == nil || *opts.RequirePassword {
 		switch {
 		case f.PasswordOnWake == nil:
-			notes = append(notes, "Could not tell whether a password is needed after sleep.")
+			notes = append(notes, msg.P("screenlock.passwordUnknown"))
 		case noPassword:
-			p.add(true, "No password is needed to get back in after sleep or the screen saver.", fixes[0])
+			p.add(true, msg.Of("screenlock.noPassword"), fixes[0])
 		}
 	}
 	max := time.Duration(opts.MaxLockMinutes) * time.Minute
 	if max > 0 && !noPassword { // without a password, nothing ever locks; reported above
 		switch {
 		case !f.LockKnown:
-			notes = append(notes, "Could not tell when the screen locks by itself.")
+			notes = append(notes, msg.P("screenlock.idleUnknown"))
 		case f.Never:
-			p.add(true, "The screen never locks by itself when the machine is left alone.", fixes[1])
+			p.add(true, msg.Of("screenlock.never"), fixes[1])
 		case f.LockAfter > max:
-			p.add(false, fmt.Sprintf("The screen locks only after %s idle (policy: %s).", minutesText(f.LockAfter), minutesText(max)), fixes[1])
+			p.add(false, msg.Of("screenlock.tooLate", "after", int(f.LockAfter.Seconds()), "max", int(max.Seconds())), fixes[1])
 		}
 	}
-	var pass []string
-	if f.PasswordOnWake != nil && *f.PasswordOnWake {
-		pass = append(pass, "A password is needed after sleep")
+	password := f.PasswordOnWake != nil && *f.PasswordOnWake
+	idle := f.LockKnown && !f.Never
+	var pass msg.Text
+	switch after := int(f.LockAfter.Seconds()); {
+	case password && idle:
+		pass = msg.Of("screenlock.passBoth", "after", after)
+	case password:
+		pass = msg.Of("screenlock.passPassword")
+	case idle:
+		pass = msg.Of("screenlock.passIdle", "after", after)
 	}
-	if f.LockKnown && !f.Never {
-		pass = append(pass, fmt.Sprintf("the screen locks after %s idle", minutesText(f.LockAfter)))
-	}
-	s := strings.Join(pass, " and ")
-	if s != "" {
-		s = strings.ToUpper(s[:1]) + s[1:] + "."
-	}
-	return p.result(s, notes, f.Details)
+	return p.result(pass, notes, f.Details)
 }
 
-var lockFixes = map[string][2]string{
-	"macos": {
-		"System Settings → Lock Screen → \"Require password after screen saver begins or display is turned off\" → Immediately.",
-		"System Settings → Lock Screen → set \"Turn display off on battery when inactive\" and \"…on power adapter when inactive\" " +
-			"(and \"Start Screen Saver when inactive\", if used) to the policy's limit or less.",
-	},
-	"windows": {
-		"Settings → Accounts → Sign-in options → \"If you've been away, when should Windows require you to sign in again?\" → When PC wakes up from sleep.",
-		"Settings → System → Power & battery → Screen, sleep & hibernate timeouts → put the device to sleep within the policy's limit " +
-			"(on battery and plugged in), or Settings → Personalization → Lock screen → Screen saver → a short wait with \"On resume, display logon screen\".",
-	},
-	"gnome": {
-		"Settings → Privacy & Security → Screen Lock → turn on Automatic Screen Lock and Lock Screen on Suspend, Automatic Screen Lock Delay → Screen Turns Off.",
-		"Settings → Power → Screen Blank → the policy's limit or less, and Settings → Privacy & Security → Screen Lock → Automatic Screen Lock on.",
-	},
-	"kde": {
-		"System Settings → Screen Locking → turn on \"After waking from sleep\".",
-		"System Settings → Screen Locking → \"Lock screen automatically\" after the policy's limit or less.",
-	},
+var lockFixes = map[string][2]msg.Part{
+	"macos":   {msg.P("screenlock.fix.macos.password"), msg.P("screenlock.fix.macos.idle")},
+	"windows": {msg.P("screenlock.fix.windows.password"), msg.P("screenlock.fix.windows.idle")},
+	"gnome":   {msg.P("screenlock.fix.gnome.password"), msg.P("screenlock.fix.gnome.idle")},
+	"kde":     {msg.P("screenlock.fix.kde.password"), msg.P("screenlock.fix.kde.idle")},
 }
 
 // ---- macOS ----

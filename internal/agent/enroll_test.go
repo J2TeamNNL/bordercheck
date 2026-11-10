@@ -124,7 +124,9 @@ func newPortal(t *testing.T) *portal {
 func enrollEnv(t *testing.T, p *portal) (Env, *strings.Builder) {
 	t.Helper()
 	out := &strings.Builder{}
-	return Env{Dir: filepath.Join(t.TempDir(), "bordercheck"), Version: "v1.0.0", Client: p.srv.Client(), Out: out}, out
+	// GitHub points at the fake portal too: a test must never reach the real
+	// github.com for an update, which it would with an empty GitHub.
+	return Env{Dir: filepath.Join(t.TempDir(), "bordercheck"), Version: "v1.0.0", Client: p.srv.Client(), Out: out, GitHub: p.url()}, out
 }
 
 func readCfg(t *testing.T, env Env) Config {

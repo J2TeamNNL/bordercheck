@@ -140,7 +140,7 @@ func TestWinUpdateFacts(t *testing.T) {
 	f = winUpdateFacts(kvLines(out))
 	r = evalOSUpdates(f, nil, opts, mustTime(t, "2026-11-10T12:00:00Z"))
 	for _, want := range []string{"Windows 10 22H2 (build 19045.6093) is older than the minimum version build 26100",
-		"the Windows Update service is disabled; a policy turns automatic updates off", "paused until 1 Dec 2026",
+		"Automatic updates are off. The Windows Update service is disabled. A policy turns automatic updates off.", "paused until 1 Dec 2026",
 		"last checked for updates 101 days ago", "need a restart", "No OS update has been installed for 124 days"} {
 		if !strings.Contains(r.Summary, want) {
 			t.Errorf("missing %q in %q", want, r.Summary)
@@ -188,7 +188,7 @@ ID_LIKE=debian
 	f := updateFacts{Family: "debian", Name: "Ubuntu 24.04.1 LTS", Key: "ubuntu", Version: "24.04", AutoUpdate: &on,
 		LastCheck: now.Add(-24 * time.Hour), PendingKnown: true, PendingCount: 12, LastInstall: now.Add(-20 * 24 * time.Hour)}
 	r := evalOSUpdates(f, nil, policy.Default().Checks.OSUpdates, now)
-	if r.Status != check.Fail || !strings.Contains(r.Summary, "12 update(s) are waiting and nothing has been installed for 20 days") ||
+	if r.Status != check.Fail || !strings.Contains(r.Summary, "12 updates are waiting and nothing has been installed for 20 days") ||
 		!strings.Contains(r.Fix, "apt full-upgrade") {
 		t.Errorf("ubuntu: got %s %q %q", r.Status, r.Summary, r.Fix)
 	}

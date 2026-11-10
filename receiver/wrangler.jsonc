@@ -25,7 +25,7 @@
   "triggers": { "crons": ["0 * * * *"] },
 
   // Secrets are not set here. See README: ADMIN_TOKEN, ALERT_WEBHOOK_URL,
-  // and optionally MCP_TOKEN / MCP_READ_TOKEN.
+  // and optionally MCP_TOKEN / MCP_READ_TOKEN, API_TOKEN / API_READ_TOKEN.
   "vars": {
     "DASHBOARD_URL": "",            // e.g. https://bordercheck.acme.com, for links in alerts
     "ACCESS_TEAM_DOMAIN": "",       // e.g. acme.cloudflareaccess.com

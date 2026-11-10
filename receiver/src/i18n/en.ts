@@ -365,9 +365,10 @@ export const en = {
   // Audit
   "audit.eyebrow": "Accountability",
   "audit.title": "Audit trail",
-  "audit.lead": "Every change made in the dashboard, by the admin token or through the MCP server, and every enrollment. Newest first, last 500. MCP rows record the tool and its arguments: review what a model did here.",
+  "audit.lead": "Every change made in the dashboard, by the admin token, through the MCP server or through the REST API, and every enrollment. Newest first, last 500. MCP rows record the tool and its arguments (review what a model did here); API rows the method, path and arguments.",
   "audit.all": "all",
   "audit.mcpOnly": "MCP only",
+  "audit.apiOnly": "API only",
   "audit.thWhen": "When",
   "audit.thWho": "Who",
   "audit.thAction": "Action",

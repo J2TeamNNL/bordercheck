@@ -32,6 +32,7 @@ import {
 } from "./portal";
 import { selfReportPage } from "./selfreport";
 import { handleMcp } from "./mcp";
+import { API_BASE, handleApi } from "./api";
 
 const MAX_FORM_BYTES = 512 * 1024;
 
@@ -180,6 +181,7 @@ export default {
     if (cap && req.method === "GET") return selfReportPage(req, env, cap[1], undefined, L);
     if (cap && req.method === "POST") return switchLanguage(req, url, path);
     if (path === "/mcp") return handleMcp(req, env);
+    if (path === API_BASE || path.startsWith(API_BASE + "/")) return handleApi(req, env);
     if (path === "/healthz") return new Response("ok\n", { headers: { "cache-control": "no-store" } });
     if ((path === "/favicon.svg" || path === "/favicon.ico") && (req.method === "GET" || req.method === "HEAD")) {
       return new Response(FAVICON, {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
 
@@ -77,11 +78,11 @@ func diskEncryption(ctx context.Context) check.Result {
 	return evalLinuxDiskEncryption(vols)
 }
 
-func listListeners(ctx context.Context) ([]listener, string, error) {
+func listListeners(ctx context.Context) ([]listener, msg.Text, error) {
 	if ss, ok := sysx.Find("ss", "/usr/sbin/ss", "/usr/bin/ss", "/sbin/ss", "/bin/ss"); ok {
-		note := ""
+		var note msg.Text
 		if os.Geteuid() != 0 {
-			note = "Process names are shown only for your own processes; run with sudo to name system services."
+			note = msg.Of("listeners.note.linux")
 		}
 		out, err := sysx.Run(ctx, ss, "-l", "-t", "-n", "-p")
 		if err == nil {
@@ -100,7 +101,7 @@ func listListeners(ctx context.Context) ([]listener, string, error) {
 		ls = append(ls, parseProcNetTCP(string(data))...)
 	}
 	if ls == nil && lastErr != nil {
-		return nil, "", lastErr
+		return nil, nil, lastErr
 	}
-	return ls, "ss was not found, so process names are unknown.", nil
+	return ls, msg.Of("listeners.note.linuxNoSS"), nil
 }

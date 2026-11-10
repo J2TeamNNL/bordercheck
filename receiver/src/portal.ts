@@ -7,7 +7,7 @@
 // dashboard shows them in the admin's language and the MCP server in English.
 
 import samplePolicy from "./sample-policy.json";
-import { audit, auditStmt, auditStmtIf, MCP_ACTOR, MCP_READ_ACTOR } from "./audit";
+import { API_ACTOR, API_READ_ACTOR, audit, auditStmt, auditStmtIf, MCP_ACTOR, MCP_READ_ACTOR } from "./audit";
 import { commandBlock, installCommands, publicOrigin } from "./enroll";
 import { config, DAY, type Env } from "./env";
 import { COPY_HEADERS, copyButton, html, Html, layout, note, page, pill } from "./html";
@@ -16,7 +16,7 @@ import { CHECK_ID_RE, POLICY_CHECKS, today, validateRolePolicy, waiverDateError 
 import { newCode, sha256hex } from "./tokens";
 
 const MAX_ROLE_POLICY = 256 * 1024;
-const MAX_BULK = 500;
+export const MAX_BULK = 500;
 const EMAIL_RE = /^[^\s@<>"'(),;:\\]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
 
 const machineLink = (id: string) => `/admin/machine/${encodeURIComponent(id)}`;
@@ -85,7 +85,9 @@ function roleForm(L: I18n, action: string, name: string, policy: string, label: 
 <div class="cmd"><code>bordercheck -policy role.json -print-policy</code></div></aside></div></form>`;
 }
 
-async function checkRole(env: Env, name: string, policyText: string, now: Date): Promise<{ errs: Msg[]; policy?: string }> {
+// checkRole is saveRole's validation without the save: the REST API uses it
+// to report every problem with a role at once.
+export async function checkRole(env: Env, name: string, policyText: string, now: Date): Promise<{ errs: Msg[]; policy?: string }> {
   const errs: Msg[] = [];
   if (!name) errs.push(msg("err.roleName"));
   if (policyText.length > MAX_ROLE_POLICY) return { errs: [...errs, msg("err.policyTooLarge")] };
@@ -106,10 +108,12 @@ function errorList(L: I18n, head: Key, errs: Msg[]): Html {
 
 // ---- Shared write operations ----
 //
-// The dashboard's forms and the MCP tools (mcp.ts) both go through these, so
+// The dashboard's forms, the MCP tools (mcp-tools.ts) and the REST API
+// (api.ts) all go through these (the last two by way of fleet.ts), so
 // validation, atomicity, limits and the audit trail are the same whichever
-// way a change is made. `extra` is merged into the audit row's detail (the MCP
-// server records the tool name and its arguments there).
+// way a change is made. `extra` is merged into the audit row's detail (MCP
+// records the tool name and its arguments there, the API the method, path and
+// arguments).
 
 export type AuditExtra = Record<string, unknown>;
 export type OpResult<T> = ({ ok: true } & T) | { ok: false; status: number; errors: Msg[] };
@@ -132,7 +136,7 @@ export async function saveRole(
   const ts = now.toISOString();
   if (input.id === undefined) {
     const exists = await env.DB.prepare("SELECT id FROM roles WHERE name = ?").bind(name).first();
-    if (exists) return { ok: false, status: 400, errors: [msg("err.roleExists")] };
+    if (exists) return { ok: false, status: 409, errors: [msg("err.roleExists")] };
     const id = await env.DB.prepare("INSERT INTO roles (name, policy, created_at, updated_at) VALUES (?, ?, ?, ?) RETURNING id")
       .bind(name, policy, ts, ts)
       .first<number>("id");
@@ -141,7 +145,7 @@ export async function saveRole(
   }
   const id = input.id;
   const clash = await env.DB.prepare("SELECT id FROM roles WHERE name = ? AND id != ?").bind(name, id).first();
-  if (clash) return { ok: false, status: 400, errors: [msg("err.roleClash")] };
+  if (clash) return { ok: false, status: 409, errors: [msg("err.roleClash")] };
   const policyChanged = old!.policy !== policy;
   await env.DB.batch([
     env.DB.prepare("UPDATE roles SET name = ?, policy = ?, updated_at = ? WHERE id = ?").bind(name, policy, ts, id),
@@ -252,18 +256,24 @@ async function roleOptions(env: Env, selected?: number): Promise<Html> {
 export type InviteFilter = (typeof INVITE_FILTERS)[number];
 export const isInviteFilter = (f: string): f is InviteFilter => (INVITE_FILTERS as readonly string[]).includes(f);
 
-// inviteRows lists invites by state, newest first, with per-state counts.
-// Never selects code_hash.
-export async function inviteRows(env: Env, filter: InviteFilter, limit: number): Promise<{ rows: InviteRow[]; counts: Record<string, number> }> {
+// inviteRows lists invites by state, newest first, with per-state counts (of
+// all invites, whatever the other options). `before` (an invite id) is where
+// a cursor resumes; `email` keeps one person's invites. Never selects code_hash.
+export async function inviteRows(
+  env: Env,
+  filter: InviteFilter,
+  limit: number,
+  o: { before?: number; email?: string } = {},
+): Promise<{ rows: InviteRow[]; counts: Record<string, number> }> {
   const nowIso = new Date().toISOString();
   const rows = await env.DB.prepare(
     `SELECT i.id, i.email, r.name AS role, i.note, i.created_at, i.created_by, i.expires_at, i.used_at, i.used_install_id,
             i.revoked_at, i.reissued_as, ${STATUS_SQL} AS status
      FROM invites i JOIN roles r ON r.id = i.role_id
-     WHERE ?2 = 'all' OR ${STATUS_SQL} = ?2
+     WHERE (?2 = 'all' OR ${STATUS_SQL} = ?2) AND (?4 = 0 OR i.id < ?4) AND (?5 = '' OR i.email = ?5)
      ORDER BY i.id DESC LIMIT ?3`,
   )
-    .bind(nowIso, filter, limit)
+    .bind(nowIso, filter, limit, o.before ?? 0, (o.email ?? "").toLowerCase())
     .all<InviteRow>();
   const counts = await env.DB.prepare(`SELECT ${STATUS_SQL} AS status, COUNT(*) AS n FROM invites i GROUP BY 1`)
     .bind(nowIso)
@@ -666,24 +676,31 @@ export interface AuditRow {
   detail: string;
 }
 
-// auditRows: newest first. mcpOnly keeps the rows written through the MCP
-// server (actor "mcp" or "mcp (read-only)").
-export async function auditRows(env: Env, limit: number, mcpOnly = false): Promise<AuditRow[]> {
+// Which rows: all, those written through the MCP server (actor "mcp" or
+// "mcp (read-only)"), or through the REST API ("api" or "api (read-only)").
+export type AuditFilter = "all" | "mcp" | "api";
+
+// auditRows: newest first. `before` (an audit id) is where a cursor resumes.
+export async function auditRows(env: Env, limit: number, filter: AuditFilter = "all", before = 0): Promise<AuditRow[]> {
+  const [a, b] = filter === "api" ? [API_ACTOR, API_READ_ACTOR] : [MCP_ACTOR, MCP_READ_ACTOR];
   const rows = await env.DB.prepare(
-    "SELECT id, at, who, action, target, detail FROM audit WHERE ?1 = 0 OR who IN (?2, ?3) ORDER BY id DESC LIMIT ?4",
-  ).bind(mcpOnly ? 1 : 0, MCP_ACTOR, MCP_READ_ACTOR, limit).all<AuditRow>();
+    "SELECT id, at, who, action, target, detail FROM audit WHERE (?1 = 0 OR who IN (?2, ?3)) AND (?5 = 0 OR id < ?5) ORDER BY id DESC LIMIT ?4",
+  ).bind(filter === "all" ? 0 : 1, a, b, limit, before).all<AuditRow>();
   return rows.results;
 }
 
+const isAutomation = (who: string) => who === MCP_ACTOR || who === MCP_READ_ACTOR || who === API_ACTOR || who === API_READ_ACTOR;
+
 export async function auditPage(env: Env, url: URL, who: string, L: I18n): Promise<Response> {
-  const mcpOnly = url.searchParams.get("who") === "mcp";
-  const rows = { results: await auditRows(env, 500, mcpOnly) };
+  const w = url.searchParams.get("who");
+  const filter: AuditFilter = w === "mcp" || w === "api" ? w : "all";
+  const rows = { results: await auditRows(env, 500, filter) };
   const body = html`<div class="hero"><p class="eyebrow">${L.t("audit.eyebrow")}</p><h1>${L.t("audit.title")}</h1>
 <p class="lead">${L.t("audit.lead")}</p></div>
-<div class="toolbar"><nav class="seg" aria-label="${L.s("audit.thWho")}"><a class="${mcpOnly ? "" : "on"}" href="/admin/audit">${L.t("audit.all")}</a><a class="${mcpOnly ? "on" : ""}" href="/admin/audit?who=mcp">${L.t("audit.mcpOnly")}</a></nav></div>
+<div class="toolbar"><nav class="seg" aria-label="${L.s("audit.thWho")}"><a class="${filter === "all" ? "on" : ""}" href="/admin/audit">${L.t("audit.all")}</a><a class="${filter === "mcp" ? "on" : ""}" href="/admin/audit?who=mcp">${L.t("audit.mcpOnly")}</a><a class="${filter === "api" ? "on" : ""}" href="/admin/audit?who=api">${L.t("audit.apiOnly")}</a></nav></div>
 <div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("audit.thWhen")}</th><th>${L.t("audit.thWho")}</th><th>${L.t("audit.thAction")}</th><th>${L.t("audit.thTarget")}</th><th>${L.t("audit.thDetail")}</th></tr></thead><tbody>
 ${rows.results.map(
-    (a) => html`<tr><td class="nowrap">${L.when(a.at)}</td><td class="wrap">${a.who.startsWith("mcp") ? pill("s-error", a.who) : a.who}</td><td class="nowrap"><code>${a.action}</code></td><td class="wrap">${
+    (a) => html`<tr><td class="nowrap">${L.when(a.at)}</td><td class="wrap">${isAutomation(a.who) ? pill("s-error", a.who) : a.who}</td><td class="nowrap"><code>${a.action}</code></td><td class="wrap">${
       /^[0-9a-f]{32}$/.test(a.target) ? html`<a class="u mono" href="${machineLink(a.target)}">${a.target}</a>` : a.target
     }</td><td class="ev wrap">${a.detail === "{}" ? "" : a.detail}</td></tr>`,
   )}</tbody></table></div>${rows.results.length === 0 ? html`<p class="empty">${L.t("audit.empty")}</p>` : ""}</div>`;

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
 
@@ -62,7 +63,7 @@ func screenLockOS(ctx context.Context) (lockFacts, error) {
 	return winLockFacts(kvLines(out), sleep, lock), nil
 }
 
-func remoteServicesOS(ctx context.Context) ([]remoteService, []string, error) {
+func remoteServicesOS(ctx context.Context) ([]remoteService, msg.Text, error) {
 	out, err := sysx.PowerShellScript(ctx, winRemoteScript)
 	if err != nil {
 		return nil, nil, err

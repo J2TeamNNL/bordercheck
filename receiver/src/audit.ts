@@ -32,3 +32,7 @@ export async function audit(env: Env, who: string, action: string, target: strin
 // audit page can filter on them.
 export const MCP_ACTOR = "mcp";
 export const MCP_READ_ACTOR = "mcp (read-only)";
+
+// REST API actors, likewise ("api (read-only)" appears only on refused writes).
+export const API_ACTOR = "api";
+export const API_READ_ACTOR = "api (read-only)";

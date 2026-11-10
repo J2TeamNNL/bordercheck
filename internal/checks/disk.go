@@ -7,38 +7,37 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 )
 
 // evalFileVault judges `fdesetup status`.
 func evalFileVault(out string) check.Result {
 	switch {
 	case strings.Contains(out, "FileVault is On"):
-		return check.Result{Status: check.Pass, Summary: "FileVault is on."}
+		return check.Result{Status: check.Pass}.WithSummary(msg.Of("disk.mac.on"))
 	case strings.Contains(out, "FileVault is Off"):
-		return check.Result{Status: check.Fail, Severity: check.High,
-			Summary: "FileVault is off: anyone who takes this Mac can read its disk.",
-			Fix:     "System Settings → Privacy & Security → FileVault → Turn On."}
+		return check.Result{Status: check.Fail, Severity: check.High}.
+			WithSummary(msg.Of("disk.mac.off")).WithFix(msg.Of("disk.mac.off.fix"))
 	}
-	return check.Result{Status: check.Warn, Severity: check.Medium,
-		Summary: "FileVault is not fully on: " + firstLine(out)}
+	return check.Result{Status: check.Warn, Severity: check.Medium}.
+		WithSummary(msg.Of("disk.mac.partial", "status", firstLine(out)))
 }
 
 // evalBitLocker judges the System.Volume.BitLockerProtection value of the system
 // drive, which Windows reports without admin rights: 1 = on, 2 = off, other values
 // mean in progress, suspended or locked.
 func evalBitLocker(code string) check.Result {
-	fix := "Settings → Privacy & security → Device encryption, or Control Panel → BitLocker Drive Encryption → turn on."
+	fix := msg.Of("disk.win.fix")
 	switch code = strings.TrimSpace(code); code {
 	case "1":
-		return check.Result{Status: check.Pass, Summary: "BitLocker is on for the system drive."}
+		return check.Result{Status: check.Pass}.WithSummary(msg.Of("disk.win.on"))
 	case "2":
-		return check.Result{Status: check.Fail, Severity: check.High,
-			Summary: "BitLocker is off: anyone who takes this PC can read its disk.", Fix: fix}
+		return check.Result{Status: check.Fail, Severity: check.High}.WithSummary(msg.Of("disk.win.off")).WithFix(fix)
 	case "":
-		return check.Skipped("Windows did not report BitLocker status for the system drive.")
+		return check.SkippedMsg(msg.Of("disk.win.unknown"))
 	}
-	return check.Result{Status: check.Warn, Severity: check.Medium,
-		Summary: "BitLocker is not fully on for the system drive (status " + code + ").", Fix: fix}
+	return check.Result{Status: check.Warn, Severity: check.Medium}.
+		WithSummary(msg.Of("disk.win.partial", "code", code)).WithFix(fix)
 }
 
 // linuxVolume is one mount and what it sits on.
@@ -54,45 +53,47 @@ var virtualFS = map[string]bool{"tmpfs": true, "overlay": true, "squashfs": true
 // evalLinuxDiskEncryption judges / and /home (when it is separate): each must
 // sit on dm-crypt (LUKS) or be an encrypted ZFS dataset.
 func evalLinuxDiskEncryption(vols []linuxVolume) check.Result {
-	var plain, unknown []string
+	var plain []string
+	var unknown msg.Text
 	for _, v := range vols {
 		switch {
 		case v.FSType == "zfs" && v.ZFSEncryption == "":
-			unknown = append(unknown, v.Mount+" (ZFS, encryption unknown)")
+			unknown = append(unknown, msg.P("disk.linux.unknownZFS", "mount", v.Mount))
 		case v.FSType == "zfs" && v.ZFSEncryption == "off":
 			plain = append(plain, v.Mount)
 		case v.FSType == "zfs":
 		case virtualFS[v.FSType]:
-			unknown = append(unknown, v.Mount+" ("+v.FSType+": a live system or container)")
+			unknown = append(unknown, msg.P("disk.linux.unknownVirtual", "mount", v.Mount, "fstype", v.FSType))
 		case len(v.Chain) == 0:
-			unknown = append(unknown, v.Mount+" (could not find the device under "+v.Source+")")
+			unknown = append(unknown, msg.P("disk.linux.unknownDevice", "mount", v.Mount, "source", v.Source))
 		case !slices.ContainsFunc(v.Chain, func(d string) bool { return strings.HasSuffix(d, " crypt") }):
 			plain = append(plain, v.Mount)
 		}
 	}
 	switch {
 	case len(vols) == 0:
-		return check.Skipped("Could not find the root filesystem in /proc/self/mounts.")
+		return check.SkippedMsg(msg.Of("disk.linux.noRoot"))
 	case len(plain) > 0:
-		return check.Result{Status: check.Fail, Severity: check.High,
-			Summary:  strings.Join(plain, " and ") + " is not on an encrypted disk: anyone who takes this machine can read it.",
-			Evidence: chainEvidence(vols),
-			Fix: "Linux cannot easily encrypt a disk in use: back up, reinstall and choose \"Encrypt the new installation\" " +
-				"(LUKS), then restore. Experts: cryptsetup reencrypt --encrypt from a live USB."}
+		s := msg.Of("disk.linux.plain", "mount", plain[0])
+		if len(plain) > 1 {
+			s = msg.Of("disk.linux.plainBoth", "mount", strings.Join(plain[:len(plain)-1], ", "), "other", plain[len(plain)-1])
+		}
+		return check.Result{Status: check.Fail, Severity: check.High, Evidence: chainEvidence(vols)}.
+			WithSummary(s).WithFix(msg.Of("disk.linux.plain.fix"))
 	case len(unknown) > 0:
-		return check.Skipped("Could not tell whether the disk is encrypted: " + strings.Join(unknown, "; ") + ".")
+		return check.SkippedMsg(append(msg.Of("disk.linux.unknown"), unknown...))
 	}
-	return check.Result{Status: check.Pass, Summary: "The disk is encrypted (" + encryptedHow(vols) + ").",
-		Evidence: chainEvidence(vols)}
+	return check.Result{Status: check.Pass, Evidence: chainEvidence(vols)}.WithSummary(msg.Of(encryptedHow(vols)))
 }
 
+// encryptedHow is the message key that says how the disk is encrypted.
 func encryptedHow(vols []linuxVolume) string {
 	for _, v := range vols {
 		if v.FSType == "zfs" {
-			return "ZFS native encryption"
+			return "disk.linux.onZFS"
 		}
 	}
-	return "LUKS / dm-crypt"
+	return "disk.linux.onLUKS"
 }
 
 func chainEvidence(vols []linuxVolume) []string {

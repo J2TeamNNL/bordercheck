@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
@@ -189,20 +190,12 @@ func (s *secretScanner) ignored(shown string) bool {
 	return false
 }
 
-func secretFix() string {
-	rotate := " Keys that sat in shell history or a synced folder may already have leaked: rotate them."
-	switch runtime.GOOS {
-	case "darwin":
-		return "Move each key into the Keychain behind Touch ID with touchenv (https://github.com/ptrinh/touch-env): " +
-			"touchenv set NAME, then delete the line or file." + rotate
-	case "windows":
-		return "Move each key into Windows Credential Manager or a password manager CLI (e.g. 1Password `op run`), " +
-			"then delete the line or file." + rotate
-	case "linux":
-		return "Move each key into the desktop keyring (secret-tool store / secret-tool lookup, from libsecret) or a " +
-			"password manager CLI such as pass or 1Password `op run`, then delete the line or file." + rotate
+func secretFix() msg.Text {
+	where := map[string]string{"darwin": "secrets.fix.mac", "windows": "secrets.fix.win", "linux": "secrets.fix.linux"}[runtime.GOOS]
+	if where == "" {
+		where = "secrets.fix.other"
 	}
-	return "Move each key into a password manager or the OS keyring, then delete the line or file." + rotate
+	return msg.Text{msg.P(where), msg.P("secrets.fix.rotate")}
 }
 
 // find returns the known credential files and the policy's extra files that
@@ -363,14 +356,13 @@ func isPlaceholder(v string) bool {
 	return strings.Trim(l, l[:1]) == "" // one character repeated
 }
 
-func evalSecrets(found []secretFinding, bundles []string, incomplete bool, fix string) check.Result {
-	note := ""
+func evalSecrets(found []secretFinding, bundles []string, incomplete bool, fix msg.Text) check.Result {
+	var note msg.Text
 	if incomplete {
-		note = " The scan hit its time limit, so some folders were not checked."
+		note = msg.Of("secrets.incomplete")
 	}
 	if len(found)+len(bundles) == 0 {
-		return check.Result{Status: check.Pass,
-			Summary: "No plain-text secrets in shell files, shell history, credential files or .env files." + note}
+		return check.Result{Status: check.Pass}.WithSummary(append(msg.Of("secrets.pass"), note...))
 	}
 	sort.SliceStable(found, func(i, j int) bool { return found[i].high() && !found[j].high() })
 	files, prod, high := map[string]bool{}, 0, false
@@ -390,11 +382,12 @@ func evalSecrets(found []secretFinding, bundles []string, incomplete bool, fix s
 	if len(ev) > secretMaxEvidence {
 		ev = append(ev[:secretMaxEvidence], fmt.Sprintf("… and %d more", len(ev)-secretMaxEvidence))
 	}
-	summary := fmt.Sprintf("%d secret(s) in plain text across %d file(s)", len(found)+len(bundles), len(files))
+	summary := msg.Of("secrets.found", "n", len(found)+len(bundles), "files", len(files))
 	if prod > 0 {
-		summary += fmt.Sprintf(", %d marked production", prod)
+		summary = msg.Of("secrets.foundProd", "n", len(found)+len(bundles), "files", len(files), "prod", prod)
 	}
-	r := check.Result{Status: check.Warn, Severity: check.Medium, Summary: summary + "." + note, Evidence: ev, Fix: fix}
+	r := check.Result{Status: check.Warn, Severity: check.Medium, Evidence: ev}.
+		WithSummary(append(summary, note...)).WithFix(fix)
 	if high {
 		r.Status, r.Severity = check.Fail, check.High
 	}

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/ptrinh/bordercheck/internal/msg"
 )
 
 // Status is the outcome of one check.
@@ -40,6 +42,12 @@ type Result struct {
 	Summary  string   `json:"summary"`
 	Evidence []string `json:"evidence,omitempty"`
 	Fix      string   `json:"fix,omitempty"`
+	// SummaryParts and FixParts are Summary and Fix as message keys with
+	// parameters (see package msg), for showing them in other languages. They
+	// are set together with the text by WithSummary and WithFix, and dropped
+	// by Consistent when the text was changed some other way.
+	SummaryParts msg.Text `json:"summary_parts,omitempty"`
+	FixParts     msg.Text `json:"fix_parts,omitempty"`
 	// Waived is set when Status is Waived.
 	Waived *Waiver `json:"waived,omitempty"`
 	// WaiverEnded is the end date (YYYY-MM-DD) of a waiver that matched this
@@ -60,9 +68,51 @@ type Check struct {
 	Run   func(ctx context.Context) Result
 }
 
+// WithSummary sets the summary from parts, in English and as parts.
+func (r Result) WithSummary(t msg.Text) Result {
+	r.SummaryParts, r.Summary = t, t.English()
+	if len(t) == 0 {
+		r.SummaryParts = nil
+	}
+	return r
+}
+
+// WithFix sets the fix from parts, in English and as parts.
+func (r Result) WithFix(t msg.Text) Result {
+	r.FixParts, r.Fix = t, t.English()
+	if len(t) == 0 {
+		r.FixParts = nil
+	}
+	return r
+}
+
+// Consistent drops parts whose English no longer matches the text, so a
+// summary or fix edited without its parts is never shown translated as
+// something else.
+func (r Result) Consistent() Result {
+	if r.SummaryParts != nil && r.SummaryParts.English() != r.Summary {
+		r.SummaryParts = nil
+	}
+	if r.FixParts != nil && r.FixParts.English() != r.Fix {
+		r.FixParts = nil
+	}
+	return r
+}
+
+// Skipped is a skip whose summary is free text, shown in English everywhere.
 func Skipped(summary string) Result { return Result{Status: Skip, Summary: summary} }
 
-func Errored(err error) Result { return Result{Status: Error, Summary: err.Error()} }
+// SkippedMsg is a skip whose summary is a message.
+func SkippedMsg(t msg.Text) Result { return Result{Status: Skip}.WithSummary(t) }
+
+// Errored reports an error; a msg.Error keeps its parts.
+func Errored(err error) Result {
+	var m msg.Error
+	if errors.As(err, &m) && err.Error() == m.Error() {
+		return Result{Status: Error}.WithSummary(msg.Text{m.Part})
+	}
+	return Result{Status: Error, Summary: err.Error()}
+}
 
 // Timeout is how long RunAll waits for the checks. One that is still running
 // then (a folder that never answers, a command that hangs) reports an error
@@ -127,13 +177,13 @@ func RunAllProgress(ctx context.Context, checks []Check, progress Progress) []Re
 				drained = true
 			}
 		}
-		why := fmt.Sprintf("Did not finish within %s and was stopped; the other checks are unaffected.", Timeout)
+		why := msg.Of("check.timeout", "after", int(Timeout.Seconds()))
 		if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			why = "Interrupted before it finished."
+			why = msg.Of("check.interrupted")
 		}
 		for i, p := range pending {
 			if p {
-				results[i] = Result{ID: checks[i].ID, Title: checks[i].Title, Status: Error, Summary: why}
+				results[i] = Result{ID: checks[i].ID, Title: checks[i].Title, Status: Error}.WithSummary(why)
 			}
 		}
 		break

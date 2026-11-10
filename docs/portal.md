@@ -137,6 +137,78 @@ Report text is written by the laptops and can try to steer the model, so keep yo
 write tools and check **Audit → MCP only** afterwards. Delete the secret to cut access. Claude Desktop, the
 tools, and the guard rails: [MCP server](../receiver/README.md#mcp-server-ask-claude-about-the-fleet).
 
+## Automate it
+
+`/api/v1` is a JSON API for scripts: your onboarding flow invites new hires, offboarding revokes their
+machines, a job exports the fleet. It is off until you set a token (separate from the dashboard's and MCP's):
+
+```sh
+openssl rand -hex 32 | npx wrangler secret put API_TOKEN        # reads and writes
+openssl rand -hex 32 | npx wrangler secret put API_READ_TOKEN   # GET only (optional)
+```
+
+The examples use `curl` and `jq`, with the token in an environment variable (from your secret store, not
+typed into the shell):
+
+```sh
+BC=https://bordercheck.acme.com/api/v1
+AUTH="Authorization: Bearer $BORDERCHECK_API_TOKEN"
+curl -fsS "$BC/roles" -H "$AUTH" | jq -r '.data[] | "\(.role_id)  \(.name)"'   # find the role id
+```
+
+**Invite a new hire and print their install command.** The `Idempotency-Key` makes a retry safe: the same key
+again gets `409 already_created` with the invite id instead of a second invite (codes are shown only once;
+re-issue the invite if the first answer was lost).
+
+```sh
+curl -sS --fail-with-body "$BC/invites" -H "$AUTH" -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: hr-onboarding-4711' \
+  -d '{"email": "new.hire@acme.com", "role_id": 3, "note": "HR-4711"}' \
+  | jq -r '.invites[0].install_macos_linux'
+```
+
+Send the command (or `.invite_link`) to that person only. `{"emails": [...]}` invites up to 500 at once.
+
+**Revoke a leaver's machines.** Their token stops working at once; the history stays.
+
+```sh
+who=leaver@acme.com
+curl -fsS "$BC/machines?search=$who&limit=200" -H "$AUTH" \
+  | jq -r --arg who "$who" '.data[] | select(.email == $who) | .install_id' \
+  | while read -r id; do curl -fsS -X POST "$BC/machines/$id/revoke" -H "$AUTH"; echo; done
+```
+
+Also revoke any invite they never used: `GET $BC/invites?email=$who&status=pending`, then
+`POST $BC/invites/<invite_id>/revoke`.
+
+**Export failing machines as CSV.** Pages through the list with the cursor. Hostnames come from the laptops,
+so a cell starting with `=`, `+`, `-` or `@` gets a leading `'`: otherwise a spreadsheet would run it as a formula.
+
+```sh
+cursor=
+while :; do
+  page=$(curl -fsS "$BC/machines?state=failing&limit=200${cursor:+&cursor=$cursor}" -H "$AUTH")
+  echo "$page" | jq -c '.data[]'
+  cursor=$(echo "$page" | jq -r '.next_cursor // empty')
+  [ -n "$cursor" ] || break
+done | jq -rs --arg q "'" '
+  def cell: (. // "") | tostring | if test("^[=+@\t\r-]") then $q + . else . end;
+  ["email", "role", "hostname", "failing", "high", "last_seen"],
+  (.[] | [.email, .role, .untrusted.hostname, .counts.fail, .counts.high_fail, .last_seen] | map(cell))
+  | @csv' > failing.csv
+```
+
+**Fail a CI job if a machine fails a high-severity check** (a read-only token is enough):
+
+```sh
+curl -fsS "$BC/checks" -H "Authorization: Bearer $BORDERCHECK_API_READ_TOKEN" \
+  | jq -e '[.data[].high] | add // 0 | . == 0'
+```
+
+Every write shows up in **Audit → API only**. All routes, errors, pagination and what the API deliberately
+can't do: [REST API](../receiver/README.md#rest-api-script-the-fleet); the OpenAPI document is at
+`/api/v1/openapi.json`.
+
 ## Upgrading
 
 Pull the new version, then from `receiver/`:

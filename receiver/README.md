@@ -14,6 +14,8 @@ alerts when something goes wrong.**
   role (Dev, Support, Sales…), with per-machine waivers. See [Enrollment](#enrollment).
 - An optional **MCP server** at `/mcp` lets an admin's Claude read the fleet and make the same changes as the
   dashboard, with its own tokens and guard rails against prompt injection ([MCP server](#mcp-server-ask-claude-about-the-fleet)).
+- An optional **REST API** at `/api/v1` lets scripts do the same: invite new hires, revoke leavers' machines,
+  export the fleet, check posture from CI, with an OpenAPI document ([REST API](#rest-api-script-the-fleet)).
 - Each report records the **public IP and Cloudflare's IP-based location**, and the machine's own local
   addresses and position if it sends them. This is personal data: read [What is stored](#what-is-stored).
 - Each accepted report gets a **login-free link** to that machine's own results, which bordercheck can open for
@@ -228,10 +230,10 @@ Pages set `<html lang>` (`en`, `zh-Hans`, `vi`) and `Vary: Accept-Language, Cook
 Dates are UTC: ISO `2026-11-01 10:05 UTC` in English, the local numeric order in Chinese and Vietnamese;
 numbers, plurals and relative times ("3m ago", "3分钟前", "3 phút trước") come from `Intl`.
 
-**Deliberately not translated**: anything a machine sends (check titles, summaries, fix text, evidence,
-unknown statuses), check IDs, policy JSON and the field names and JSON paths quoted in validation messages,
+**Deliberately not translated**: what a machine sends as free text (evidence, unknown statuses, the titles of
+checks the portal does not know, and summaries or fixes without parts, see below), check IDs, policy JSON and the field names and JSON paths quoted in validation messages,
 audit action codes, emails and hostnames, the MCP server (a machine interface: tools, descriptions, results
-and errors stay English), the JSON of `/enroll`, `/policy` and `/report`, and webhook alerts (English; there
+and errors stay English), the REST API (likewise), the JSON of `/enroll`, `/policy` and `/report`, and webhook alerts (English; there
 is no per-deployment language setting). Known statuses and severities (`fail`, `high`…) are shown translated
 in pages; anything else as received.
 
@@ -243,6 +245,46 @@ renders every page in every language). In a translation, `{name}` is a parameter
 `[b]…[/b]`, `[code]…[/code]`, `[kbd]…[/kbd]` are the only markup; any other `<`, `>` or `&` is shown as text.
 Operations shared with the MCP server return messages (`Msg`, a key and parameters) rather than text, so the
 dashboard shows them in the admin's language and MCP in English.
+
+### Check summaries and fixes
+
+The built-in checks' titles are translated by check ID (`checkTitle.*` in the catalogues). Their summaries
+and fixes are translated by message key: bordercheck 0.4+ sends, next to each result's English `summary` and
+`fix`, the same text as `summary_parts` / `fix_parts` (a list of `{"key", "params"}`, see
+[docs/install.md](../docs/install.md#what-is-sent)). `src/checktext.ts` renders them:
+
+- The English templates live in Go, in `internal/msg/catalog.go`, the one table the checks build their English
+  from. `src/i18n/checks.en.json` is generated from it (`go generate ./internal/msg`) and is the set of keys;
+  `src/i18n/checks.zh.ts` and `checks.vi.ts` translate them and are typed `Record<CheckKey, Entry>`, so a
+  missing or extra key fails `npm run typecheck`.
+- Two tests keep Go and the JSON identical: `go test ./internal/msg` (`TestCatalogJSON`) and
+  `test/checks-go-sync.test.ts`, which parses `catalog.go`. `test/checktext.test.ts` checks that every
+  translation has the same parameters (names and types) as the English, keeps every `[code]` command and URL
+  verbatim, and uses only `[code]`/`[kbd]` markup (no `[b]`: inside a fix box it is the label style).
+- Template syntax is the catalogues' (`{name}`, `[code]`, `{one, other}` plurals on `{n}`) plus typed
+  parameters: `{x:dur}` seconds ("5 minutes", "5 phút", "5 分钟"), `{x:ago}` days ("3 days ago"), `{x:date}`
+  a `YYYY-MM-DD` date. Numbers are shown as sent (no grouping: ports, counts).
+- A field is shown translated only when every part's key is known here and its params are exactly the ones
+  that key takes, with the right types; otherwise the English text the machine sent is shown, as for a client
+  older than 0.4. So an older portal shows a newer client's new messages in English, never half-translated.
+  Summary parts join with a space (none in Chinese); fix parts each go on their own line.
+- Parts are untrusted: `parseParts` (used by `report.ts`) drops the whole field if it is not a list of at most
+  24 parts with dotted keys and at most 8 parameters each, named `[a-z][A-Za-z0-9_]*`, each a finite number or
+  a string (control characters removed, cut at 300 characters). Parameters are always escaped and never read
+  as markup; in fixes only https links to the trusted hosts (`linkify`) become anchors, in the translation
+  and in parameters alike.
+
+**Adding or changing a message**: edit `internal/msg/catalog.go` (a key never changes meaning or parameters; a
+sentence that needs different ones gets a new key), use it from the check with `msg.P` / `msg.Of`, run
+`go generate ./internal/msg`, then add the key to `checks.zh.ts` and `checks.vi.ts` (typecheck tells you).
+`go test ./internal/msg` fails on a key no check uses or a check using an unknown key.
+
+Translation conventions: Vietnamese keeps menu paths and setting names exactly as the English OS shows them,
+inside a Vietnamese sentence ("Mở System Settings → Network → Firewall rồi bật lên"), since most people in
+Vietnam run macOS and Windows in English. Chinese gives each path as the Chinese OS shows it, followed once by
+the English path in parentheses ("系统设置 → 网络 → 防火墙（System Settings → Network → Firewall）"), so it works
+whichever language the OS is in; apps with no Chinese UI (Tailscale) stay English. Commands, flags, file paths,
+product names and URLs are never translated.
 
 ## MCP server: ask Claude about the fleet
 
@@ -386,6 +428,172 @@ afterwards. Disabling a check for a whole role (`"enabled": false`) is legitimat
 allowed; it is the broadest thing MCP can do, so watch `role.update` entries. Give people who only need to
 look `MCP_READ_TOKEN`.
 
+## REST API: script the fleet
+
+`/api/v1` is a JSON API for scripts and other systems: onboarding creates invites when someone joins,
+offboarding revokes a machine, a nightly job exports the fleet to a spreadsheet or BI tool, CI checks
+posture. It is the same Worker and the same code paths as the dashboard and MCP (validation, limits,
+transactions, audit trail); there is no third copy of any rule.
+
+**It is off until you set a token.** Its own bearer tokens, separate from `ADMIN_TOKEN` and from the MCP tokens:
+
+```sh
+openssl rand -hex 32 | npx wrangler secret put API_TOKEN        # reads and writes
+openssl rand -hex 32 | npx wrangler secret put API_READ_TOKEN   # GET only (optional)
+```
+
+At least 16 characters. With neither, every `/api/v1` path answers `404` like any unknown path, including the
+OpenAPI document. A value equal to `ADMIN_TOKEN` is ignored, so the dashboard login never opens the API. To
+cut access, delete or replace the secret. If `/admin` is behind Cloudflare Access, leave `/api/v1` out of the
+Access application (it checks its own token), or put it in one with a service token your scripts send too.
+
+**Why separate secrets rather than reusing `MCP_TOKEN`.** The two surfaces have different guard rails (below):
+MCP's exist because a model reads attacker-controlled report text, and they are tied to the surface, which
+the token picks. If the MCP token also opened the API, anything holding it (a Claude config file, a model
+steered by a hostname) could step around MCP's rules by calling the API instead. Separate pairs can also be
+rotated and revoked independently, and the audit trail tells `mcp` from `api`. If you want a single
+automation credential anyway, you may put the same value in `API_TOKEN` and `MCP_TOKEN`; know that whoever
+holds it then has the API's wider permissions.
+
+### Conventions
+
+- `Authorization: Bearer <token>` on every request except `GET /api/v1/openapi.json`. Only that header is read:
+  no cookies, so there is nothing for a cross-site request to ride on. A browser `Origin` other than this
+  deployment's (`DASHBOARD_URL` or the request's own origin) gets `403`. `API_READ_TOKEN` on anything but `GET`
+  gets `403 read_only_token`, and the attempt is audited.
+- JSON bodies (`Content-Type: application/json`, UTF-8), at most 320 KB; unknown fields are refused. Writes
+  without arguments take an empty body or `{}`. Unknown query parameters are refused too, so a typo fails
+  loudly instead of returning everything.
+- Every response is JSON with `Cache-Control: no-store`. Times are ISO 8601 UTC.
+- Rate limit per client IP, counted before the token check: `API_RATE_LIMIT` (default 300) per
+  `RATE_WINDOW_SECONDS`; over it, `429` with `Retry-After`.
+- English only (a machine interface, like MCP).
+
+**Errors** have one shape:
+
+```json
+{"error": {"code": "validation_failed", "message": "The request is not valid.",
+           "details": [{"message": "report.interval must be a duration of at least 15m, like \"24h\""},
+                       {"message": "checks: unknown check \"firewal\""}]}}
+```
+
+| Status | `code` |
+|---|---|
+| 400 | `validation_failed` (`details` lists every problem; a role policy gets the dashboard's messages, in English, all at once), `invalid_json` |
+| 401 | `unauthorized` (with `WWW-Authenticate: Bearer`) |
+| 403 | `read_only_token`, `origin_not_allowed` |
+| 404 | `not_found` (no such machine, role, invite or waiver), `unknown_endpoint` |
+| 405 | `method_not_allowed` (`Allow` lists the methods) |
+| 409 | `name_taken`, `invite_not_pending`, `invite_not_reissuable`, `not_enrolled`, `already_created`, `request_in_progress` |
+| 413 | `payload_too_large` |
+| 415 | `unsupported_media_type` |
+| 422 | `idempotency_key_reused` |
+| 429 | `rate_limited` (with `Retry-After`) |
+
+Codes are stable; messages may be reworded.
+
+**Pagination.** Lists return `{"data": [...], "next_cursor": "…" | null, "total": n}`. Pass `limit` (each list
+has a default and a cap, at most 200) and, for the next page, `cursor=<next_cursor>`; `null` means the last
+page. Cursors are opaque. Machines are ordered by `install_id` (not worst first), and invites, alerts and the
+audit trail by id, newest first: unchanging keys, so an export that pages through while reports keep arriving
+sees every machine exactly once. `total` (matches across all pages) is given for machines, roles and invites,
+where it is a cheap count; not for alerts and the audit trail, which only grow. `GET /checks` is one short
+list and not paged.
+
+**Idempotency.** `POST /invites` accepts an `Idempotency-Key` header (1 to 255 visible ASCII characters; use
+something stable such as the HR record id). The first request creates the invites and returns their codes.
+A retry with the same key and the same body does **not** create them again and does **not** return the codes:
+it gets `409 already_created` with `details: [{"invite_id", "email"}, …]`. The codes are shown once and never
+stored, so the original response can't be replayed, and storing codes to replay them would put a working
+credential in the database; a `2xx` without codes would look like success to a script that then sends the new
+hire nothing. If the first response was lost, re-issue the invite (`POST /invites/{id}/reissue`) to get a new
+code. The same key with a different body gets `422 idempotency_key_reused`; a retry while the first request
+is still running gets `409 request_in_progress` with `Retry-After`. A request refused for validation frees its
+key. Only SHA-256 hashes of the key and of the canonical body are stored, with the invite ids, for 24 hours
+(`api_idempotency`, pruned by the cron). Revoke, restore and role changes are idempotent by nature;
+re-revoking an invite gives `409 invite_not_pending`.
+
+### Routes
+
+All under `/api/v1`. Reads take either token; writes need `API_TOKEN`.
+
+| Route | | |
+|---|---|---|
+| `GET /openapi.json` | no token | OpenAPI 3.1 document, generated from the route table |
+| `GET /summary` | | Machines reporting, failing, silent, revoked, never reported; roles; invites by state; pending alerts; most failing checks |
+| `GET /machines` | paged | `state` (`all`, `failing`, `attention`, `silent`, `revoked`, `no_report`), `role_id`, `check` + `check_status`, `search` (email or hostname) |
+| `GET /machines/{install_id}` | | Enrollment, waivers, checks needing attention with since when, passing checks, `history` (0–60 reports); `include=evidence,location` to add those |
+| `POST /machines/{install_id}/revoke` | idempotent | Token stops working at once, report links end, history stays |
+| `POST /machines/{install_id}/restore` | idempotent | Undo a revoke |
+| `PUT /machines/{install_id}/role` | idempotent | `{"role_id": 3}` |
+| `GET /machines/{install_id}/waivers` | | That machine's waivers, active first |
+| `POST /machines/{install_id}/waivers` | `201` | `{"check", "until": "YYYY-MM-DD", "reason"}`: a known check, today to a year ahead |
+| `DELETE /machines/{install_id}/waivers/{waiver_id}` | | Ends it now (the record stays) |
+| `POST /machines/{install_id}/report-links/reset` | | Ends that machine's login-free report links |
+| `GET /roles` | paged | With active machines and pending invites |
+| `POST /roles` | `201` | `{"name", "policy"}` (policy as an object or its text) |
+| `GET /roles/{role_id}` | | Policy and machines |
+| `PUT /roles/{role_id}` | | `{"name"?, "policy"?}`: each field given replaces that field; the policy is replaced whole |
+| `GET /invites` | paged | `status` (`all`, `pending`, `used`, `expired`, `revoked`), `email`; with `counts` per state |
+| `POST /invites` | `201` | `{"email"}` or `{"emails": [...]}` (at most 500), `role_id`, `days`?, `note`?; all or nothing; `Idempotency-Key` |
+| `POST /invites/{invite_id}/revoke` | | A pending invite |
+| `POST /invites/{invite_id}/reissue` | `201` | New code for an unused invite; the old one stops working |
+| `GET /checks` | | Per check: failing, high, error, warn, waived, pass, reporting |
+| `GET /alerts` | paged | `pending=true` for those not yet delivered |
+| `GET /audit` | paged | `actor=api` or `actor=mcp` to narrow it |
+
+Responses use the same shapes as the MCP tools' results (minus the note for models): a machine is
+`{"install_id", "enrolled", "revoked", "role", "email", "last_seen", "silent", "state", "counts", "place",
+"untrusted": {"hostname", "os", "arch", "bordercheck_version"}}`, and so on. `GET /api/v1/openapi.json` has
+every route's parameters, bodies and response fields; generate a client from it if you like. A test keeps the
+document, the router and the table above in step.
+
+### Audit
+
+Every write is in the audit trail as `api`, with the method, the path and the arguments (bodies capped;
+never a code or token, and nothing secret is ever an argument). Refused writes (validation, guard rails,
+`API_READ_TOKEN` trying to write) are recorded as `api.refused`, the last with the actor `api (read-only)`.
+Reads are not audited. **Audit → API only** in the dashboard, or `GET /api/v1/audit?actor=api`, shows them.
+
+### Machine-supplied text is untrusted
+
+Hostnames, OS strings, versions, check titles, summaries, fix text, evidence and unknown check ids come from
+the laptops and are attacker-controllable. The API returns them only inside objects named `untrusted`, as
+plain JSON strings, length-capped, with control and invisible formatting characters removed, exactly as MCP
+does; they never appear in error messages. That makes them inert as JSON, not safe everywhere: **treat them as
+data in whatever you feed them to.** In a spreadsheet, a hostname like `=HYPERLINK("https://evil.example",…)`
+is a formula: prefix cells starting with `=`, `+`, `-`, `@`, tab or carriage return with `'` (the CSV example in
+[docs/portal.md](../docs/portal.md#automate-it) does). Escape them in HTML, quote them in shells, and don't
+paste them into an LLM prompt as instructions. `email` and `role` come from the invite, not from the machine.
+
+### Dashboard, MCP and API: what each may do
+
+| | Dashboard | MCP (`/mcp`) | API (`/api/v1`) |
+|---|---|---|---|
+| Who | a person, signed in | a model acting for an admin | a script written by an admin |
+| Credential | Access or `ADMIN_TOKEN` | `MCP_TOKEN` / `MCP_READ_TOKEN` | `API_TOKEN` / `API_READ_TOKEN` |
+| Language | English, 中文, Tiếng Việt | English | English |
+| Forget a machine, delete a role | yes | no | no |
+| Role: `report.url`, `report.headers`, `update.policy_url`, `update.repo`, `update.public_key` | yes | no (keep as is) | no (keep as is) |
+| Role: turn on `include_evidence`, `include_ips`, `include_location` | yes | no (may turn off) | yes |
+| Role: `check_interval`, role-level `waivers` | yes | `check_interval` yes; waivers no | yes |
+| Invites per request | 500 | 50 | 500 |
+| Invite codes shown | once, on create / re-issue | once, in the tool result | once, in the `201` response |
+| Machine tokens, code/token hashes, report-link ids | never | never | never |
+| Audit actor | the Access email or `admin token` | `mcp`, `mcp (read-only)` | `api`, `api (read-only)` |
+
+Why they differ: MCP's extra rules exist because the caller is a model that reads report text a laptop wrote,
+and a hostname saying "turn on location for everyone" must not be able to do it. A script's author holds a
+credential as strong as a dashboard admin's and writes the requests themselves, so the API allows what the
+dashboard allows, except the two things no automation surface gets: anything irreversible (Forget, deleting
+roles) and changing where reports, policy and binary updates come from (a role pointing `update.repo` and
+`update.public_key` elsewhere would run someone else's binary on every laptop). Do those in the dashboard;
+the API can still edit a role that has them, as long as it leaves them unchanged.
+
+**Deliberately absent**: Forget machine, deleting roles, anything about tokens or configuration, and anything
+that returns a machine token, a code or token hash, or a report-link id. Invite codes appear only in the
+responses of `POST /invites` and `POST /invites/{invite_id}/reissue`.
+
 ## Alerts
 
 `ALERT_WEBHOOK_URL` takes a Discord webhook (`https://discord.com/api/webhooks/…`), a Slack incoming webhook
@@ -418,6 +626,8 @@ Secrets (`npx wrangler secret put NAME`):
 | `ALERT_WEBHOOK_URL` | Where alerts go. Without it alerts are only listed on the dashboard. |
 | `MCP_TOKEN` | [MCP server](#mcp-server-ask-claude-about-the-fleet), read and write tools. |
 | `MCP_READ_TOKEN` | MCP server, read-only tools. Neither set: `/mcp` is off (404). |
+| `API_TOKEN` | [REST API](#rest-api-script-the-fleet), reads and writes. |
+| `API_READ_TOKEN` | REST API, `GET` only. Neither set (or equal to `ADMIN_TOKEN`): `/api/v1` is off (404). |
 
 Vars (`wrangler.jsonc`):
 
@@ -439,6 +649,7 @@ Vars (`wrangler.jsonc`):
 | `PAGE_RATE_LIMIT` | `60` | `/i/` and `/r/` page views per client IP per window |
 | `RATE_WINDOW_SECONDS` | `600` | |
 | `MCP_RATE_LIMIT` | `300` | `/mcp` requests per client IP per window |
+| `API_RATE_LIMIT` | `300` | `/api/v1` requests per client IP per window |
 | `STORE_PUBLIC_IP` | `on` | Public IP and the machine's local addresses; see [What is stored](#what-is-stored) |
 | `STORE_GEO` | `on` | Cloudflare's IP-based location and the device-reported position |
 | `ALERT_NEW_COUNTRY` | `off` | Alert when a machine reports from a country not in its kept history |
@@ -461,6 +672,7 @@ Vars (`wrangler.jsonc`):
 | `audit` | Who changed what and when | kept |
 | `report_links` | SHA-256 of each live report link, its machine and expiry | until it expires or is replaced |
 | `rate_limits` | Request counts per hashed client IP | one window |
+| `api_idempotency` | SHA-256 of each API `Idempotency-Key` and of its request body, the invite ids it created (never codes) | 24 hours |
 
 ### IP addresses and locations: personal data
 
