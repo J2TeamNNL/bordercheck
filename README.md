@@ -465,10 +465,19 @@ Repo secrets:
 | `MACOS_SIGNING_IDENTITY` | optional, e.g. `Developer ID Application: Acme Ltd (ABCDE12345)` |
 | `APPLE_NOTARY_KEY_P8`, `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID` | an App Store Connect API key for `notarytool` |
 
-Without the macOS secrets the release still goes out, unsigned, with a warning on the run. The signing steps
-have not run for real yet: on the first signed release, download a darwin binary with a browser and check
-`codesign -dv --verbose=2` and that it opens without a Gatekeeper prompt. A bare binary cannot be stapled, so
-Gatekeeper looks its notarization up online.
+The macOS secrets put your Developer ID key on GitHub. To keep it on your Mac instead, leave them unset and sign
+there, before pushing the tag:
+
+```sh
+SIGN_ID="Developer ID Application: Acme Ltd (ABCDE12345)" NOTARY_PROFILE=my-notary scripts/sign-macos-release.sh v1.2.3
+git tag v1.2.3 && git push origin v1.2.3
+```
+
+The script builds the two macOS binaries from the commit you are on, signs and notarizes them, and leaves them in
+a draft release. The workflow then uses them instead of its own, after checking that they were built from exactly
+the tagged commit with nothing uncommitted, signs `SHA256SUMS` over everything and publishes the draft. With
+neither the secrets nor a draft, the release goes out with unsigned macOS binaries and a warning on the run. A
+bare binary cannot be stapled, so Gatekeeper looks its notarization up online.
 
 Homebrew: copy `bordercheck.rb` from the release to `Formula/bordercheck.rb` in the tap repo
 (`ptrinh/homebrew-tap`) and push. `scripts/homebrew-formula.sh vX.Y.Z dist/SHA256SUMS` renders it locally.

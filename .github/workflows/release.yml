@@ -14,9 +14,12 @@ on:
 #   APPLE_NOTARY_KEY_P8           optional. Contents of an App Store Connect API key (AuthKey_XXXXXXXXXX.p8) for notarytool.
 #   APPLE_NOTARY_KEY_ID           its key ID.
 #   APPLE_NOTARY_ISSUER_ID        its issuer ID.
-# Without the MACOS_* secrets the release still goes out, with unsigned macOS
-# binaries and a warning on the run. This macOS signing has not been run for
-# real yet: check the first signed release by hand (see README, Releasing).
+# Without the MACOS_* secrets the macOS job signs nothing and warns. The
+# Developer ID key then stays on the maintainer's Mac: scripts/sign-macos-release.sh
+# signs and notarizes the two macOS binaries there and leaves them in a draft
+# release for this tag, and the release job below uses those instead of its own
+# (only if they were built from exactly this commit) and publishes the draft.
+# With neither, the release goes out with unsigned macOS binaries.
 
 permissions:
   contents: read
@@ -166,6 +169,29 @@ jobs:
           path: darwin/
       - name: Take the macOS binaries from the signing job
         run: cp -f darwin/bordercheck-*-darwin-* dist/ && rm -rf darwin
+      - name: Use the macOS binaries signed on the maintainer's Mac, if a draft release holds them
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null || true)
+          if [ "$draft" != true ]; then
+            echo "No draft release for $GITHUB_REF_NAME: using the macOS binaries from the macos job."
+            exit 0
+          fi
+          mkdir presigned
+          gh release download "$GITHUB_REF_NAME" --pattern "bordercheck-$GITHUB_REF_NAME-darwin-*" --dir presigned
+          for arch in arm64 amd64; do
+            f="presigned/bordercheck-$GITHUB_REF_NAME-darwin-$arch"
+            test -s "$f"
+            # Built from exactly this commit, with nothing uncommitted.
+            info=$(go version -m "$f")
+            printf '%s\n' "$info" | grep -q "vcs.revision=$GITHUB_SHA\$" || { echo "::error::$f was not built from $GITHUB_SHA"; exit 1; }
+            printf '%s\n' "$info" | grep -q "vcs.modified=false\$" || { echo "::error::$f was built from a modified tree"; exit 1; }
+            cp -f "$f" dist/
+          done
+          echo "PRESIGNED=yes" >>"$GITHUB_ENV"
+          echo "## macOS binaries: signed and notarized on the maintainer's Mac (taken from the draft release)" >>"$GITHUB_STEP_SUMMARY"
       # SHA256SUMS.sig is what installed copies and the install scripts trust.
       - name: Write and sign SHA256SUMS
         run: test -n "$BORDERCHECK_SIGNING_KEY" && scripts/sums.sh && test -s dist/SHA256SUMS.sig
@@ -177,6 +203,13 @@ jobs:
         run: go run . verify dist/SHA256SUMS dist/SHA256SUMS.sig dist/bordercheck-*
       - name: Render the Homebrew formula
         run: scripts/homebrew-formula.sh "$GITHUB_REF_NAME" dist/SHA256SUMS "$GITHUB_REPOSITORY" >bordercheck.rb
-      - run: gh release create "$GITHUB_REF_NAME" dist/* bordercheck.rb --title "$GITHUB_REF_NAME" --generate-notes
+      - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${PRESIGNED:-}" = yes ]; then
+            gh release upload "$GITHUB_REF_NAME" dist/* bordercheck.rb --clobber
+            gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* bordercheck.rb --title "$GITHUB_REF_NAME" --generate-notes
+          fi
