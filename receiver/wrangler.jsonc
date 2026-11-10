@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bordercheck-receiver",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+
+  // The dashboard checks Access JWTs or the admin token itself, so the
+  // workers.dev URL is safe to leave on. Turn it off once you have a custom domain.
+  "workers_dev": true,
+  "preview_urls": false,
+  // "routes": [{ "pattern": "bordercheck.acme.com", "custom_domain": true }],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bordercheck",
+      // PLACEHOLDER: replace with the id printed by `npx wrangler d1 create bordercheck`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Hourly: silent machines, pending alerts, the digest, pruning.
+  "triggers": { "crons": ["0 * * * *"] },
+
+  // Secrets are not set here. See README: REPORT_TOKEN, ADMIN_TOKEN,
+  // ALERT_WEBHOOK_URL, and optionally REPORT_TOKEN_PREVIOUS and POLICY_KEY.
+  "vars": {
+    "DASHBOARD_URL": "",            // e.g. https://bordercheck.acme.com, for links in alerts
+    "ACCESS_TEAM_DOMAIN": "",       // e.g. acme.cloudflareaccess.com
+    "ACCESS_AUD": "",               // the Access application's AUD tag
+    "ALLOWED_EMAIL_DOMAINS": "",    // e.g. "acme.com,acme.co.uk"; empty = any
+    "SILENT_DAYS": "7",
+    "DIGEST_HOURS": "168",          // weekly; "0" = no digest
+    "HISTORY_DAYS": "180",
+    "MAX_REPORT_BYTES": "262144",
+    "MAX_MACHINES": "10000"
+  }
+}
