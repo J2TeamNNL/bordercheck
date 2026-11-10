@@ -18,7 +18,7 @@ type Obj = Record<string, unknown>;
 // A waiver or checks key outside this list makes the client reject the file.
 export const POLICY_CHECKS = [
   "firewall", "disk-encryption", "listeners", "tailscale", "docker", "secrets", "ssh-keys", "tunnels", "ai-agents",
-  "os-updates", "screen-lock", "remote-access",
+  "os-updates", "screen-lock", "remote-access", "cracked-software",
 ];
 
 export const MAX_WAIVER_DAYS = 365;
