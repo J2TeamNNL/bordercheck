@@ -59,10 +59,12 @@ beside the binary, else uses the built-in one.
   "name": "Acme",
   "report": {
     "url": "https://bordercheck.acme.com/report",   // HTTPS POST of the JSON report
-    "headers": { "Authorization": "Bearer …" },     // a token that can only submit reports
+    "headers": { "Authorization": "Bearer …" },     // a token that can only submit reports (not with invite links)
     "interval": "24h",                              // how often each machine reports
     "include_evidence": false,                      // true also sends file paths, ports, names
-    "email_domains": ["acme.com"]                   // emails people may install with
+    "email_domains": ["acme.com"],                  // emails people may install with
+    "include_ips": false,                           // true also sends the machine's own IP addresses
+    "include_location": false                       // true also sends a device position, where the OS allows (see Privacy)
   },
   "update": {
     "binary": true,                                 // install newer signed releases
@@ -75,7 +77,8 @@ beside the binary, else uses the built-in one.
     "enabled": true,                                // desktop notifications for the person at the machine
     "statuses": ["fail"],                           // "fail" and/or "warn"
     "severities": ["high", "medium"],               // a result without a severity counts as medium
-    "remind_every": "24h"                           // re-announce a problem still there; "0" = never
+    "remind_every": "24h",                          // re-announce a problem still there; "0" = never
+    "open_report": true                             // open the machine's report page with a high-severity problem
   },
   "waivers": [
     { "check": "listeners", "email": "an@acme.com", "until": "2026-12-01",
@@ -122,7 +125,7 @@ A waiver exempts one machine from one check for a while, without loosening the r
 | Field | |
 |---|---|
 | `check` | the check ID (`bordercheck -list`) |
-| `email`, `install_id` | which machine; at least one. `email` is the one bordercheck was installed with, `install_id` is in its reports and in `bordercheck status`. |
+| `email`, `install_id` | which machine; at least one. `email` is the one bordercheck was installed with (or IT set in the invite), `install_id` is in its reports and in `bordercheck status`; an install from an invite link gets it from the portal, which can serve waivers keyed by it. |
 | `hostname` | optional, narrows the waiver to one of that person's machines: the report's `host.hostname` (case and a trailing `.local` are ignored). Never enough alone, since users set their own hostname. Every field given must match. |
 | `until` | required, `YYYY-MM-DD`: the last day it applies, by the machine's local date. At most a year ahead; a waiver without an end is rejected. |
 | `reason` | required; shown to the person and sent in the report |
@@ -138,6 +141,89 @@ identity when this user has installed bordercheck (it reads `config.json` in the
 so what you see matches what IT sees. Without an install there is no email or install ID, so no waiver applies.
 
 ## Install as a service
+
+There are two ways to set machines up:
+
+| | Invite links (enrolled) | `policies.json` (static) |
+|---|---|---|
+| What IT does | creates an invite per person in the portal (a receiver that supports enrollment), sends them one command | hosts one `policies.json` for everybody |
+| What the person does | runs the command; nothing to type | runs the command and types their work email |
+| Who sets the email | IT, in the invite | the person (limited by `email_domains`) |
+| Report credential | a token for this install only | one token shared by every machine, readable by anyone who can fetch `policies.json` |
+| Policy | chosen by the person's role, fetched with the install's token | the same file for everyone |
+| IT can cut one machine off | yes, revoke that install | no, only rotate everybody's token |
+
+Use invite links when the receiver supports them (the reference receiver in [`receiver/`](receiver) is gaining
+enrollment); use `policies.json` for any other endpoint, or to try bordercheck out.
+
+### With an invite link
+
+IT creates an invite for the person in the portal and sends them the command it shows. macOS and Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.acme.com/i/<code>
+```
+
+Windows (PowerShell):
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/i/<code>
+```
+
+or, with the binary already there, `bordercheck install https://bordercheck.acme.com/i/<code>`. bordercheck
+copies itself into the install folder and checks the hourly service can be registered, then spends the code
+(`POST /enroll`), and gets back this install's ID, the email and role IT set, a token, and the URL of the
+policy for that role. It fetches the policy with the token, registers the service and sends a first report.
+There is no email question; `-email` with an invite link is an error.
+
+- **A code works once.** If something goes wrong before it is spent (no write access, no way to run a
+  service), nothing is installed and the invite is still good. If something goes wrong after (the portal is
+  down when the policy is fetched, the service fails to register), the enrollment is saved and the error says
+  to run `<install folder>/bordercheck install` (or the same command again): that finishes the job without
+  a new invite. If the network drops while the code is being sent, bordercheck cannot know whether it was
+  spent; run the command again, and if it says the invite was used, ask IT for a new one.
+- **A new invite on an enrolled machine replaces the enrollment** (new install ID, token, email and role)
+  once the new code has been accepted; until then the old one keeps working. Waivers keyed by the old install
+  ID stop applying. Going from an enrolled install to a `policies.json` install needs `bordercheck uninstall`
+  first.
+- **Refusals** say what to do: an invalid link (check you copied all of it), an expired, used or cancelled
+  invite (ask IT for a new one; a used invite you did not use yourself is worth telling IT about), or too many
+  attempts (wait a few minutes).
+
+What is stored, in the install folder (below):
+
+| File | Holds | Access |
+|---|---|---|
+| `config.json` | install ID, email, role, the portal's address, the policy URL, a hash of the spent invite code, the pinned update source | this user (`0600`) |
+| `token` | the install's token, nothing else | this user (`0600`); never printed, logged, put in `state.json`, a report or `bordercheck status` |
+| `policies.json` | the last good policy from the portal | this user (`0600`) |
+
+On Windows file modes don't apply: `%LOCALAPPDATA%\bordercheck` inherits the profile folder's permissions, so
+the token can be read by the user, SYSTEM and local Administrators, like the rest of their profile, and not by
+other standard users. On macOS and Linux root can read it too.
+
+Afterwards every hourly run fetches the policy with `Authorization: Bearer <token>` and posts the report with
+it. The token is sent **only** to the portal that issued it: over https, never following a redirect, and only
+to the exact host of the invite link. A policy that points `report.url` or `update.policy_url` at another host
+is refused and the last good policy kept (with the reason in the log), rather than sending reports somewhere
+without the token: that keeps reports going to IT and makes the mistake visible.
+
+If the portal answers `401 {"error": "revoked"}`, IT has revoked this install: `bordercheck status` says so,
+the person gets one desktop notification, no more reports are sent, and the service asks the portal again only
+once a day (a report that gets through clears it). `bordercheck uninstall` deletes the token; it does not tell
+the portal, which has no endpoint for that, so IT revokes or forgets the machine there.
+
+What it does and does not prove:
+
+- A report carrying the token came from that install: nobody else can submit or overwrite its reports or
+  claim its email, and IT can revoke it alone.
+- It does not prove the machine tells the truth. The person at the machine can read the token and send
+  whatever they like with it, as with any self-reported check.
+- An invite link is a bearer credential until it is used or expires: whoever has an unused link can enroll a
+  machine as that person. Send invites over a channel only that person reads, keep their lifetime short, and
+  revoke ones that went astray.
+
+### With a policies.json
 
 Host your `policies.json` at an HTTPS URL and have people run one command.
 
@@ -156,13 +242,14 @@ Windows (PowerShell):
 The script picks the latest release for the OS and CPU, checks it (below), and runs
 `bordercheck install <url>`, which asks for the person's work email on the terminal. For scripted rollouts add
 `--email an@acme.com` (`-Email` in PowerShell). Other options: `--version v1.2.3`, `--dry-run` (verify, then
-stop), and `--repo owner/name --key <base64>` for a fork.
+stop), and `--repo owner/name --key <base64>` for a fork (with an invite link, these also become the installed
+copy's update source; see [Updates](#updates)).
 
 Already have the binary? `./bordercheck install https://bordercheck.acme.com/policies.json` does the same, or
 hand people a zip with `bordercheck` and `policies.json` side by side and they run `./bordercheck install`.
 `-email you@acme.com` skips the question.
 
-That copies both files to `~/Library/Application Support/bordercheck` (macOS), `~/.local/share/bordercheck`
+Either way, install copies bordercheck and its policy to `~/Library/Application Support/bordercheck` (macOS), `~/.local/share/bordercheck`
 (Linux, or `$XDG_DATA_HOME/bordercheck`) or `%LOCALAPPDATA%\bordercheck` (Windows), registers an hourly
 per-user service (launchd LaunchAgent / systemd user timer / Task Scheduler; no admin rights), and sends a first
 report straight away. The service sends a report whenever `report.interval` has passed since the last one that
@@ -217,8 +304,19 @@ A notification that cannot be shown is logged in `bordercheck.log` and tried at 
 report. `bordercheck send -force` (and the first report at install) is run by someone at a terminal, so it prints the
 problems there instead and the next scheduled run does not repeat them. A plain `bordercheck` never notifies.
 
+**Report page.** A receiver may answer a report with `{"report_url": "https://<host>/r/<id>"}`, a link to that
+machine's own report that needs no login. bordercheck keeps it (in `state.json`, never in the log) only if it is
+https on exactly the host reports go to, and shows it in `bordercheck status`. When a notification announces a
+**high-severity** problem (new, or due its `remind_every` reminder, not every hour), the page also opens in the
+default browser: `open` on macOS, `rundll32 url.dll,FileProtocolHandler` on Windows, `xdg-open` on Linux, the
+link passed as one argument, never through a shell. Linux skips it quietly without a graphical session (a
+systemd user timer often has no `DISPLAY`). With `notify.open_report` off, or when the browser can't be opened,
+the notification only adds "Run bordercheck status for the link to your report page." `bordercheck send -force`
+prints the link on the terminal instead. A receiver that sends no link changes nothing. Anyone who has the link
+can see that machine's failing checks, so treat it like a password.
+
 ```sh
-bordercheck status               # email, policy, service, last report, updates
+bordercheck status               # email, enrollment, policy, what is sent, service, last report, report page, updates
 bordercheck send -force          # send a report now
 bordercheck update               # refresh the policy and install a newer release now
 bordercheck uninstall
@@ -228,7 +326,8 @@ bordercheck uninstall
 
 **Policy.** With `update.policy_url`, every hourly run fetches `policies.json` from that URL and keeps the last
 good copy if the fetch fails or the new file is invalid. Change rules, the report endpoint or the update settings
-in one place; no reinstall.
+in one place; no reinstall. An install from an invite link fetches from the policy URL it was enrolled with,
+sending its token.
 
 **Binary.** With `update.binary`, once every `update.interval` the service reads
 `github.com/<repo>/releases/latest/download/SHA256SUMS` (GitHub's CDN, not the rate-limited API) and installs the
@@ -246,16 +345,24 @@ report. Development builds (`dev`) never update themselves.
 a policy fetched from `policy_url` cannot change them, and whoever controls your policy server cannot push a
 binary. Changing them needs a reinstall.
 
+An install from an invite link goes further: the portal's policy never chooses the update source, not even at
+install. Its `update.repo` and `update.public_key` are ignored; the install pins the built-in defaults (this
+repo and `update.OfficialKey`) unless the person installing names another with
+`bordercheck install <invite> -update-repo owner/name -update-key <base64>` (`--repo`/`--key` in `install.sh`,
+`-Repo`/`-Key` in `install.ps1`). A compromised portal, or a role's policy edited carelessly, therefore cannot
+point machines at another release. `update.binary` and `update.interval` still come from the policy.
+
 Releases are signed in CI: `go run ./scripts/sign -keygen` makes the key pair; the private half goes in the
 `BORDERCHECK_SIGNING_KEY` repo secret (never in a file) and the public half in `internal/update.OfficialKey`.
 Forks use their own pair and set `update.public_key`.
 
-The report is the same JSON as `bordercheck -json`, plus `email` and `install_id`:
+The report is the same JSON as `bordercheck -json`, plus `email` and `install_id`, plus `host.ips` and
+`location` only when the policy asks for them (see [Privacy](#privacy)):
 
 ```json
 {
   "tool": "bordercheck", "version": "v0.2.0", "policy": "Acme", "time": "2026-10-30T14:46:07Z",
-  "host": { "os": "darwin", "arch": "arm64", "hostname": "ans-mbp" },
+  "host": { "os": "darwin", "arch": "arm64", "hostname": "ans-mbp", "ips": ["192.168.1.23", "2001:db8::23"] },
   "email": "an@acme.com", "install_id": "4f1c…",
   "counts": { "fail": 1, "error": 0, "warn": 1, "pass": 3, "skip": 1, "waived": 0 },
   "results": [ { "id": "firewall", "title": "Firewall is on", "status": "fail", "severity": "high",
@@ -263,7 +370,12 @@ The report is the same JSON as `bordercheck -json`, plus `email` and `install_id
 }
 ```
 
-Reports are self-reported by the machine: they tell you who needs help, not proof of compliance.
+`location`, when an OS can supply it (none does yet), is
+`{"lat": 51.5, "lon": -0.12, "accuracy_m": 30, "source": "…", "time": "2026-10-30T14:46:00Z"}`. The token of an
+enrolled install travels in the `Authorization` header, never in the body.
+
+Reports are self-reported by the machine: they tell you who needs help, not proof of compliance. A token proves
+which install sent a report, not that the machine told the truth.
 
 ## Privacy
 
@@ -272,6 +384,27 @@ Reports are self-reported by the machine: they tell you who needs help, not proo
   Passwords show nothing.
 - Evidence (file paths, variable names, ports) leaves the machine only when the policy sets
   `include_evidence`.
+- The machine's IP addresses leave it only when the policy sets `report.include_ips`: the addresses of its own
+  network interfaces that are up (IPv4 and IPv6, without loopback and link-local; at most 16), read locally.
+  bordercheck never asks a "what is my IP" service. Whatever the policy says, the receiver sees the public IP
+  address the report arrives from, as every web server does, and may store it or look up a rough location
+  from it.
+- A device location leaves it only when the policy sets `report.include_location` **and** the OS can supply
+  one without a permission prompt, admin rights or bordercheck contacting a third party. Today no OS can, so
+  no location is sent anywhere and the receiver can only estimate one from the public IP:
+  - macOS: Core Location needs an app bundle with a usage description and a Location Services prompt; a bare
+    command-line binary run by launchd can't use it.
+  - Windows: since Windows 11 24H2 a desktop program reading the location API can trigger a "let this app
+    access your location" prompt, and position fixes usually come from Microsoft's Wi-Fi location service.
+    Reading it only where a registry check proves no prompt can appear might be sound, but it is untested.
+  - Linux: GeoClue asks the desktop's agent, which prompts for programs not listed in `geoclue.conf`, and its
+    Wi-Fi source looks nearby networks up with an online service.
+- `bordercheck status` shows what this install sends (evidence, IP addresses, location), and install says so
+  once when the IP addresses or location are on. A plain `bordercheck` or `bordercheck -json` never includes
+  them.
+- An enrolled install's token is only ever sent to the portal that issued it (see
+  [With an invite link](#with-an-invite-link)). The report page link a receiver may return shows that
+  machine's results to whoever has it; it is kept out of the log.
 - SSH keys are judged by reading their file format; key material is never shown, only type, fingerprint and
   comment. Tunnel command lines can hold auth tokens, so only the tool name and local port are shown.
 

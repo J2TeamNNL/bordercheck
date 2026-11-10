@@ -9,7 +9,9 @@
     "include_evidence": false,
     "email_domains": [
       "example.com"
-    ]
+    ],
+    "include_ips": false,
+    "include_location": false
   },
   "update": {
     "binary": true,
@@ -27,7 +29,8 @@
       "high",
       "medium"
     ],
-    "remind_every": "24h"
+    "remind_every": "24h",
+    "open_report": true
   },
   "waivers": [
     {

@@ -17,6 +17,10 @@ type Notify struct {
 	Statuses    []check.Status   `json:"statuses"`     // which results notify: "fail" and/or "warn"
 	Severities  []check.Severity `json:"severities"`   // and of which severity; a result without one counts as "medium"
 	RemindEvery string           `json:"remind_every"` // re-announce a problem still there after this long; "0" = never
+	// OpenReport opens the machine's report page in the browser along with a
+	// notification that announces a high-severity problem, when the receiver
+	// returned a link to one.
+	OpenReport bool `json:"open_report"`
 }
 
 func defaultNotify() Notify {
@@ -25,6 +29,7 @@ func defaultNotify() Notify {
 		Statuses:    []check.Status{check.Fail},
 		Severities:  []check.Severity{check.High, check.Medium},
 		RemindEvery: "24h",
+		OpenReport:  true,
 	}
 }
 

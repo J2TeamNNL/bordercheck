@@ -6,7 +6,7 @@ every hour (a per-user scheduled task; no administrator rights).
 .DESCRIPTION
 Downloads the latest release for this PC, checks it against SHA256SUMS before
 running it, has the binary check the ed25519 signature on SHA256SUMS with the
-key pinned below, then runs `bordercheck install <policies URL>`. Any mismatch
+key pinned below, then runs `bordercheck install <policies URL or invite link>`. Any mismatch
 stops the install. Windows PowerShell 5.1 has no ed25519, so unlike install.sh
 with OpenSSL 3 the signature is always checked by the downloaded binary; see
 README, "What the install script proves".
@@ -16,15 +16,23 @@ README, "What the install script proves".
 
 .EXAMPLE
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/policies.json -Email an@acme.com
+
+.EXAMPLE
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/i/<code>
 #>
 param(
+    # The policies URL, or an invite link https://<host>/i/<code> from IT.
     [Parameter(Position = 0)][string]$PolicyUrl = $env:BORDERCHECK_POLICY_URL,
-    [string]$Email,                  # don't ask for the work email (scripted rollouts)
+    [string]$Email,                  # don't ask for the work email (scripted rollouts; not with an invite link)
     [string]$Version,                # install this release (vX.Y.Z) instead of the latest
+    # With an invite link, the installed copy also takes its updates from -Repo and -Key when given.
     [string]$Repo = $(if ($env:BORDERCHECK_REPO) { $env:BORDERCHECK_REPO } else { 'ptrinh/bordercheck' }),
     [string]$Key,                    # ed25519 public key (base64) that must sign SHA256SUMS; forks set it
     [switch]$DryRun                  # download and verify, then stop before installing
 )
+# Whether the update source was named (option or environment), before defaults fill it in.
+$RepoSet = $PSBoundParameters.ContainsKey('Repo') -or [bool]$env:BORDERCHECK_REPO
+$KeySet = [bool]$Key -or [bool]$env:BORDERCHECK_PUBLIC_KEY
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue' # Invoke-WebRequest is very slow with the progress bar
@@ -39,8 +47,11 @@ function Fail([string]$msg) { throw "bordercheck-install: $msg Nothing was insta
 if (-not $Key) { $Key = if ($env:BORDERCHECK_PUBLIC_KEY) { $env:BORDERCHECK_PUBLIC_KEY } else { $OfficialKey } }
 $GitHub = if ($env:BORDERCHECK_GITHUB) { $env:BORDERCHECK_GITHUB } else { 'https://github.com' }
 
-if (-not $PolicyUrl) { Fail "Give your organisation's policies URL, e.g. https://bordercheck.acme.com/policies.json." }
-if (-not $PolicyUrl.StartsWith('https://')) { Fail 'The policies URL must start with https://.' }
+if (-not $PolicyUrl) { Fail "Give your invite link or your organisation's policies URL, e.g. https://bordercheck.acme.com/policies.json." }
+if (-not $PolicyUrl.StartsWith('https://')) { Fail 'The URL must start with https://.' }
+# An invite link: keep in step with ParseInvite in internal/agent/enroll.go.
+$Invite = $PolicyUrl -cmatch '^https://[^/?#@]+/i/[A-Za-z0-9._~-]+/?$'
+if ($Invite -and $Email) { Fail '-Email cannot be used with an invite link: IT set your email when they created the invite.' }
 if ($Repo -notmatch '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$') { Fail '-Repo must be owner/name.' }
 if ($Version -and $Version -notmatch '^v\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$') { Fail '-Version must look like v1.2.3.' }
 
@@ -97,11 +108,15 @@ try {
 
     $installArgs = @('install', $PolicyUrl)
     if ($Email) { $installArgs += @('-email', $Email) }
+    if ($Invite) {
+        if ($RepoSet) { $installArgs += @('-update-repo', $Repo) }
+        if ($KeySet) { $installArgs += @('-update-key', $Key) }
+    }
     if ($DryRun) {
         Say "Verified $tag. Dry run: would now run: bordercheck $($installArgs -join ' ')"
         return
     }
-    # Run from the console, so bordercheck can ask for the work email itself.
+    # Run from the console, so bordercheck can ask for the work email itself (not with an invite link).
     & $exe @installArgs
     if ($LASTEXITCODE -ne 0) { throw "bordercheck-install: bordercheck install failed (exit $LASTEXITCODE)." }
 }

@@ -31,6 +31,9 @@ const usage = `Usage:
   bordercheck install [policies-url] [-email you@work]
                                                      report to your organisation every hour as a service;
                                                      without a URL, uses policies.json beside the binary
+  bordercheck install https://<portal>/i/<code> [-update-repo owner/name -update-key base64]
+                                                     enroll with an invite link from IT (no email question);
+                                                     run again without the link to finish an interrupted install
   bordercheck status                                 show the install and the last report sent
   bordercheck send [-force]                          what the service runs; -force sends a report now
   bordercheck update                                 refresh the policy and install a newer signed release now
@@ -159,7 +162,9 @@ func waiverIdentity() policy.Identity {
 
 func runAgent(cmd string, args []string) int {
 	fs := flag.NewFlagSet("bordercheck "+cmd, flag.ContinueOnError)
-	email := fs.String("email", "", "install: your work email (asked for when omitted)")
+	email := fs.String("email", "", "install: your work email (asked for when omitted); not with an invite link")
+	updateRepo := fs.String("update-repo", "", "install with an invite link: take self-updates from this GitHub owner/name instead of the official one")
+	updateKey := fs.String("update-key", "", "install with an invite link: the base64 ed25519 key those releases are signed with")
 	force := fs.Bool("force", false, "send: send a report now even if one is not due")
 	// Flags may come before or after the policies URL.
 	var positional []string
@@ -184,13 +189,17 @@ func runAgent(cmd string, args []string) int {
 		return fail(err)
 	}
 	env := agent.Env{Dir: dir, Version: version, Client: &http.Client{Timeout: time.Minute}, Out: os.Stdout}
+	if isTerminal(os.Stdout) { // the report page link goes to a person, never to the log
+		env.Term = os.Stdout
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
 	switch cmd {
 	case "install":
 		err = agent.Install(ctx, env, agent.InstallOptions{
-			Policy: policySrc, Email: *email, In: os.Stdin, Ask: isTerminal(os.Stdin)})
+			Policy: policySrc, Email: *email, In: os.Stdin, Ask: isTerminal(os.Stdin),
+			UpdateRepo: *updateRepo, UpdateKey: *updateKey})
 	case "uninstall":
 		if err = agent.Uninstall(env); err == nil {
 			fmt.Println("Uninstalled.")

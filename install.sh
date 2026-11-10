@@ -5,10 +5,16 @@
 #   curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh \
 #     | sh -s -- https://bordercheck.acme.com/policies.json
 #
-# Options (after the policies URL or before it):
-#   --email you@acme.com   don't ask for the work email (scripted rollouts)
+# or, with an invite link IT sent you (no email question; IT set it):
+#
+#   curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh \
+#     | sh -s -- https://bordercheck.acme.com/i/<code>
+#
+# Options (after the URL or before it):
+#   --email you@acme.com   don't ask for the work email (scripted rollouts; not with an invite link)
 #   --version vX.Y.Z       install that release instead of the latest
-#   --repo owner/name      install from a fork (with --key, the fork's release key)
+#   --repo owner/name      install from a fork (with --key, the fork's release key); with an
+#                          invite link, the installed copy also takes its updates from there
 #   --key BASE64           the ed25519 public key that must sign SHA256SUMS
 #   --dry-run              download and verify, then stop before installing
 #
@@ -43,6 +49,8 @@ die() {
 usage() {
 	cat >&2 <<'EOF'
 Usage: install.sh https://bordercheck.acme.com/policies.json [--email you@acme.com]
+                  [--version vX.Y.Z] [--repo owner/name --key BASE64] [--dry-run]
+       install.sh https://bordercheck.acme.com/i/<code>
                   [--version vX.Y.Z] [--repo owner/name --key BASE64] [--dry-run]
 EOF
 	exit 2
@@ -100,6 +108,9 @@ openssl_ed25519_works() {
 main() {
 	policy='' email='' version='' repo=${BORDERCHECK_REPO:-ptrinh/bordercheck}
 	key=${BORDERCHECK_PUBLIC_KEY:-$OFFICIAL_KEY} dry_run=no
+	# Whether the update source was named, by option or environment: an invite
+	# install then pins it instead of the official one.
+	repo_set=${BORDERCHECK_REPO:+yes} key_set=${BORDERCHECK_PUBLIC_KEY:+yes}
 	github=${BORDERCHECK_GITHUB:-https://github.com} # tests point this at a local server
 	while [ $# -gt 0 ]; do
 		case $1 in
@@ -107,10 +118,10 @@ main() {
 		--email=*) email=${1#*=}; shift ;;
 		--version) version=${2:?--version needs a value}; shift 2 ;;
 		--version=*) version=${1#*=}; shift ;;
-		--repo) repo=${2:?--repo needs a value}; shift 2 ;;
-		--repo=*) repo=${1#*=}; shift ;;
-		--key) key=${2:?--key needs a value}; shift 2 ;;
-		--key=*) key=${1#*=}; shift ;;
+		--repo) repo=${2:?--repo needs a value}; repo_set=yes; shift 2 ;;
+		--repo=*) repo=${1#*=}; repo_set=yes; shift ;;
+		--key) key=${2:?--key needs a value}; key_set=yes; shift 2 ;;
+		--key=*) key=${1#*=}; key_set=yes; shift ;;
 		--dry-run) dry_run=yes; shift ;;
 		-h | --help) usage ;;
 		-*) die "unknown option $1 (see --help)" ;;
@@ -122,8 +133,14 @@ main() {
 		esac
 	done
 	policy=${policy:-${BORDERCHECK_POLICY_URL:-}}
-	[ -n "$policy" ] || die "give your organisation's policies URL, e.g.: sh -s -- https://bordercheck.acme.com/policies.json"
-	case $policy in https://*) ;; *) die "the policies URL must start with https://" ;; esac
+	[ -n "$policy" ] || die "give your invite link or your organisation's policies URL, e.g.: sh -s -- https://bordercheck.acme.com/policies.json"
+	case $policy in https://*) ;; *) die "the URL must start with https://" ;; esac
+	# An invite link, https://<host>/i/<code>: keep in step with ParseInvite in internal/agent/enroll.go.
+	invite=no
+	if printf '%s' "$policy" | grep -Eq '^https://[^/?#@]+/i/[A-Za-z0-9._~-]+/?$'; then
+		invite=yes
+		[ -z "$email" ] || die "--email cannot be used with an invite link: IT set your email when they created the invite."
+	fi
 	printf '%s' "$repo" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || die "--repo must be owner/name"
 	if [ -n "$version" ]; then
 		printf '%s' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$' || die "--version must look like v1.2.3"
@@ -208,11 +225,18 @@ main() {
 
 	set -- install "$policy"
 	[ -z "$email" ] || set -- "$@" -email "$email"
+	if [ "$invite" = yes ]; then
+		[ "$repo_set" != yes ] || set -- "$@" -update-repo "$repo"
+		[ "$key_set" != yes ] || set -- "$@" -update-key "$key"
+	fi
 	if [ "$dry_run" = yes ]; then
 		say "Verified $tag. Dry run: would now run: bordercheck $*"
 		return 0
 	fi
-	if [ -n "$email" ]; then
+	if [ "$invite" = yes ]; then
+		# Nothing to ask: the invite carries the email.
+		"$tmp/$asset" "$@" </dev/null
+	elif [ -n "$email" ]; then
 		"$tmp/$asset" "$@" </dev/null
 	elif (exec </dev/tty) 2>/dev/null; then
 		# Piped into sh, stdin is this script: ask on the terminal instead.

@@ -163,7 +163,7 @@ func TestPolicyRefreshKeepsPinnedUpdateSource(t *testing.T) {
 	setPolicy(t, env, srv, `"policy_url": %q`, srv.URL+"/policies.json")
 
 	cfg := Config{UpdateRepo: "ptrinh/bordercheck"}
-	pol, err := currentPolicy(t.Context(), env, cfg)
+	pol, err := currentPolicy(t.Context(), env, cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

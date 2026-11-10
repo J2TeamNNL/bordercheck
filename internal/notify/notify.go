@@ -82,6 +82,12 @@ func Compose(due []check.Result) Message {
 	return Message{Title: title, Body: strings.Join(lines, "\n")}
 }
 
+// Clean puts text from elsewhere on one line without control characters, and
+// Clip shortens it to n characters, for showing it to the person.
+func Clean(s string) string { return clean(s) }
+
+func Clip(s string, n int) string { return clip(s, n) }
+
 // clean puts text on one line and drops control characters.
 func clean(s string) string {
 	s = strings.Map(func(r rune) rune {

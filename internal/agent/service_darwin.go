@@ -57,6 +57,23 @@ func registerService(bin, dir string) error {
 	return nil
 }
 
+// canRegisterService checks, without changing anything launchd sees, that
+// registerService should work: launchctl is there and the LaunchAgents folder
+// can be written.
+func canRegisterService() error {
+	if _, err := exec.LookPath("launchctl"); err != nil {
+		return err
+	}
+	path, err := plistPath()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return probeWrite(filepath.Dir(path))
+}
+
 func unregisterService() error {
 	_ = exec.Command("launchctl", "bootout", domain()+"/"+label).Run()
 	path, err := plistPath()

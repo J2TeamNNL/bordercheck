@@ -57,6 +57,11 @@ type Report struct {
 	Interval        string            `json:"interval"`         // Go duration between reports, e.g. "24h"
 	IncludeEvidence bool              `json:"include_evidence"` // send file paths, ports, etc., not just pass/fail
 	EmailDomains    []string          `json:"email_domains"`    // if set, the user's email must be in one of these
+	// IncludeIPs adds the machine's own interface addresses (host.ips) to the
+	// installed service's report; IncludeLocation adds a device position
+	// (location) where the OS can give one without a prompt. Both off by default.
+	IncludeIPs      bool `json:"include_ips"`
+	IncludeLocation bool `json:"include_location"`
 }
 
 // Every returns the interval between reports.
@@ -231,7 +236,7 @@ func ptr[T any](v T) *T { return &v }
 func Default() Policy {
 	return Policy{
 		Name:   "built-in",
-		Report: Report{Headers: map[string]string{}, Interval: "24h", EmailDomains: []string{}},
+		Report: Report{Headers: map[string]string{}, Interval: "24h", EmailDomains: []string{}, IncludeIPs: false, IncludeLocation: false},
 		Update: Update{Interval: "24h", Repo: "ptrinh/bordercheck"},
 		Notify: defaultNotify(),
 
@@ -269,6 +274,9 @@ func Default() Policy {
 }
 
 var repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
+
+// ValidRepo reports whether s looks like a GitHub owner/name.
+func ValidRepo(s string) bool { return repoRe.MatchString(s) }
 
 // FileName is the policy file bordercheck looks for next to its binary.
 const FileName = "policies.json"

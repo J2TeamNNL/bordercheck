@@ -6,9 +6,12 @@
 //
 // The install folder holds the binary, policies.json beside it, and:
 //
-//	config.json     the user's email and this install's ID
-//	state.json      when the last report was sent, the last error, and which
-//	                problems the person at the machine was last notified of
+//	config.json     the user's email and this install's ID; for an install
+//	                from an invite link, the portal, role and policy URL
+//	token           an enrolled install's bearer token, this user only (enroll.go)
+//	state.json      when the last report was sent, the last error, which
+//	                problems the person at the machine was last notified of,
+//	                and the link to this machine's report page
 //	bordercheck.log what each scheduled run did
 package agent
 
@@ -34,6 +37,7 @@ import (
 
 	"github.com/ptrinh/bordercheck/internal/check"
 	"github.com/ptrinh/bordercheck/internal/checks"
+	"github.com/ptrinh/bordercheck/internal/hostinfo"
 	"github.com/ptrinh/bordercheck/internal/policy"
 	"github.com/ptrinh/bordercheck/internal/report"
 	"github.com/ptrinh/bordercheck/internal/update"
@@ -45,7 +49,8 @@ type Env struct {
 	Version string
 	Client  *http.Client
 	Out     io.Writer
-	GitHub  string // release host for updates; "" = https://github.com
+	Term    io.Writer // the terminal only, never the log; nil = none
+	GitHub  string    // release host for updates; "" = https://github.com
 }
 
 // Dir is the install folder: ~/Library/Application Support/bordercheck on macOS,
@@ -87,6 +92,8 @@ type Config struct {
 	// they must be signed with. A refreshed policy cannot change them.
 	UpdateRepo string `json:"update_repo"`
 	UpdateKey  string `json:"update_public_key,omitempty"`
+	// Set for an install made from an invite link; nil for a policies.json one.
+	Enrollment *Enrollment `json:"enrollment,omitempty"`
 }
 
 type State struct {
@@ -98,6 +105,14 @@ type State struct {
 	// Notified maps each problem announced on the desktop (notify.Key) and
 	// still present at the last check to when it was last announced.
 	Notified map[string]time.Time `json:"notified,omitempty"`
+	// ReportPage is the link the receiver gave to this machine's report page;
+	// anyone who has it can see this machine's results.
+	ReportPage string `json:"report_page,omitempty"`
+	// An enrolled install the portal revoked: since when, when it last asked
+	// the portal again, and whether the person at the machine has been told.
+	Revoked         time.Time `json:"revoked,omitzero"`
+	RevokedChecked  time.Time `json:"revoked_checked,omitzero"`
+	RevokedNotified bool      `json:"revoked_notified,omitempty"`
 }
 
 func readJSON(path string, v any) error {
@@ -127,23 +142,44 @@ func writeJSON(path string, v any) error {
 
 // InstallOptions are the answers install needs; Email is asked for when empty.
 type InstallOptions struct {
-	Policy string    // https URL (or path) of policies.json; "" = the one beside this binary
-	Email  string    //
+	// Policy is the https URL (or path) of policies.json, or an invite link
+	// https://<host>/i/<code>. "" = finish or redo an install made from an
+	// invite, else the policies.json beside this binary.
+	Policy string
+	Email  string    // policies.json installs only
 	In     io.Reader // where to read the email from when Email is empty
 	Ask    bool      // In is a terminal, so asking is possible
+	// Invite installs only: the update source, instead of the built-in default.
+	UpdateRepo, UpdateKey string
 }
 
 // Install copies bordercheck and its policy into env.Dir, records the user's
 // email, registers the hourly service and sends a first report right away, so
-// the person installing sees at once whether reports get through.
+// the person installing sees at once whether reports get through. With an
+// invite link, it enrolls instead: see installEnrolled.
 func Install(ctx context.Context, env Env, o InstallOptions) error {
+	var saved Config
+	hadConfig := readJSON(filepath.Join(env.Dir, "config.json"), &saved) == nil
+	if portal, code, ok := ParseInvite(o.Policy); ok {
+		return installEnrolled(ctx, env, o, saved, hadConfig, portal, code)
+	}
+	if saved.Enrollment != nil {
+		if o.Policy == "" {
+			return installEnrolled(ctx, env, o, saved, hadConfig, "", "")
+		}
+		return fmt.Errorf("this machine is enrolled with %s; to install from a policies.json instead, run bordercheck uninstall first",
+			hostOf(saved.Enrollment.Portal))
+	}
+	if o.UpdateRepo != "" || o.UpdateKey != "" {
+		return errors.New("-update-repo and -update-key are for invite links; a policies.json install takes update.repo and update.public_key from the policy")
+	}
 	source := o.Policy
 	if source == "" {
 		if source = policy.NextToBinary(); source == "" {
 			return fmt.Errorf("no %s beside this binary; get it from your IT team or pass -policy", policy.FileName)
 		}
 	}
-	data, pol, err := readPolicy(ctx, env.Client, source)
+	data, pol, err := readPolicy(ctx, env.Client, source, nil)
 	if err != nil {
 		return err
 	}
@@ -183,7 +219,7 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 	if err := writeJSON(filepath.Join(env.Dir, "config.json"), cfg); err != nil {
 		return err
 	}
-	if err := registerService(bin, env.Dir); err != nil {
+	if err := services.register(bin, env.Dir); err != nil {
 		return fmt.Errorf("registering the hourly service: %w", err)
 	}
 	fmt.Fprintf(env.Out, "Installed in %s for %s.\nChecking every hour; reporting every %s to %s.\n",
@@ -196,14 +232,40 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 	if pol.Update.Binary {
 		fmt.Fprintf(env.Out, "Updates itself from github.com/%s releases.\n", pol.Update.Repo)
 	}
+	printSends(env.Out, pol)
 	fmt.Fprintln(env.Out)
 	return Send(ctx, env, true)
 }
 
-// Uninstall removes the service and the install folder.
+// printSends says, at install, when the report carries more than results.
+func printSends(w io.Writer, pol policy.Policy) {
+	if pol.Report.IncludeIPs || pol.Report.IncludeLocation {
+		fmt.Fprintf(w, "Your organisation's policy also sends: %s.\n", sends(pol.Report))
+	}
+}
+
+// sends lists what a report carries besides the results.
+func sends(r policy.Report) string {
+	onOff := func(b bool) string {
+		if b {
+			return "on"
+		}
+		return "off"
+	}
+	loc := onOff(r.IncludeLocation)
+	if r.IncludeLocation {
+		if _, err := hostinfo.Location(context.Background()); err != nil {
+			loc += " (" + hostinfo.LocationSupport() + ")"
+		}
+	}
+	return fmt.Sprintf("evidence %s, IP addresses %s, location %s", onOff(r.IncludeEvidence), onOff(r.IncludeIPs), loc)
+}
+
+// Uninstall removes the service and the install folder, the token with it.
+// The portal is not told: a revoked or forgotten install is IT's to clean up.
 func Uninstall(env Env) error {
-	err := unregisterService()
-	for _, name := range []string{"config.json", "state.json", "bordercheck.log", policy.FileName, binName()} {
+	err := services.unregister()
+	for _, name := range []string{"config.json", "state.json", "bordercheck.log", policy.FileName, TokenFile, binName()} {
 		if e := os.Remove(filepath.Join(env.Dir, name)); e != nil && !errors.Is(e, os.ErrNotExist) {
 			err = errors.Join(err, e) // Windows cannot remove a running binary; it goes on the next uninstall
 		}
@@ -221,17 +283,36 @@ func Send(ctx context.Context, env Env, force bool) error {
 	}
 	var st State
 	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
+	tok, err := credentials(env, cfg)
+	if err != nil {
+		return err
+	}
+	statePath := filepath.Join(env.Dir, "state.json")
+	now := time.Now()
+	// A revoked install asks the portal again once a day, not every hour.
+	if tok != nil && !st.Revoked.IsZero() && !force && now.Sub(st.RevokedChecked) < revokedRetry {
+		fmt.Fprintf(env.Out, "%s revoked by IT since %s; asking %s again after %s\n", now.Format(time.RFC3339),
+			st.Revoked.Format(time.RFC3339), hostOf(tok.portal), st.RevokedChecked.Add(revokedRetry).Format(time.RFC3339))
+		notifyRevoked(ctx, env, &st, now, force)
+		return errors.Join(ErrRevoked, writeJSON(statePath, st))
+	}
 
-	pol, err := currentPolicy(ctx, env, cfg)
+	pol, err := currentPolicy(ctx, env, cfg, tok)
+	if errors.Is(err, ErrRevoked) {
+		revoked(ctx, env, &st, now, force)
+		return errors.Join(err, writeJSON(statePath, st))
+	}
 	if err != nil {
 		return err
 	}
 	if pol.Report.URL == "" {
 		return errors.New("the policy has no report.url")
 	}
-	now := time.Now()
 	if force || now.Sub(st.LastSent) >= pol.Report.Every() {
-		err = sendReport(ctx, env, cfg, pol, &st, now, force)
+		err = sendReport(ctx, env, cfg, pol, &st, now, force, tok)
+		if errors.Is(err, ErrRevoked) {
+			revoked(ctx, env, &st, now, force)
+		}
 	} else {
 		fmt.Fprintf(env.Out, "%s next report due %s\n", now.Format(time.RFC3339),
 			st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339))
@@ -244,25 +325,39 @@ func Send(ctx context.Context, env Env, force bool) error {
 	return errors.Join(err, writeJSON(filepath.Join(env.Dir, "state.json"), st))
 }
 
-func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time, force bool) error {
+func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time, force bool, tok *bearer) error {
 	results := check.RunAll(ctx, checks.All(pol))
 	results = pol.Waive(results, identity(cfg), now)
 	rep := report.New(env.Version, pol.Name, results)
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID
+	if pol.Report.IncludeIPs {
+		rep.Host.IPs = hostinfo.IPs()
+	}
+	if pol.Report.IncludeLocation {
+		if loc, err := hostinfo.Location(ctx); err == nil {
+			rep.Location = loc
+		}
+	}
 	// After the report is posted, whether or not it got through; a notification
 	// never holds up or fails a report.
-	defer notifyUser(ctx, env, pol.Notify, results, st, now, force)
+	defer notifyUser(ctx, env, pol.Notify, results, st, now, force, pol.Report.URL)
 	if !pol.Report.IncludeEvidence {
 		for i := range rep.Results {
 			rep.Results[i].Evidence = nil
 		}
 	}
 	st.LastTry = now
-	err := post(ctx, env, pol.Report, rep)
+	page, err := post(ctx, env, pol.Report, rep, tok)
 	if err != nil {
 		st.LastError = err.Error()
 		fmt.Fprintf(env.Out, "%s report failed: %v\n", now.Format(time.RFC3339), err)
 		return err
+	}
+	if page != "" {
+		st.ReportPage = page
+	}
+	if tok != nil {
+		st.Revoked, st.RevokedChecked, st.RevokedNotified = time.Time{}, time.Time{}, false
 	}
 	st.LastSent, st.LastError = now, ""
 	c := rep.Counts
@@ -280,10 +375,14 @@ func Update(ctx context.Context, env Env) error {
 	}
 	var st State
 	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
-	if _, err := currentPolicy(ctx, env, cfg); err != nil {
+	tok, err := credentials(env, cfg)
+	if err != nil {
 		return err
 	}
-	err := updateBinary(ctx, env, cfg, &st, time.Now())
+	if _, err := currentPolicy(ctx, env, cfg, tok); err != nil {
+		return err
+	}
+	err = updateBinary(ctx, env, cfg, &st, time.Now())
 	return errors.Join(err, writeJSON(filepath.Join(env.Dir, "state.json"), st))
 }
 
@@ -315,22 +414,46 @@ func Status(env Env) (string, error) {
 	}
 	var st State
 	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
+	var b strings.Builder
+	fmt.Fprintf(&b, "Installed:  %s (%s)\nEmail:      %s\nInstall ID: %s\n", env.Dir, env.Version, cfg.Email, cfg.InstallID)
+	refreshedFrom := ""
+	if e := cfg.Enrollment; e != nil {
+		fmt.Fprintf(&b, "Enrolled:   with %s", hostOf(e.Portal))
+		if e.Role != "" {
+			fmt.Fprintf(&b, ", role %s", e.Role)
+		}
+		b.WriteString("\n")
+		if e.Pending {
+			fmt.Fprintf(&b, "Unfinished: the install stopped after enrolling; run: %s install\n", filepath.Join(env.Dir, binName()))
+			return b.String(), nil
+		}
+		refreshedFrom = e.PolicyURL
+	}
+	if !st.Revoked.IsZero() {
+		fmt.Fprintf(&b, "Revoked:    by IT on %s; no reports are sent. Ask IT for a new invite, or run bordercheck uninstall\n",
+			st.Revoked.Format(time.RFC1123))
+	}
 	pol, err := policy.Load(filepath.Join(env.Dir, policy.FileName))
 	if err != nil {
 		return "", err
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "Installed:  %s (%s)\nEmail:      %s\nInstall ID: %s\nPolicy:     %s", env.Dir, env.Version, cfg.Email,
-		cfg.InstallID, pol.Name)
-	if pol.Update.PolicyURL != "" {
-		fmt.Fprintf(&b, " (refreshed from %s)", pol.Update.PolicyURL)
+	if refreshedFrom == "" {
+		refreshedFrom = pol.Update.PolicyURL
 	}
-	fmt.Fprintf(&b, "\nReports:    every %s to %s\nService:    %s\n", pol.Report.Interval, hostOf(pol.Report.URL), serviceStatus())
+	fmt.Fprintf(&b, "Policy:     %s", pol.Name)
+	if refreshedFrom != "" {
+		fmt.Fprintf(&b, " (refreshed from %s)", refreshedFrom)
+	}
+	fmt.Fprintf(&b, "\nReports:    every %s to %s\nSends:      results; %s\nService:    %s\n", pol.Report.Interval,
+		hostOf(pol.Report.URL), sends(pol.Report), services.status())
 	if !st.LastSent.IsZero() {
 		fmt.Fprintf(&b, "Last sent:  %s\n", st.LastSent.Format(time.RFC1123))
 	}
 	if st.LastError != "" {
 		fmt.Fprintf(&b, "Last error: %s (%s)\n", st.LastError, st.LastTry.Format(time.RFC1123))
+	}
+	if link := reportPage(st.ReportPage, pol.Report.URL); link != "" {
+		fmt.Fprintf(&b, "Report page: %s (anyone with this link can see this machine's results)\n", link)
 	}
 	if n := pol.Notify; n.Enabled {
 		fmt.Fprintf(&b, "Notify:     new %s (%s)", joinWords(n.Statuses), joinWords(n.Severities))
@@ -369,15 +492,28 @@ func joinWords[T ~string](vs []T) string {
 
 // currentPolicy refreshes policies.json from its update.policy_url, keeping the
 // last good copy if the fetch or the new policy fails, and applies the update
-// source pinned at install.
-func currentPolicy(ctx context.Context, env Env, cfg Config) (policy.Policy, error) {
+// source pinned at install. An enrolled install (tok != nil) refreshes from the
+// policy URL it was enrolled with, with its token, refuses a policy that points
+// reports or its refresh at another host, and returns ErrRevoked when the
+// portal says so.
+func currentPolicy(ctx context.Context, env Env, cfg Config, tok *bearer) (policy.Policy, error) {
 	path := filepath.Join(env.Dir, policy.FileName)
 	pol, err := policy.Load(path)
 	if err != nil {
 		return pol, err
 	}
-	if u := pol.Update.PolicyURL; u != "" {
-		data, fresh, err := readPolicy(ctx, env.Client, u)
+	u := pol.Update.PolicyURL
+	if tok != nil {
+		u = cfg.Enrollment.PolicyURL
+	}
+	if u != "" {
+		data, fresh, err := readPolicy(ctx, env.Client, u, tok)
+		if errors.Is(err, ErrRevoked) {
+			return pol, err
+		}
+		if err == nil && tok != nil {
+			err = checkEnrolledPolicy(fresh, tok.portal)
+		}
 		if err == nil {
 			err = writeFile(path, data, 0o600)
 		}
@@ -397,8 +533,9 @@ func currentPolicy(ctx context.Context, env Env, cfg Config) (policy.Policy, err
 
 func isURL(s string) bool { return strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://") }
 
-// readPolicy reads a policy from a file or an https URL.
-func readPolicy(ctx context.Context, client *http.Client, source string) ([]byte, policy.Policy, error) {
+// readPolicy reads a policy from a file or an https URL; with tok, from the
+// portal that issued the token only, sending it and following no redirects.
+func readPolicy(ctx context.Context, client *http.Client, source string, tok *bearer) ([]byte, policy.Policy, error) {
 	var data []byte
 	if !isURL(source) {
 		var err error
@@ -415,11 +552,21 @@ func readPolicy(ctx context.Context, client *http.Client, source string) ([]byte
 		if err != nil {
 			return nil, policy.Policy{}, err
 		}
+		if tok != nil {
+			if err := tok.allows(source); err != nil {
+				return nil, policy.Policy{}, err
+			}
+			req.Header.Set("Authorization", "Bearer "+tok.token)
+			client = noRedirects(client)
+		}
 		resp, err := client.Do(req)
 		if err != nil {
 			return nil, policy.Policy{}, err
 		}
 		defer resp.Body.Close()
+		if tok != nil && resp.StatusCode == http.StatusUnauthorized {
+			return nil, policy.Policy{}, fmt.Errorf("fetching policy: %w", authError(resp, hostOf(source)))
+		}
 		if resp.StatusCode != http.StatusOK {
 			return nil, policy.Policy{}, fmt.Errorf("fetching policy: %s", resp.Status)
 		}
@@ -431,38 +578,55 @@ func readPolicy(ctx context.Context, client *http.Client, source string) ([]byte
 	return data, pol, err
 }
 
-// post sends the report. Errors name the host only, never the headers, which
-// may hold a token.
-func post(ctx context.Context, env Env, r policy.Report, rep report.Report) error {
+// post sends the report and returns the link to this machine's report page if
+// the receiver gave a usable one (see reportPage). Errors name the host only,
+// never the headers, which may hold a token. An enrolled install's token (tok)
+// goes only to the portal that issued it.
+func post(ctx context.Context, env Env, r policy.Report, rep report.Report, tok *bearer) (string, error) {
 	body, err := json.Marshal(rep)
 	if err != nil {
-		return err
+		return "", err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.URL, bytes.NewReader(body))
 	if err != nil {
-		return err
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "bordercheck/"+env.Version)
 	for k, v := range r.Headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := env.Client.Do(req)
+	client := env.Client
+	if tok != nil {
+		if err := tok.allows(r.URL); err != nil {
+			return "", err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok.token)
+		client = noRedirects(client)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		var uerr *url.Error
 		if errors.As(err, &uerr) {
 			err = uerr.Err
 		}
-		return fmt.Errorf("posting to %s: %w", hostOf(r.URL), err)
+		return "", fmt.Errorf("posting to %s: %w", hostOf(r.URL), err)
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
-	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("%s answered %s", hostOf(r.URL), resp.Status)
+	if tok != nil && resp.StatusCode == http.StatusUnauthorized {
+		return "", authError(resp, hostOf(r.URL))
 	}
-	return nil
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	if resp.StatusCode/100 != 2 {
+		return "", fmt.Errorf("%s answered %s", hostOf(r.URL), resp.Status)
+	}
+	var answer struct {
+		ReportURL string `json:"report_url"`
+	}
+	_ = json.Unmarshal(data, &answer) // other receivers answer with nothing, or something else
+	return reportPage(answer.ReportURL, r.URL), nil
 }
 
 func askEmail(in io.Reader, out io.Writer, domains []string) (string, error) {

@@ -75,6 +75,26 @@ func registerService(bin, dir string) error {
 	return setCron(cronLine(bin, time.Now().Minute()))
 }
 
+// canRegisterService checks that registerService should work: a systemd user
+// session whose unit folder can be written, or a crontab command.
+func canRegisterService() error {
+	if hasSystemdUser() {
+		ud, err := unitDir()
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(ud, 0o755); err != nil {
+			return err
+		}
+		return probeWrite(ud)
+	}
+	if _, err := exec.LookPath("crontab"); err != nil {
+		return errors.New("this login has no systemd user session and no crontab command, so there is nothing " +
+			"to run bordercheck every hour. Log in to a desktop session, or install cron")
+	}
+	return nil
+}
+
 func unregisterService() error {
 	var err error
 	if hasSystemdUser() {

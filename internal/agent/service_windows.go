@@ -19,6 +19,12 @@ func registerService(bin, _ string) error {
 	return nil
 }
 
+// canRegisterService checks that registerService should work.
+func canRegisterService() error {
+	_, err := exec.LookPath("schtasks")
+	return err
+}
+
 func unregisterService() error {
 	if out, err := exec.Command("schtasks", "/Delete", "/F", "/TN", taskName).CombinedOutput(); err != nil {
 		return fmt.Errorf("schtasks /Delete: %s", bytes.TrimSpace(out))

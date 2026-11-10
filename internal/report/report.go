@@ -18,6 +18,19 @@ type Host struct {
 	OS       string `json:"os"`
 	Arch     string `json:"arch"`
 	Hostname string `json:"hostname"`
+	// The machine's own interface addresses, sent by the installed service only
+	// when the policy sets report.include_ips.
+	IPs []string `json:"ips,omitempty"`
+}
+
+// Location is a device position, sent by the installed service only when the
+// policy sets report.include_location and the OS can give one without asking.
+type Location struct {
+	Lat       float64   `json:"lat"`
+	Lon       float64   `json:"lon"`
+	AccuracyM float64   `json:"accuracy_m"`
+	Source    string    `json:"source"`
+	Time      time.Time `json:"time"`
 }
 
 type Counts struct {
@@ -39,6 +52,7 @@ type Report struct {
 	// Set when an installed bordercheck sends the report.
 	Email     string         `json:"email,omitempty"`
 	InstallID string         `json:"install_id,omitempty"`
+	Location  *Location      `json:"location,omitempty"`
 	Counts    Counts         `json:"counts"`
 	Results   []check.Result `json:"results"`
 }
