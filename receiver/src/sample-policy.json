@@ -1,0 +1,59 @@
+{
+  "report": {
+    "interval": "24h",
+    "include_evidence": false,
+    "include_ips": false
+  },
+  "update": {
+    "binary": true,
+    "interval": "24h"
+  },
+  "notify": {
+    "enabled": true,
+    "statuses": ["fail"],
+    "severities": ["high", "medium"],
+    "remind_every": "24h",
+    "open_report": true
+  },
+  "checks": {
+    "firewall": { "require_stealth": true },
+    "disk-encryption": {},
+    "listeners": {
+      "on_problem": "warn",
+      "allow": [{ "process": "rapportd" }]
+    },
+    "tailscale": {},
+    "docker": { "allow_containers": [], "allow_mounts": [] },
+    "secrets": {
+      "production_keywords": ["prod", "production", "live"],
+      "show_tail": true,
+      "walk_depth": 5,
+      "ignore_paths": []
+    },
+    "ssh-keys": {
+      "no_passphrase": true,
+      "loose_permissions": true,
+      "authorized_keys": true,
+      "allow_keys": []
+    },
+    "tunnels": {
+      "processes": true,
+      "tailscale_funnel": true,
+      "tailscale_serve": true,
+      "allow": [],
+      "lower_severity": ["cloudflared"]
+    },
+    "ai-agents": { "tokens": true, "guardrails": true },
+    "os-updates": {
+      "min_os_versions": { "macos": "15", "windows": "26100", "ubuntu": "22.04" },
+      "require_auto_update": true,
+      "max_check_age_days": 14,
+      "max_pending_days": 14,
+      "max_days_since_update": 45,
+      "check_browsers": true,
+      "max_browser_age_days": 60
+    },
+    "screen-lock": { "require_password": true, "max_lock_minutes": 10 },
+    "remote-access": { "allow": [] }
+  }
+}

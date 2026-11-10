@@ -447,3 +447,19 @@ describe("role policy helpers", () => {
     ]);
   });
 });
+
+describe("sample policy", () => {
+  it("is offered on the roles page, fills the box, and can be saved as it is", async () => {
+    const plain = await (await adminGet("/admin/roles")).text();
+    expect(plain).toContain("Paste sample policy");
+    expect(plain).not.toContain("max_lock_minutes");
+    const filled = await (await adminGet("/admin/roles?sample=1")).text();
+    expect(filled).toContain("max_lock_minutes");
+    expect(filled).toContain("&quot;ai-agents&quot;");
+    const { SAMPLE_POLICY } = await import("../src/portal");
+    expect(validateRolePolicy(JSON.parse(SAMPLE_POLICY), new Date())).toEqual([]);
+    const res = await adminPost("/admin/roles", { name: "From sample", policy: SAMPLE_POLICY });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("created");
+  });
+});

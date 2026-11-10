@@ -28,6 +28,7 @@ import {
   rolePage,
   rolesPage,
   updateRole,
+  SAMPLE_POLICY,
 } from "./portal";
 import { selfReportPage } from "./selfreport";
 
@@ -113,7 +114,9 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
     return redirect(`/admin/machine/${m[1]}`);
   }
 
-  if (path === "/admin/roles" && req.method === "GET") return rolesPage(env, v.who);
+  if (path === "/admin/roles" && req.method === "GET") {
+    return rolesPage(env, v.who, "", url.searchParams.has("sample") ? { name: "", policy: SAMPLE_POLICY } : undefined);
+  }
   if (path === "/admin/roles" && req.method === "POST") return createRole(env, v.who, await formOf(req));
   m = /^\/admin\/roles\/(\d{1,12})$/.exec(path);
   if (m && req.method === "GET") return rolePage(env, Number(m[1]), v.who);

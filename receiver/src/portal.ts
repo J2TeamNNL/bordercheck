@@ -3,6 +3,7 @@
 // revoke/restore, waivers, report link). Auth and same-origin checks are done
 // by the /admin router in index.ts before anything here runs.
 
+import samplePolicy from "./sample-policy.json";
 import { audit, auditStmt } from "./audit";
 import { commandBlock, installCommands, publicOrigin } from "./enroll";
 import { config, DAY, type Env } from "./env";
@@ -31,6 +32,10 @@ interface RoleRow {
   created_at: string;
   updated_at: string;
 }
+
+// What "Paste sample policy" fills in: every check with its main settings spelled
+// out at their defaults, to edit. internal/policy has a test that bordercheck accepts it.
+export const SAMPLE_POLICY = JSON.stringify(samplePolicy, null, 2);
 
 const STARTER_POLICY = `{
   "report": { "interval": "24h" },
@@ -61,7 +66,9 @@ ${rows.results.map(
     (r) => html`<tr><td><a href="/admin/roles/${r.id}">${r.name}</a></td><td class="n">${r.machines}</td><td class="n">${r.pending}</td><td>${when(r.updated_at)}</td></tr>`,
   )}</tbody></table></div>
 ${rows.results.length === 0 ? html`<p class="muted">No roles yet. Create one to start inviting people.</p>` : ""}
-<h2>New role</h2>
+<h2 id="new-role">New role</h2>
+<form method="get" action="/admin/roles#new-role"><p><button name="sample" value="1">Paste sample policy</button>
+<span class="muted">Fills the box with a policy that spells out every check; edit it, then create the role.</span></p></form>
 ${roleForm("/admin/roles", draft?.name ?? "", draft?.policy ?? STARTER_POLICY, "Create role")}`;
   return page(layout("Roles", who, body), status);
 }
