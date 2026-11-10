@@ -43,6 +43,7 @@ const usage = `Usage:
   bordercheck verify SHA256SUMS SHA256SUMS.sig [file...]
                                                      check downloaded release files against the signed checksums
   bordercheck -list | -print-policy | -version
+  bordercheck help                                   the commands in plain words
 
 The policy is read from -policy, then $BORDERCHECK_POLICY, then policies.json beside the binary,
 else the built-in one. Exit status: 0 no failures, 1 at least one failure, 2 error.
@@ -50,14 +51,59 @@ else the built-in one. Exit status: 0 no failures, 1 at least one failure, 2 err
 
 func main() { os.Exit(run(os.Args[1:])) }
 
+// help is what a person at the machine can run, in plain words; usage (-h)
+// lists every option.
+const help = `bordercheck %s: checks this computer for open doors and says how to close each one.
+
+Everyday
+  bordercheck                    check this computer now and show what to fix (sends nothing)
+  bordercheck status             is it installed, when it last reported, the link to your report page
+  bordercheck send -force        check now and send a fresh report to your organisation
+  bordercheck update             get the newest policy and the newest version now
+  bordercheck notifications      macOS: let bordercheck show notifications under its own name
+  bordercheck uninstall          remove bordercheck from this computer (stops the reports too)
+
+Looking closer
+  bordercheck -only firewall,secrets    run only these checks
+  bordercheck -list                     the checks and their IDs
+  bordercheck -json                     the report as JSON
+  bordercheck -print-policy             the rules in force on this computer
+
+Setting up
+  bordercheck install <invite link from IT, or a policies.json URL>
+  bordercheck verify SHA256SUMS SHA256SUMS.sig [file...]
+
+  bordercheck help               this list
+  bordercheck -h                 every option
+
+This copy: %s
+%s
+`
+
+func runHelp() int {
+	exe, err := os.Executable()
+	if err != nil {
+		exe = "bordercheck"
+	}
+	fmt.Printf(help, version, exe, report.Credit)
+	return 0
+}
+
 func run(args []string) int {
 	if len(args) > 0 {
 		switch args[0] {
+		case "help", "--help":
+			return runHelp()
 		case "install", "uninstall", "status", "send", "update", "notifications":
 			return runAgent(args[0], args[1:])
 		case "verify":
 			return runVerify(args[1:])
 		}
+	}
+	// A word that is not a command or an option: say so, rather than running the checks.
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		fmt.Fprintf(os.Stderr, "bordercheck: unknown command %q; run: bordercheck help\n", args[0])
+		return 2
 	}
 	return runCheck(args)
 }
