@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
 
@@ -48,7 +49,7 @@ func updateFactsOS(ctx context.Context) (updateFacts, error) {
 			on := aptAutoUpgrade(dump) && hasFile("/usr/bin/unattended-upgrade")
 			f.AutoUpdate = &on
 			if !on {
-				f.AutoUpdateOff = "unattended-upgrades is not installed or not enabled"
+				f.AutoUpdateOff = msg.Of("updates.autoOff.apt")
 			}
 		}
 		f.LastCheck = newestModTime("/var/lib/apt/periodic/update-success-stamp", "/var/cache/apt/pkgcache.bin")
@@ -67,12 +68,12 @@ func updateFactsOS(ctx context.Context) (updateFacts, error) {
 		if !on {
 			if gs, err := sysx.Run(ctx, "gsettings", "get", "org.gnome.software", "download-updates"); err == nil && strings.TrimSpace(gs) == "true" {
 				on = true
-				f.Notes = append(f.Notes, "GNOME Software downloads updates; they install on restart.")
+				f.Notes = append(f.Notes, msg.P("updates.note.gnomeSoftware"))
 			}
 		}
 		f.AutoUpdate = &on
 		if !on {
-			f.AutoUpdateOff = "no dnf-automatic timer is enabled and GNOME Software does not download updates"
+			f.AutoUpdateOff = msg.Of("updates.autoOff.dnf")
 		}
 		f.LastInstall = newestModTime("/var/lib/rpm/rpmdb.sqlite", "/var/lib/rpm/Packages")
 	case "arch":
@@ -128,14 +129,14 @@ func screenLockOS(ctx context.Context) (lockFacts, error) {
 
 var remoteUnits = []string{"ssh.service", "sshd.service", "ssh.socket", "sshd.socket", "xrdp.service", "gnome-remote-desktop.service"}
 
-func remoteServicesOS(ctx context.Context) ([]remoteService, []string, error) {
+func remoteServicesOS(ctx context.Context) ([]remoteService, msg.Text, error) {
 	var ls []listener
 	for _, p := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
 		if b, err := os.ReadFile(p); err == nil {
 			ls = append(ls, procNetListen(string(b))...)
 		}
 	}
-	var notes []string
+	var notes msg.Text
 	active := map[string]string{}
 	out, _ := sysx.Run(ctx, "systemctl", append([]string{"is-active"}, remoteUnits...)...)
 	if states := strings.Fields(out); len(states) == len(remoteUnits) {
@@ -143,7 +144,7 @@ func remoteServicesOS(ctx context.Context) ([]remoteService, []string, error) {
 			active[u] = states[i]
 		}
 	} else {
-		notes = append(notes, "Could not read systemd unit states; judged from open ports only.")
+		notes = append(notes, msg.P("remote.note.noSystemd"))
 	}
 	var confs []string
 	for _, pat := range []string{"/usr/share/lightdm/lightdm.conf.d/*.conf", "/usr/local/share/lightdm/lightdm.conf.d/*.conf",

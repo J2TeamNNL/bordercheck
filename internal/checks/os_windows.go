@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
 
@@ -23,10 +24,10 @@ func diskEncryption(ctx context.Context) check.Result {
 	return evalBitLocker(out)
 }
 
-func listListeners(ctx context.Context) ([]listener, string, error) {
+func listListeners(ctx context.Context) ([]listener, msg.Text, error) {
 	out, err := sysx.PowerShell(ctx, `Get-NetTCPConnection -State Listen | ForEach-Object { '{0}|{1}|{2}' -f (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName, $_.LocalAddress, $_.LocalPort }`)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
-	return parseWinListeners(out), "", nil
+	return parseWinListeners(out), nil, nil
 }

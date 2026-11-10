@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
@@ -511,8 +512,7 @@ func splitTOML(data []byte, scope []string) (string, map[string]string) {
 
 func evalAIAgents(found []aiFinding, files int) check.Result {
 	if len(found) == 0 {
-		return check.Result{Status: check.Pass,
-			Summary: fmt.Sprintf("%d AI agent config file(s) checked: no plain-text tokens, guardrails on.", files)}
+		return check.Result{Status: check.Pass}.WithSummary(msg.Of("ai.pass", "n", files))
 	}
 	sort.SliceStable(found, func(i, j int) bool { return found[i].sev == check.High && found[j].sev != check.High })
 	var ev []string
@@ -530,18 +530,15 @@ func evalAIAgents(found []aiFinding, files int) check.Result {
 	if len(ev) > secretMaxEvidence {
 		ev = append(ev[:secretMaxEvidence], fmt.Sprintf("… and %d more", len(ev)-secretMaxEvidence))
 	}
-	var parts []string
+	var parts msg.Text
 	if tokens > 0 {
-		parts = append(parts, fmt.Sprintf("%d plain-text token(s) in AI agent / MCP configs", tokens))
+		parts = append(parts, msg.P("ai.tokens", "n", tokens))
 	}
 	if guards > 0 {
-		parts = append(parts, fmt.Sprintf("%d agent setting(s) that skip approvals or the sandbox", guards))
+		parts = append(parts, msg.P("ai.guards", "n", guards))
 	}
-	r := check.Result{Status: check.Warn, Severity: check.Medium, Summary: strings.Join(parts, ", ") + ".", Evidence: ev,
-		Fix: "Keep tokens out of MCP configs: reference an environment variable instead (\"env\": {\"API_KEY\": " +
-			"\"${env:API_KEY}\"} or the agent's own input/secret mechanism) and load it from the OS keychain " +
-			"(touchenv run on macOS). Rotate tokens that sat in these files. Turn approvals and the sandbox back on: " +
-			"a prompt injection in any file, web page or issue the agent reads can then run commands as you."}
+	r := check.Result{Status: check.Warn, Severity: check.Medium, Evidence: ev}.
+		WithSummary(parts).WithFix(msg.Of("ai.fix"))
 	if high {
 		r.Status, r.Severity = check.Fail, check.High
 	}

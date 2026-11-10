@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
@@ -30,18 +31,18 @@ func docker(ctx context.Context, opts policy.Docker) check.Result {
 	}
 	bin, ok := sysx.Find("docker", fallbacks...)
 	if !ok {
-		return check.Skipped("Docker is not installed.")
+		return check.SkippedMsg(msg.Of("docker.notInstalled"))
 	}
 	ids, err := sysx.Run(ctx, bin, "ps", "-q")
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "permission denied") {
 			// Linux: the socket belongs to root and the docker group.
-			return check.Skipped("Docker is installed, but this user may not use it (not in the docker group), so its containers were not checked.")
+			return check.SkippedMsg(msg.Of("docker.noPermission"))
 		}
-		return check.Skipped("Docker is not running.")
+		return check.SkippedMsg(msg.Of("docker.notRunning"))
 	}
 	if len(strings.Fields(ids)) == 0 {
-		return check.Result{Status: check.Pass, Summary: "No running containers."}
+		return check.Result{Status: check.Pass}.WithSummary(msg.Of("docker.noContainers"))
 	}
 	out, err := sysx.Run(ctx, bin, append([]string{"inspect"}, strings.Fields(ids)...)...)
 	if err != nil {
@@ -106,13 +107,11 @@ func evalDocker(out, home string, opts policy.Docker) check.Result {
 	}
 	high, medium = uniqSorted(high), uniqSorted(medium)
 	if len(high)+len(medium) == 0 {
-		return check.Result{Status: check.Pass, Summary: fmt.Sprintf("%d running container(s), all isolated.", len(cs))}
+		return check.Result{Status: check.Pass}.WithSummary(msg.Of("docker.pass", "n", len(cs)))
 	}
-	r := check.Result{Status: check.Warn, Severity: check.Medium,
-		Summary:  fmt.Sprintf("%d problem(s) in %d running container(s).", len(high)+len(medium), len(cs)),
-		Evidence: append(high, medium...),
-		Fix: "Publish ports on localhost only (-p 127.0.0.1:5432:5432). Don't use --network host or --privileged. " +
-			"Mount only the project folder, never the Docker socket, your home folder or credential folders."}
+	r := check.Result{Status: check.Warn, Severity: check.Medium, Evidence: append(high, medium...)}.
+		WithSummary(msg.Of("docker.problems", "n", len(high)+len(medium), "containers", len(cs))).
+		WithFix(msg.Of("docker.fix"))
 	if len(high) > 0 {
 		r.Status, r.Severity = check.Fail, check.High
 	}

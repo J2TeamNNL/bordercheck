@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
 
@@ -32,7 +33,7 @@ func updateFactsOS(ctx context.Context) (updateFacts, error) {
 	su, err := plistXML(ctx, "/Library/Preferences/com.apple.SoftwareUpdate.plist")
 	if err != nil || su == "" {
 		f := updateFacts{Family: "macos", Key: "macos", Version: strings.TrimSpace(ver), Name: "macOS " + strings.TrimSpace(ver)}
-		f.Notes = append(f.Notes, "Could not read Software Update's settings.")
+		f.Notes = append(f.Notes, msg.P("updates.note.macSettings"))
 		return f, nil
 	}
 	managed, _ := plistXML(ctx, "/Library/Managed Preferences/com.apple.SoftwareUpdate.plist")
@@ -107,7 +108,7 @@ func macScreenSaverIdle(ctx context.Context) int {
 	return -1
 }
 
-func remoteServicesOS(ctx context.Context) ([]remoteService, []string, error) {
+func remoteServicesOS(ctx context.Context) ([]remoteService, msg.Text, error) {
 	disabled, err := sysx.Run(ctx, "/bin/launchctl", "print-disabled", "system")
 	if err != nil {
 		return nil, nil, err

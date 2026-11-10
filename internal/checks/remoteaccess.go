@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
@@ -22,7 +23,7 @@ type remoteService struct {
 	Name string // what the OS calls it
 	On   bool
 	How  string // why it looks on, e.g. "port 22 open"
-	Fix  string
+	Fix  msg.Part
 }
 
 // Guest logins and Remote Apple Events need someone at the keyboard or a
@@ -42,7 +43,7 @@ func remoteAccess(opts policy.RemoteAccess) func(context.Context) check.Result {
 	}
 }
 
-func evalRemoteAccess(svcs []remoteService, notes, allow []string) check.Result {
+func evalRemoteAccess(svcs []remoteService, notes msg.Text, allow []string) check.Result {
 	var p issueList
 	var evidence, off, allowed []string
 	for _, s := range svcs {
@@ -60,12 +61,12 @@ func evalRemoteAccess(svcs []remoteService, notes, allow []string) check.Result 
 			continue
 		}
 		evidence = append(evidence, line)
-		p.add(!slices.Contains(remoteMedium, s.ID), s.Name+" is on.", s.Fix)
+		p.add(!slices.Contains(remoteMedium, s.ID), msg.Of("remote.on", "service", s.Name), s.Fix)
 	}
 	if len(allowed) > 0 {
-		notes = append([]string{"On but allowed by policy: " + strings.Join(allowed, ", ") + "."}, notes...)
+		notes = append(msg.Of("remote.allowed", "services", strings.Join(allowed, ", ")), notes...)
 	}
-	pass := "Off: " + strings.Join(off, ", ") + "."
+	pass := msg.Of("remote.off", "services", strings.Join(off, ", "))
 	return p.result(pass, notes, evidence)
 }
 
@@ -128,9 +129,8 @@ func openPorts(ls []listener) map[int]bool {
 func macRemoteServices(disabled, netstat string, ardOn bool, guest string) []remoteService {
 	overrides := parseLaunchctlDisabled(disabled)
 	ports := openPorts(parseNetstatListen(netstat))
-	sharing := "System Settings → General → Sharing → turn off "
 	svc := func(id, name, label string, port int, fix string) remoteService {
-		s := remoteService{ID: id, Name: name, Fix: sharing + fix + "."}
+		s := remoteService{ID: id, Name: name, Fix: msg.P("remote.fix.macSharing", "service", fix)}
 		var how []string
 		if overrides[label] {
 			how = append(how, "enabled in launchd")
@@ -152,7 +152,7 @@ func macRemoteServices(disabled, netstat string, ardOn bool, guest string) []rem
 		}
 	}
 	g := remoteService{ID: "guest", Name: "Guest user", On: strings.TrimSpace(guest) == "true",
-		Fix: "System Settings → Users & Groups → Guest User → turn off \"Allow guests to log in to this computer\"."}
+		Fix: msg.P("remote.fix.macGuest")}
 	if g.On {
 		g.How = "guests can log in"
 	}
@@ -186,7 +186,7 @@ func winRemoteServices(kv map[string]string) []remoteService {
 		deny = v
 	}
 	rdp := remoteService{ID: "rdp", Name: "Remote Desktop",
-		Fix: "Settings → System → Remote Desktop → Off (if a policy turned it on, ask IT)."}
+		Fix: msg.P("remote.fix.winRDP")}
 	var how []string
 	if deny == "0" {
 		how = append(how, "allowed in settings")
@@ -197,15 +197,13 @@ func winRemoteServices(kv map[string]string) []remoteService {
 	rdp.On, rdp.How = len(how) > 0, strings.Join(how, ", ")
 
 	winrm := remoteService{ID: "winrm", Name: "WinRM (PowerShell remoting)", On: ports[5985] || ports[5986],
-		Fix: "As administrator: winrm delete winrm/config/Listener?Address=*+Transport=HTTP, then " +
-			"Stop-Service WinRM; Set-Service WinRM -StartupType Disabled."}
+		Fix: msg.P("remote.fix.winRM")}
 	if winrm.On {
 		winrm.How = "port 5985/5986 open"
 	}
 
 	ssh := remoteService{ID: "ssh", Name: "OpenSSH Server",
-		Fix: "As administrator: Stop-Service sshd; Set-Service sshd -StartupType Disabled. " +
-			"Or Settings → System → Optional features → remove OpenSSH Server."}
+		Fix: msg.P("remote.fix.winSSH")}
 	status, start, _ := strings.Cut(kv["sshd"], "/")
 	how = nil
 	if status == "Running" {
@@ -219,7 +217,7 @@ func winRemoteServices(kv map[string]string) []remoteService {
 	ssh.On, ssh.How = len(how) > 0, strings.Join(how, ", ")
 
 	guest := remoteService{ID: "guest", Name: "Guest account", On: strings.EqualFold(kv["guest_disabled"], "False"),
-		Fix: "As administrator: Computer Management → Local Users and Groups → Users → Guest → tick \"Account is disabled\"."}
+		Fix: msg.P("remote.fix.winGuest")}
 	if guest.On {
 		guest.How = "enabled"
 	}
@@ -280,7 +278,7 @@ func lightdmGuest(confs []string, hasGuestScript bool) bool {
 func linuxRemoteServices(active map[string]string, ls []listener, guest bool) []remoteService {
 	ports := openPorts(ls)
 	svc := func(id, name string, units []string, portLo, portHi int, fix string) remoteService {
-		s := remoteService{ID: id, Name: name, Fix: fix}
+		s := remoteService{ID: id, Name: name, Fix: msg.P(fix)}
 		var how []string
 		for _, u := range units {
 			if active[u] == "active" {
@@ -296,13 +294,13 @@ func linuxRemoteServices(active map[string]string, ls []listener, guest bool) []
 		return s
 	}
 	ssh := svc("ssh", "SSH server", []string{"ssh.service", "sshd.service", "ssh.socket", "sshd.socket"}, 22, 22,
-		"sudo systemctl disable --now ssh.service ssh.socket (Debian/Ubuntu) or sshd.service (Fedora/Arch), or uninstall openssh-server.")
+		"remote.fix.linuxSSH")
 	rdp := svc("rdp", "Remote desktop (RDP)", []string{"xrdp.service", "gnome-remote-desktop.service"}, 3389, 3389,
-		"GNOME: Settings → System → Remote Desktop → turn off Desktop Sharing and Remote Login. xrdp: sudo systemctl disable --now xrdp.")
+		"remote.fix.linuxRDP")
 	vnc := svc("screen-sharing", "Screen sharing (VNC)", nil, 5900, 5909,
-		"Turn off screen sharing (GNOME: Settings → Sharing; KDE: Krfb) and stop VNC servers such as x11vnc or TigerVNC.")
+		"remote.fix.linuxVNC")
 	g := remoteService{ID: "guest", Name: "Guest session", On: guest,
-		Fix: "Set allow-guest=false under [Seat:*] in /etc/lightdm/lightdm.conf."}
+		Fix: msg.P("remote.fix.linuxGuest")}
 	if guest {
 		g.How = "LightDM offers a guest session"
 	}

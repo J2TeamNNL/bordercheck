@@ -70,20 +70,20 @@ Code\x20H   777 me    7u  IPv4 0x1234567890abcdef      0t0  TCP 192.168.1.5:9000
 	if len(ls) != 5 {
 		t.Fatalf("parseLsof: got %d listeners, want 5: %+v", len(ls), ls)
 	}
-	r := evalListeners(ls, "", nil)
+	r := evalListeners(ls, nil, nil)
 	want := []string{"Code H: port 9000 on 192.168.1.5", "node: port 3000 on all interfaces"}
 	if r.Status != check.Warn || !slices.Equal(r.Evidence, want) {
 		t.Errorf("got %s %q, want warn %q", r.Status, r.Evidence, want)
 	}
 
 	win := parseWinListeners("System|0.0.0.0|445\r\nnode|127.0.0.1|5173\r\n|::|135\r\n")
-	r = evalListeners(win, "", nil)
+	r = evalListeners(win, nil, nil)
 	want = []string{"System: port 445 on all interfaces (Windows file sharing (SMB) and other system services)", "unknown process: port 135 on all interfaces"}
 	if !slices.Equal(r.Evidence, want) {
 		t.Errorf("windows: got %q, want %q", r.Evidence, want)
 	}
 
-	if r := evalListeners(parseLsof(lsof)[:1], "", nil); r.Status != check.Pass {
+	if r := evalListeners(parseLsof(lsof)[:1], nil, nil); r.Status != check.Pass {
 		t.Errorf("loopback only: got %s", r.Status)
 	}
 }
@@ -196,15 +196,15 @@ func TestScanSecrets(t *testing.T) {
 }
 
 func TestEvalSecrets(t *testing.T) {
-	if r := evalSecrets(nil, nil, false, ""); r.Status != check.Pass {
+	if r := evalSecrets(nil, nil, false, nil); r.Status != check.Pass {
 		t.Errorf("none: got %s", r.Status)
 	}
 	medium := []secretFinding{{"~/.zshrc", 1, "OpenAI API key", "OPENAI_API_KEY", false, "", false}}
-	if r := evalSecrets(medium, nil, false, ""); r.Status != check.Warn {
+	if r := evalSecrets(medium, nil, false, nil); r.Status != check.Warn {
 		t.Errorf("medium: got %s", r.Status)
 	}
 	high := append(medium, secretFinding{"~/k.pem", 1, "Private key", "", false, "", true})
-	r := evalSecrets(high, []string{"~/c.p12"}, true, "")
+	r := evalSecrets(high, []string{"~/c.p12"}, true, nil)
 	if r.Status != check.Fail || !strings.HasPrefix(r.Evidence[0], "~/k.pem") || !strings.Contains(r.Summary, "time limit") {
 		t.Errorf("high: got %s %q %q", r.Status, r.Summary, r.Evidence)
 	}
@@ -252,7 +252,7 @@ func TestFirewallWithoutStealth(t *testing.T) {
 
 func TestListenerAllow(t *testing.T) {
 	ls := []listener{{"node", "*", "3000"}, {"node", "*", "4000"}, {"Dropbox", "*", "17500"}}
-	r := evalListeners(ls, "", []policy.ListenerRule{{Process: "node", Port: "3000"}, {Process: "dropbox"}})
+	r := evalListeners(ls, nil, []policy.ListenerRule{{Process: "node", Port: "3000"}, {Process: "dropbox"}})
 	if !slices.Equal(r.Evidence, []string{"node: port 4000 on all interfaces"}) || !strings.Contains(r.Summary, "2 more allowed") {
 		t.Errorf("got %q %q", r.Summary, r.Evidence)
 	}

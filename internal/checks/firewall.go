@@ -1,12 +1,12 @@
 package checks
 
 import (
-	"errors"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 )
 
 var fwStateRe = regexp.MustCompile(`State = (\d)`)
@@ -18,22 +18,18 @@ func evalMacFirewall(global, stealth string, requireStealth bool) check.Result {
 		on = m[1] != "0" // 1 = on, 2 = block all
 	}
 	if !on {
-		return check.Result{Status: check.Fail, Severity: check.High,
-			Summary: "The macOS firewall is off.",
-			Fix: "System Settings → Network → Firewall → turn it on. " +
-				"Or: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on"}
+		return check.Result{Status: check.Fail, Severity: check.High}.
+			WithSummary(msg.Of("firewall.mac.off")).WithFix(msg.Of("firewall.mac.off.fix"))
 	}
 	s := strings.ToLower(strings.TrimSpace(stealth))
 	if requireStealth && !strings.Contains(s, "enabled") && !strings.HasSuffix(s, " on") {
-		return check.Result{Status: check.Warn, Severity: check.Low,
-			Summary: "The firewall is on, but stealth mode is off: this Mac answers probes from the network.",
-			Fix: "System Settings → Network → Firewall → Options → turn on stealth mode. " +
-				"Or: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on"}
+		return check.Result{Status: check.Warn, Severity: check.Low}.
+			WithSummary(msg.Of("firewall.mac.stealthOff")).WithFix(msg.Of("firewall.mac.stealthOff.fix"))
 	}
 	if !requireStealth {
-		return check.Result{Status: check.Pass, Summary: "Firewall is on."}
+		return check.Result{Status: check.Pass}.WithSummary(msg.Of("firewall.mac.on"))
 	}
-	return check.Result{Status: check.Pass, Summary: "Firewall and stealth mode are on."}
+	return check.Result{Status: check.Pass}.WithSummary(msg.Of("firewall.mac.onStealth"))
 }
 
 // parseWinFirewall reads lines of "Profile=True|False".
@@ -50,7 +46,7 @@ func parseWinFirewall(out string) map[string]bool {
 
 func evalWinFirewall(profiles map[string]bool) check.Result {
 	if len(profiles) == 0 {
-		return check.Errored(errors.New("Windows reported no firewall profiles"))
+		return check.Errored(msg.Err("firewall.win.noProfiles"))
 	}
 	var off []string
 	for name, on := range profiles {
@@ -59,13 +55,12 @@ func evalWinFirewall(profiles map[string]bool) check.Result {
 		}
 	}
 	if len(off) == 0 {
-		return check.Result{Status: check.Pass, Summary: "Windows Firewall is on for every profile."}
+		return check.Result{Status: check.Pass}.WithSummary(msg.Of("firewall.win.on"))
 	}
 	sort.Strings(off)
-	return check.Result{Status: check.Fail, Severity: check.High,
-		Summary: "Windows Firewall is off for: " + strings.Join(off, ", ") + ".",
-		Fix: "Windows Security → Firewall & network protection → turn it on for every network. " +
-			"Or, as administrator: Set-NetFirewallProfile -All -Enabled True"}
+	return check.Result{Status: check.Fail, Severity: check.High}.
+		WithSummary(msg.Of("firewall.win.off", "profiles", strings.Join(off, ", "))).
+		WithFix(msg.Of("firewall.win.off.fix"))
 }
 
 // The services that load firewall rules on Linux, in the order they are judged.
@@ -87,28 +82,26 @@ type linuxFirewall struct {
 // Zones whose defaults let the network in. Fedora Workstation's own zone opens
 // every port from 1025 up, so apps that listen on all interfaces are reachable.
 var openFirewalldZones = map[string]string{
-	"FedoraWorkstation": "lets in every port from 1025 to 65535",
-	"trusted":           "lets everything in",
+	"FedoraWorkstation": "firewall.linux.zoneOpenPorts",
+	"trusted":           "firewall.linux.zoneTrusted",
 }
 
-const linuxFirewallFix = "Ubuntu/Debian: sudo ufw enable (it blocks incoming connections and allows outgoing). " +
-	"Fedora/RHEL/openSUSE: sudo systemctl enable --now firewalld."
+var linuxFirewallFix = msg.Of("firewall.linux.fix")
 
 // evalLinuxFirewall judges what linuxFirewall gathered. Without root it trusts
 // configuration (ufw.conf, running services) and says so; it never guesses
 // about rules it cannot read.
 func evalLinuxFirewall(fw linuxFirewall) check.Result {
 	if fw.Services["firewalld"] == "active" {
-		if why, open := openFirewalldZones[fw.FirewalldZone]; open {
-			return check.Result{Status: check.Warn, Severity: check.Medium,
-				Summary: "firewalld is on, but its default zone " + fw.FirewalldZone + " " + why + ".",
-				Fix:     "sudo firewall-cmd --set-default-zone=public (allows SSH and DHCPv6 only); open what you need with --add-service."}
+		if key, open := openFirewalldZones[fw.FirewalldZone]; open {
+			return check.Result{Status: check.Warn, Severity: check.Medium}.
+				WithSummary(msg.Of(key, "zone", fw.FirewalldZone)).WithFix(msg.Of("firewall.linux.zone.fix"))
 		}
-		s := "firewalld is on."
+		s := msg.Of("firewall.linux.firewalldOn")
 		if fw.FirewalldZone != "" {
-			s = "firewalld is on (default zone " + fw.FirewalldZone + ")."
+			s = msg.Of("firewall.linux.firewalldOnZone", "zone", fw.FirewalldZone)
 		}
-		return check.Result{Status: check.Pass, Summary: s}
+		return check.Result{Status: check.Pass}.WithSummary(s)
 	}
 
 	ufwOn, ufwKnown := false, false
@@ -118,20 +111,19 @@ func evalLinuxFirewall(fw linuxFirewall) check.Result {
 		ufwOn, ufwKnown = strings.EqualFold(m[1], "yes"), true
 	}
 	if ufwOn {
-		s := "ufw is on."
+		s := msg.Of("firewall.linux.ufwOn")
 		if !fw.Root {
-			s = "ufw is on (enabled in /etc/ufw/ufw.conf)."
+			s = msg.Of("firewall.linux.ufwOnConf")
 		}
-		return check.Result{Status: check.Pass, Summary: s}
+		return check.Result{Status: check.Pass}.WithSummary(s)
 	}
 
 	if fw.Root {
 		if nftInputDrops(fw.Nft) || iptablesInputDrops(fw.Iptables) {
-			return check.Result{Status: check.Pass, Summary: "The firewall drops incoming connections by default (input policy)."}
+			return check.Result{Status: check.Pass}.WithSummary(msg.Of("firewall.linux.inputDrops"))
 		}
-		return check.Result{Status: check.Fail, Severity: check.High,
-			Summary: "No firewall drops incoming connections: no nftables or iptables input chain defaults to drop.",
-			Fix:     linuxFirewallFix}
+		return check.Result{Status: check.Fail, Severity: check.High}.
+			WithSummary(msg.Of("firewall.linux.noDrop")).WithFix(linuxFirewallFix)
 	}
 
 	var loaders []string
@@ -141,24 +133,16 @@ func evalLinuxFirewall(fw linuxFirewall) check.Result {
 		}
 	}
 	if len(loaders) > 0 {
-		return check.Skipped("The " + strings.Join(loaders, ", ") + " service loads firewall rules, but they can only be " +
-			"read as root, so bordercheck cannot tell whether they block incoming connections. " +
-			"Run sudo bordercheck -only firewall to check them.")
+		return check.SkippedMsg(msg.Of("firewall.linux.rootOnly", "services", strings.Join(loaders, ", ")))
 	}
 	if fw.Services["firewalld"] == "" && !ufwKnown {
-		return check.Skipped("Could not tell without root: there is no ufw configuration and systemd did not say which " +
-			"firewall services run. Run sudo bordercheck -only firewall to check the rules.")
+		return check.SkippedMsg(msg.Of("firewall.linux.unknown"))
 	}
-	s := "No firewall is on: "
+	s := msg.Of("firewall.linux.noneNoUfw")
 	if fw.UFW {
-		s += "ufw is installed but off, "
-	} else {
-		s += "ufw is not installed, "
+		s = msg.Of("firewall.linux.noneUfwOff")
 	}
-	return check.Result{Status: check.Fail, Severity: check.High,
-		Summary: s + "and no firewalld, nftables or iptables service is running. " +
-			"(If you load rules some other way, sudo bordercheck -only firewall checks them.)",
-		Fix: linuxFirewallFix}
+	return check.Result{Status: check.Fail, Severity: check.High}.WithSummary(s).WithFix(linuxFirewallFix)
 }
 
 var ufwEnabledRe = regexp.MustCompile(`(?m)^\s*ENABLED\s*=\s*"?(\w+)"?`)

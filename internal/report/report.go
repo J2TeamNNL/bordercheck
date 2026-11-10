@@ -61,7 +61,8 @@ func New(version, policy string, results []check.Result) Report {
 	hostname, _ := os.Hostname()
 	r := Report{Tool: "bordercheck", Version: version, Policy: policy, Time: time.Now().UTC().Truncate(time.Second),
 		Host: Host{OS: runtime.GOOS, Arch: runtime.GOARCH, Hostname: hostname}, Results: results}
-	for _, res := range results {
+	for i, res := range results {
+		results[i] = res.Consistent()
 		switch res.Status {
 		case check.Fail:
 			r.Counts.Fail++

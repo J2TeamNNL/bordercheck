@@ -1,5 +1,6 @@
 import { config, DAY, type Env } from "./env";
-import { badge, count, html, type Html, layout, linkify, note, page, pct, pill, sev, statusClass } from "./html";
+import { fixHtml, summaryHtml } from "./checktext";
+import { badge, count, html, type Html, layout, note, page, pct, pill, sev, statusClass } from "./html";
 import { type Geo, mapLink, parseGeo, place } from "./geo";
 import { checkTitle, type I18n, type Key } from "./i18n";
 import { enrollmentOf, enrollmentSection } from "./portal";
@@ -275,9 +276,9 @@ function resultCard(L: I18n, r: Result, since: string | undefined, now: number):
   return html`<div class="result ${statusClass(r.status)}"><div class="head">${badge(L, r.status)} ${sev(L, r.severity)}
 <h3>${checkTitle(L, r.id, r.title)}</h3> <code class="muted">${r.id}</code>${since ? html`<span class="since">${L.t("machine.since", { when: L.when(since) })}</span>` : ""}</div>
 ${waiverNote(L, r, now)}
-${r.summary ? html`<div class="body">${r.summary}</div>` : ""}
+${r.summary ? html`<div class="body">${summaryHtml(L, r)}</div>` : ""}
 ${r.evidence.length ? html`<ul class="evidence">${r.evidence.map((e) => html`<li class="ev">${e}</li>`)}</ul>` : ""}
-${r.fix ? html`<div class="fix"><b>${L.t("machine.fix")}</b><span>${linkify(r.fix)}</span></div>` : ""}</div>`;
+${r.fix ? html`<div class="fix"><b>${L.t("machine.fix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}</div>`;
 }
 
 function statTile(L: I18n, n: number, label: Html, tone: string): Html {
@@ -345,7 +346,7 @@ ${problems.map((r) => resultCard(L, r, since.get(r.id), now))}
 <h2>${L.t("machine.fine", { n: fine.length })}</h2>
 ${fine.length
     ? html`<div class="compact">${fine.map(
-        (r) => html`<div>${badge(L, r.status)}<div><div class="t">${checkTitle(L, r.id, r.title)}</div><div class="sub"><code>${r.id}</code>${r.summary ? html` · ${r.summary}` : ""}</div></div></div>`,
+        (r) => html`<div>${badge(L, r.status)}<div><div class="t">${checkTitle(L, r.id, r.title)}</div><div class="sub"><code>${r.id}</code>${r.summary ? html` · ${summaryHtml(L, r)}` : ""}</div></div></div>`,
       )}</div>`
     : html`<div class="panel"><p class="muted">${L.t("common.none")}</p></div>`}
 <h2>${L.t("machine.details")}</h2>

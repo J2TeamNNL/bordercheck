@@ -16,8 +16,9 @@
 
 import { config, type Env } from "./env";
 import { CAPABILITY_HEADERS, SELF, tooManyRequests } from "./enroll";
+import { fixHtml, summaryHtml } from "./checktext";
 import { checkTitle, forRequest, type I18n } from "./i18n";
-import { badge, Html, html, layout, linkify, MARK, page, sev, statusClass } from "./html";
+import { badge, Html, html, layout, MARK, page, sev, statusClass } from "./html";
 
 const GLYPH_OK = new Html(
   `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5.5 12.5 4.2 4.2 8.8-9.2" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
@@ -78,15 +79,15 @@ ${problems.length === 0
     : html`<h2>${L.t("rep.toFix", { n: problems.length })}</h2>${problems.map(
         (r) => html`<div class="result ${statusClass(r.status)}"><div class="head">${badge(L, r.status)} ${sev(L, r.severity)}</div>
 <h3>${checkTitle(L, r.id, r.title)}</h3>
-${r.summary ? html`<div class="body">${r.summary}</div>` : ""}
+${r.summary ? html`<div class="body">${summaryHtml(L, r)}</div>` : ""}
 ${prodSecrets(L, r)}
-${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${linkify(r.fix)}</span></div>` : ""}</div>`,
+${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}</div>`,
       )}`}
 ${waived.length
     ? html`<h2>${L.t("rep.exemptedTitle", { n: waived.length })}</h2><p class="dim">${L.t("rep.exemptedText")}</p>${waived.map(
         (r) => html`<div class="result s-waived"><div class="head">${badge(L, r.status)}</div><h3>${checkTitle(L, r.id, r.title)}</h3>
 <div class="waiver">${L.t("rep.until", { date: r.waived?.until ? L.day(r.waived.until) : "?" })}${r.waived?.reason ? html`: <span class="body">${r.waived.reason}</span>` : ""}</div>
-${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${linkify(r.fix)}</span></div>` : ""}</div>`,
+${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}</div>`,
       )}`
     : ""}
 <p class="foot">${L.t("rep.foot")}</p>`;

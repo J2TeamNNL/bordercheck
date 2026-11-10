@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
@@ -82,7 +83,9 @@ func expandHome(p, home string) string {
 
 var errUnsupported = errors.New("not supported on " + runtime.GOOS + " yet")
 
-func unsupported() check.Result { return check.Skipped("Not supported on " + runtime.GOOS + " yet.") }
+func unsupported() check.Result {
+	return check.SkippedMsg(msg.Of("check.unsupported", "os", runtime.GOOS))
+}
 
 func firstLine(s string) string {
 	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
