@@ -1,6 +1,8 @@
 import { config, DAY, type Env } from "./env";
 import { ago, badge, html, type Html, layout, page, statusClass, when } from "./html";
-import { parseReport, type Result, statusRank } from "./report";
+import { type Geo, mapLink, parseGeo, place } from "./geo";
+import { enrollmentOf, enrollmentSection } from "./portal";
+import { type DeviceLocation, parseReport, type Result, statusRank } from "./report";
 
 interface MachineRow {
   install_id: string;
@@ -25,9 +27,11 @@ interface MachineRow {
 
 const FILTERS = {
   all: { label: "All", where: "1 = 1" },
-  failing: { label: "Failing", where: "fail > 0" },
-  attention: { label: "Fail, error or warn", where: "(fail > 0 OR error > 0 OR warn > 0)" },
-  silent: { label: "Silent", where: "last_seen < ?2" },
+  failing: { label: "Failing", where: "m.fail > 0" },
+  attention: { label: "Fail, error or warn", where: "(m.fail > 0 OR m.error > 0 OR m.warn > 0)" },
+  silent: { label: "Silent", where: "m.last_seen < ?2" },
+  legacy: { label: "Legacy", where: "e.install_id IS NULL" },
+  revoked: { label: "Revoked", where: "e.revoked_at IS NOT NULL" },
 } as const;
 type Filter = keyof typeof FILTERS;
 
@@ -49,14 +53,20 @@ export async function machinesPage(env: Env, url: URL, who: string, now: number)
   const silentBefore = new Date(now - config(env).silentDays * DAY).toISOString();
   const like = `%${q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
   const rows = await env.DB.prepare(
-    `SELECT install_id, email, hostname, os, arch, version, policy, first_seen, last_seen, report_time,
-            fail, high_fail, error, warn, waived, pass, skip, other
-     FROM machines
-     WHERE ${FILTERS[filter].where} AND (?1 = '' OR email LIKE ?3 ESCAPE '\\' OR hostname LIKE ?3 ESCAPE '\\')
-     ORDER BY fail > 0 DESC, high_fail DESC, fail DESC, last_seen DESC LIMIT 2000`,
+    `SELECT m.install_id, m.email, m.hostname, m.os, m.arch, m.version, m.policy, m.first_seen, m.last_seen, m.report_time,
+            m.fail, m.high_fail, m.error, m.warn, m.waived, m.pass, m.skip, m.other, m.public_ip, m.geo,
+            e.install_id IS NOT NULL AS enrolled, e.revoked_at, r.name AS role
+     FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id LEFT JOIN roles r ON r.id = e.role_id
+     WHERE ${FILTERS[filter].where} AND (?1 = '' OR m.email LIKE ?3 ESCAPE '\\' OR m.hostname LIKE ?3 ESCAPE '\\')
+     ORDER BY m.fail > 0 DESC, m.high_fail DESC, m.fail DESC, m.last_seen DESC LIMIT 2000`,
   )
     .bind(q, silentBefore, like)
-    .all<MachineRow>();
+    .all<MachineRow & { public_ip: string; geo: string; enrolled: number; revoked_at: string | null; role: string | null }>();
+  const waiting = await env.DB.prepare(
+    `SELECT e.install_id, e.email, e.hostname, e.enrolled_at, r.name AS role FROM enrollments e JOIN roles r ON r.id = e.role_id
+     WHERE e.revoked_at IS NULL AND NOT EXISTS (SELECT 1 FROM machines m WHERE m.install_id = e.install_id)
+     ORDER BY e.enrolled_at DESC LIMIT 500`,
+  ).all<{ install_id: string; email: string; hostname: string; enrolled_at: string; role: string }>();
   const totals = await env.DB.prepare(
     `SELECT COUNT(*) AS n, SUM(fail > 0) AS failing, SUM(last_seen < ?1) AS silent FROM machines`,
   )
@@ -76,18 +86,25 @@ export async function machinesPage(env: Env, url: URL, who: string, now: number)
     (k) => html`<a href="${link(k)}" class="${k === filter ? "on" : ""}">${FILTERS[k].label}</a>`,
   )}
 <form method="get" action="/admin">${filter !== "all" ? html`<input type="hidden" name="filter" value="${filter}">` : ""}<input name="q" value="${q}" placeholder="email or hostname"> <button>Search</button></form></div>
-<div class="scroll"><table><thead><tr><th>Email</th><th>Hostname</th><th>OS</th><th>Version</th><th>Last seen</th>
+<div class="scroll"><table><thead><tr><th>Email</th><th>Hostname</th><th>Role</th><th>OS</th><th>Version</th><th>From</th><th>Last seen</th>
 <th>Fail</th><th>Error</th><th>Warn</th><th>Waived</th><th>State</th></tr></thead><tbody>
 ${rows.results.map(
     (m) => html`<tr><td><a href="${machineLink(m.install_id)}">${m.email || "(no email)"}</a></td>
-<td>${m.hostname}</td><td>${m.os}/${m.arch}</td><td>${m.version}</td>
+<td>${m.hostname}</td><td>${m.enrolled ? m.role : html`<span class="badge s-skip">legacy</span>`}${m.revoked_at ? html` <span class="badge s-fail">revoked</span>` : ""}</td>
+<td>${m.os}/${m.arch}</td><td>${m.version}</td>
+<td>${place(parseGeo(m.geo))}${m.public_ip ? html`<br><code class="muted">${m.public_ip}</code>` : ""}</td>
 <td title="${when(m.last_seen)}">${ago(m.last_seen, now)}</td>
 <td class="n ${m.fail ? "s-fail" : ""}">${m.fail}${m.high_fail ? html` <span class="muted">(${m.high_fail} high)</span>` : ""}</td>
 <td class="n ${m.error ? "s-error" : ""}">${m.error}</td><td class="n ${m.warn ? "s-warn" : ""}">${m.warn}</td>
 <td class="n ${m.waived ? "s-waived" : ""}">${m.waived}</td><td>${state(m, silentBefore)}</td></tr>`,
   )}
 </tbody></table></div>
-${rows.results.length === 0 ? html`<p class="muted">No machines match.</p>` : ""}`;
+${rows.results.length === 0 ? html`<p class="muted">No machines match.</p>` : ""}
+${waiting.results.length
+    ? html`<h2>Enrolled, no report yet (${waiting.results.length})</h2><ul>${waiting.results.map(
+        (w) => html`<li><a href="${machineLink(w.install_id)}">${w.email}</a> ${w.hostname} · ${w.role} · enrolled ${ago(w.enrolled_at, now)}</li>`,
+      )}</ul>`
+    : ""}`;
   return page(layout("Machines", who, body));
 }
 
@@ -112,6 +129,9 @@ interface HistoryRow {
   error: number;
   waived: number;
   statuses: string;
+  ip: string;
+  geo: string;
+  device_location: string;
 }
 
 function changes(prev: Record<string, string> | null, cur: Record<string, string>): Html[] {
@@ -133,13 +153,63 @@ function parseStatuses(s: string): Record<string, string> {
   }
 }
 
+function parseJSON<T>(s: string | null | undefined): T | null {
+  if (!s) return null;
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return null;
+  }
+}
+
+function geoLine(g: Geo | null): Html | string {
+  if (!g) return "";
+  const coords = g.lat !== undefined && g.lon !== undefined
+    ? html` · <a href="${mapLink(g.lat, g.lon)}" rel="noreferrer noopener" target="_blank">${g.lat.toFixed(3)}, ${g.lon.toFixed(3)} (map)</a>`
+    : "";
+  return html`${place(g) || "?"}${coords}${g.timezone ? html` · ${g.timezone}` : ""}${g.asn ? html` · AS${g.asn} ${g.as_org ?? ""}` : ""}`;
+}
+
+function deviceLine(d: DeviceLocation | null): Html | string {
+  if (!d || typeof d.lat !== "number" || typeof d.lon !== "number") return "";
+  return html`<a href="${mapLink(d.lat, d.lon)}" rel="noreferrer noopener" target="_blank">${d.lat.toFixed(5)}, ${d.lon.toFixed(5)} (map)</a>${
+    d.accuracy_m !== null && d.accuracy_m !== undefined ? html` ±${d.accuracy_m} m` : ""
+  }${d.source ? html` · source ${d.source}` : ""}${d.time ? html` · at ${when(d.time)}` : ""}`;
+}
+
+function whereSection(m: { public_ip: string; geo: string; local_ips: string; device_location: string }): Html {
+  const g = parseGeo(m.geo);
+  const d = parseJSON<DeviceLocation>(m.device_location);
+  const ips = parseJSON<string[]>(m.local_ips) ?? [];
+  if (!m.public_ip && !g && !d && !ips.length) {
+    return html`<h2>Where it reports from</h2><p class="muted">Nothing recorded (collection is off, or the receiver runs without Cloudflare in front).</p>`;
+  }
+  return html`<h2>Where it reports from</h2>
+<p class="muted">Map links open OpenStreetMap with only the coordinates, and only if you click them.</p>
+<dl><dt>Public IP</dt><dd>${m.public_ip ? html`<code>${m.public_ip}</code>` : "?"} <span class="muted">(seen by Cloudflare)</span></dd>
+<dt>IP-based location</dt><dd>${geoLine(g) || "?"} <span class="muted">(Cloudflare's estimate from the IP)</span></dd>
+<dt>Device-reported location</dt><dd>${deviceLine(d) || html`<span class="muted">none</span>`} <span class="muted">(sent by the machine; unverified)</span></dd>
+<dt>Local addresses</dt><dd>${ips.length ? ips.map((ip, i) => html`${i ? ", " : ""}<code>${ip}</code>`) : html`<span class="muted">none</span>`} <span class="muted">(sent by the machine; unverified)</span></dd></dl>`;
+}
+
 export async function machinePage(env: Env, id: string, who: string, now: number): Promise<Response> {
-  const m = await env.DB.prepare("SELECT * FROM machines WHERE install_id = ?").bind(id).first<MachineRow & { report: string }>();
-  if (!m) return page(layout("Not found", who, html`<h1>No such machine</h1><p><a href="/admin">Back</a></p>`), 404);
+  const [mRow, enrollment] = await Promise.all([
+    env.DB.prepare("SELECT * FROM machines WHERE install_id = ?").bind(id).first<MachineRow & { report: string; public_ip: string; geo: string; local_ips: string; device_location: string }>(),
+    enrollmentOf(env, id),
+  ]);
+  if (!mRow && !enrollment) return page(layout("Not found", who, html`<h1>No such machine</h1><p><a href="/admin">Back</a></p>`), 404);
+  const enrollHtml = await enrollmentSection(env, id, enrollment, new Date(now));
+  if (!mRow) {
+    const e = enrollment!;
+    const body = html`<h1>${e.email} · ${e.hostname}</h1><p class="note">Enrolled ${ago(e.enrolled_at, now)}; no report has arrived yet.</p>
+<dl><dt>Install ID</dt><dd><code>${e.install_id}</code></dd></dl>${enrollHtml}`;
+    return page(layout(e.hostname || e.email, who, body));
+  }
+  const m = mRow;
   const [checks, hist] = await Promise.all([
     env.DB.prepare("SELECT check_id, since FROM checks WHERE install_id = ?").bind(id).all<{ check_id: string; since: string }>(),
     env.DB.prepare(
-      "SELECT received_at, version, fail, warn, error, waived, statuses FROM reports WHERE install_id = ? ORDER BY id DESC LIMIT 61",
+      "SELECT received_at, version, fail, warn, error, waived, statuses, ip, geo, device_location FROM reports WHERE install_id = ? ORDER BY id DESC LIMIT 61",
     ).bind(id).all<HistoryRow>(),
   ]);
   const since = new Map(checks.results.map((c) => [c.check_id, c.since]));
@@ -162,6 +232,7 @@ export async function machinePage(env: Env, id: string, who: string, now: number
     const older = h[i + 1] ? parseStatuses(h[i + 1].statuses) : null;
     return html`<tr><td title="${r.received_at}">${when(r.received_at)}</td><td>${r.version}</td>
 <td class="n">${r.fail}</td><td class="n">${r.error}</td><td class="n">${r.warn}</td><td class="n">${r.waived}</td>
+<td>${place(parseGeo(r.geo))}${r.ip ? html`<br><code class="muted">${r.ip}</code>` : ""}${r.device_location ? html`<br><span class="muted">+ device location</span>` : ""}</td>
 <td>${changes(older, parseStatuses(r.statuses))}</td></tr>`;
   });
 
@@ -187,10 +258,13 @@ ${r.fix ? html`<div class="body"><b>Fix:</b> ${r.fix}</div>` : ""}</div>`,
     (r) => html`<tr><td>${badge(r.status)}</td><td>${r.title || r.id}</td><td><code>${r.id}</code></td><td class="muted">${r.summary}</td></tr>`,
   )}</tbody></table></div>
 <h2>History</h2>
-<div class="scroll"><table><thead><tr><th>Received</th><th>Version</th><th>Fail</th><th>Error</th><th>Warn</th><th>Waived</th><th>Changed</th></tr></thead>
+<div class="scroll"><table><thead><tr><th>Received</th><th>Version</th><th>Fail</th><th>Error</th><th>Warn</th><th>Waived</th><th>From</th><th>Changed</th></tr></thead>
 <tbody>${histRows}</tbody></table></div>
+${whereSection(m)}
+${enrollHtml}
 <h2>Forget this machine</h2>
-<p class="muted">Deletes its reports and history, for a laptop that was retired. If it reports again it comes back as new.</p>
+<p class="muted">Deletes its reports, history, recorded IPs and locations and report links, for a laptop that was retired.
+If it reports again it comes back as new.${enrollment ? " Its enrollment (and token) stays; revoke it first so it can't." : ""}</p>
 <form method="post" action="${machineLink(m.install_id)}/forget"><button class="danger">Forget machine</button></form>`;
   return page(layout(m.hostname || m.email || "Machine", who, body));
 }
@@ -201,6 +275,7 @@ export async function forgetMachine(env: Env, id: string): Promise<void> {
     env.DB.prepare("DELETE FROM checks WHERE install_id = ?").bind(id),
     env.DB.prepare("DELETE FROM reports WHERE install_id = ?").bind(id),
     env.DB.prepare("DELETE FROM alerts WHERE install_id = ? AND sent_at IS NULL").bind(id),
+    env.DB.prepare("DELETE FROM report_links WHERE install_id = ?").bind(id),
   ]);
 }
 

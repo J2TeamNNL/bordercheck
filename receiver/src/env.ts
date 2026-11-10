@@ -20,6 +20,41 @@ export interface Env {
   MAX_REPORT_BYTES?: string; // default 262144
   MAX_MACHINES?: string; // refuse new install_ids beyond this (default 10000)
   ALERT_WEBHOOK_FORMAT?: string; // discord | slack | json; default: from the URL
+
+  // Enrollment portal.
+  LEGACY_MODE?: string; // "on" (default): shared REPORT_TOKEN and /policies.json work; "off": only enrolled machines
+  INVITE_DAYS?: string; // default lifetime of an invite (7)
+  INSTALL_SH_URL?: string; // install script shown in invite commands (macOS/Linux)
+  INSTALL_PS1_URL?: string; // and for Windows
+  ENROLL_RATE_LIMIT?: string; // /enroll attempts per client IP per window (10)
+  PAGE_RATE_LIMIT?: string; // /i/<code> and /r/<id> views per client IP per window (60)
+  RATE_WINDOW_SECONDS?: string; // (600)
+
+  // Where reports come from. Personal data: see README "What is stored".
+  STORE_PUBLIC_IP?: string; // "on" (default) | "off": public IP and the machine's local addresses
+  STORE_GEO?: string; // "on" (default) | "off": Cloudflare's IP geolocation and device-reported position
+  ALERT_NEW_COUNTRY?: string; // "on" | "off" (default): alert when a machine reports from a new country
+
+  // Login-free links to a machine's own report.
+  REPORT_LINKS?: string; // "on" (default) | "off"
+  REPORT_LINK_DAYS?: string; // how long a link works (30)
+}
+
+export const DEFAULT_INSTALL_SH = "https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh";
+export const DEFAULT_INSTALL_PS1 = "https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1";
+
+// flag reads an on/off switch; anything unrecognised keeps the default.
+export function flag(v: string | undefined, def: boolean): boolean {
+  const s = (v ?? "").trim().toLowerCase();
+  if (["off", "false", "0", "no"].includes(s)) return false;
+  if (["on", "true", "1", "yes"].includes(s)) return true;
+  return def;
+}
+
+// Install-script URLs go into shell commands, so only plain https URLs are used.
+function scriptURL(v: string | undefined, def: string): string {
+  const s = (v ?? "").trim();
+  return /^https:\/\/[A-Za-z0-9._~\/%:-]+$/.test(s) ? s : def;
 }
 
 export const MIN_TOKEN_LENGTH = 16;
@@ -41,6 +76,18 @@ export const config = (env: Env) => ({
     .split(",")
     .map((d) => d.trim().toLowerCase().replace(/^@/, ""))
     .filter(Boolean),
+  legacy: flag(env.LEGACY_MODE, true),
+  inviteDays: num(env.INVITE_DAYS, 7, 1),
+  installSh: scriptURL(env.INSTALL_SH_URL, DEFAULT_INSTALL_SH),
+  installPs1: scriptURL(env.INSTALL_PS1_URL, DEFAULT_INSTALL_PS1),
+  enrollRateLimit: num(env.ENROLL_RATE_LIMIT, 10, 1),
+  pageRateLimit: num(env.PAGE_RATE_LIMIT, 60, 1),
+  rateWindow: num(env.RATE_WINDOW_SECONDS, 600, 10),
+  storeIp: flag(env.STORE_PUBLIC_IP, true),
+  storeGeo: flag(env.STORE_GEO, true),
+  alertNewCountry: flag(env.ALERT_NEW_COUNTRY, false),
+  reportLinks: flag(env.REPORT_LINKS, true),
+  reportLinkDays: num(env.REPORT_LINK_DAYS, 30, 1),
 });
 
 export const DAY = 24 * 60 * 60 * 1000;

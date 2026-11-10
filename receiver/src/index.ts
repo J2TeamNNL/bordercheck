@@ -13,6 +13,34 @@ import type { Env } from "./env";
 import { html, layout, page } from "./html";
 import { handleReport, json } from "./ingest";
 import { policyPage, savePolicy, servePolicy } from "./policy";
+import { audit } from "./audit";
+import { handleEnroll, invitePage, serveMachinePolicy } from "./enroll";
+import {
+  auditPage,
+  createInvites,
+  createRole,
+  deleteRole,
+  invitesPage,
+  type MachineAction,
+  machineAction,
+  reissueInvite,
+  revokeInvite,
+  rolePage,
+  rolesPage,
+  updateRole,
+} from "./portal";
+import { selfReportPage } from "./selfreport";
+
+const MAX_FORM_BYTES = 512 * 1024;
+
+async function formOf(req: Request): Promise<FormData> {
+  if (Number(req.headers.get("content-length") ?? "0") > MAX_FORM_BYTES) return new FormData();
+  try {
+    return await req.formData();
+  } catch {
+    return new FormData();
+  }
+}
 
 function loginPage(message = "", status = 200): Response {
   const body = html`<h1>Sign in</h1>
@@ -73,14 +101,40 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
   m = /^\/admin\/machine\/([A-Za-z0-9_-]+)\/forget$/.exec(path);
   if (m && req.method === "POST") {
     await forgetMachine(env, m[1]);
+    await audit(env, v.who, "machine.forget", m[1]);
     return redirect("/admin");
   }
+  m = /^\/admin\/machine\/([A-Za-z0-9_-]+)\/(revoke|restore|role|waivers|reset-link|waivers\/(\d+)\/remove)$/.exec(path);
+  if (m && req.method === "POST") {
+    const action = (m[3] ? "remove-waiver" : m[2]) as MachineAction;
+    const form = await formOf(req);
+    const r = await machineAction(env, v.who, m[1], action, form, Number(m[3] ?? 0));
+    if (r.error) return page(layout("Not done", v.who, html`<h1>Not done</h1><div class="note">${r.error}</div><p><a href="/admin/machine/${m[1]}">Back</a></p>`), r.status);
+    return redirect(`/admin/machine/${m[1]}`);
+  }
+
+  if (path === "/admin/roles" && req.method === "GET") return rolesPage(env, v.who);
+  if (path === "/admin/roles" && req.method === "POST") return createRole(env, v.who, await formOf(req));
+  m = /^\/admin\/roles\/(\d{1,12})$/.exec(path);
+  if (m && req.method === "GET") return rolePage(env, Number(m[1]), v.who);
+  if (m && req.method === "POST") return updateRole(env, Number(m[1]), v.who, await formOf(req));
+  m = /^\/admin\/roles\/(\d{1,12})\/delete$/.exec(path);
+  if (m && req.method === "POST") return deleteRole(env, Number(m[1]), v.who);
+
+  if (path === "/admin/invites" && req.method === "GET") return invitesPage(env, url, v.who);
+  if (path === "/admin/invites" && req.method === "POST") return createInvites(env, req, url, v.who, await formOf(req));
+  m = /^\/admin\/invites\/(\d{1,12})\/(revoke|reissue)$/.exec(path);
+  if (m && req.method === "POST") {
+    return m[2] === "revoke" ? revokeInvite(env, url, v.who, Number(m[1])) : reissueInvite(env, req, url, v.who, Number(m[1]));
+  }
+  if (path === "/admin/audit" && req.method === "GET") return auditPage(env, v.who);
 
   if (path === "/admin/policy" && req.method === "GET") return policyPage(env, v.who);
   if ((path === "/admin/policy" && req.method === "POST") || (path === "/admin/policies.json" && req.method === "PUT")) {
     const isForm = (req.headers.get("content-type") ?? "").includes("form");
     const text = isForm ? String((await req.formData()).get("policy") ?? "") : await req.text();
     const err = await savePolicy(env, text);
+    if (!err) await audit(env, v.who, "legacy_policy.save", "policies.json");
     if (!isForm) return err ? json({ error: err }, 400) : json({ ok: true });
     return err ? policyPage(env, v.who, err, text) : policyPage(env, v.who, "Saved.");
   }
@@ -96,6 +150,19 @@ export default {
       return handleReport(req, env);
     }
     if (path === "/policies.json" && (req.method === "GET" || req.method === "HEAD")) return servePolicy(req, env);
+    if (path === "/enroll") {
+      if (req.method !== "POST") return json({ error: "bad_request", message: "POST an enrollment here" }, 405, { allow: "POST" });
+      return handleEnroll(req, env);
+    }
+    if (path === "/policy") {
+      if (req.method !== "GET") return json({ error: "bad_request", message: "GET your policy here" }, 405, { allow: "GET" });
+      return serveMachinePolicy(req, env);
+    }
+    // Capability URLs. The code or id is never logged by this Worker.
+    let cap = /^\/i\/([^/]{1,200})$/.exec(path);
+    if (cap && req.method === "GET") return invitePage(req, env, cap[1]);
+    cap = /^\/r\/([^/]{1,200})$/.exec(path);
+    if (cap && req.method === "GET") return selfReportPage(req, env, cap[1]);
     if (path === "/healthz") return new Response("ok\n", { headers: { "cache-control": "no-store" } });
     if (path === "/" || path === "") return redirect("/admin");
     if (path === "/admin" || path.startsWith("/admin/")) return admin(req, env, url);

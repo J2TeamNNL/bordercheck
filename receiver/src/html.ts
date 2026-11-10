@@ -66,7 +66,8 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}.filters{display:flex;ga
 .result{background:var(--card);border:1px solid var(--line);border-left:4px solid currentColor;border-radius:4px;padding:10px 12px;margin:8px 0}
 .result .body{color:var(--fg)}.result ul{margin:6px 0;padding-left:20px}.result code,.ev{font:12px ui-monospace,Menlo,monospace;word-break:break-all}
 dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0}dt{color:var(--muted)}dd{margin:0;word-break:break-word}
-input,textarea,button{font:inherit}textarea{width:100%;min-height:360px;font:12px ui-monospace,Menlo,monospace}
+input,textarea,button,select{font:inherit}textarea{width:100%;min-height:360px;font:12px ui-monospace,Menlo,monospace}
+textarea.cmd{min-height:0;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px}
 button{padding:5px 12px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:4px;cursor:pointer}
 .danger{color:var(--fail)}.note{padding:8px 12px;border:1px solid var(--line);background:var(--card);border-radius:4px;margin:8px 0}
 `;
@@ -76,7 +77,7 @@ export function layout(title: string, who: string | null, body: Html): Html {
 <title>${title} · bordercheck</title><style>${new Html(STYLE)}</style></head><body>
 <header><b>bordercheck</b>${
     who
-      ? html`<nav><a href="/admin">Machines</a><a href="/admin/checks">Checks</a><a href="/admin/alerts">Alerts</a><a href="/admin/policy">Policy</a></nav>
+      ? html`<nav><a href="/admin">Machines</a><a href="/admin/checks">Checks</a><a href="/admin/alerts">Alerts</a><a href="/admin/roles">Roles</a><a href="/admin/invites">Invites</a><a href="/admin/audit">Audit</a><a href="/admin/policy">Legacy policy</a></nav>
 <span class="who">${who}${
           who === "admin token"
             ? html` · <form method="post" action="/admin/logout" style="display:inline"><button>Sign out</button></form>`

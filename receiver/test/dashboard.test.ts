@@ -32,8 +32,10 @@ describe("dashboard auth", () => {
     expect(cookie).toMatch(/HttpOnly; Secure; SameSite=Strict/);
     const session = cookie.split(";")[0];
     expect((await call(new Request(`${BASE}/admin`, { headers: { cookie: session } }))).status).toBe(200);
-    // A tampered session fails.
-    const bad = session.replace(/.$/, (c) => (c === "A" ? "B" : "A"));
+    // A tampered session fails. (Not the last character: its low bits are
+    // base64 padding, so A and B there can decode to the same signature.)
+    const dot = session.indexOf(".") + 3;
+    const bad = session.slice(0, dot) + (session[dot] === "A" ? "B" : "A") + session.slice(dot + 1);
     expect((await call(new Request(`${BASE}/admin`, { headers: { cookie: bad } }))).status).toBe(303);
     // Changing ADMIN_TOKEN signs everyone out.
     expect((await call(new Request(`${BASE}/admin`, { headers: { cookie: session } }), { ADMIN_TOKEN: "another-admin-token-xyz" })).status).toBe(303);

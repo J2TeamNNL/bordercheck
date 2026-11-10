@@ -35,6 +35,17 @@
     "DIGEST_HOURS": "168",          // weekly; "0" = no digest
     "HISTORY_DAYS": "180",
     "MAX_REPORT_BYTES": "262144",
-    "MAX_MACHINES": "10000"
+    "MAX_MACHINES": "10000",
+
+    // Enrollment portal (see README "Enrollment").
+    "LEGACY_MODE": "on",            // "off" once every machine is enrolled: the shared REPORT_TOKEN stops working
+    "INVITE_DAYS": "7",
+
+    // Personal data about employees: see README "What is stored" before deploying.
+    "STORE_PUBLIC_IP": "on",        // public IP (from Cloudflare) and the machine's local addresses
+    "STORE_GEO": "on",              // Cloudflare's IP-based location and device-reported position
+    "ALERT_NEW_COUNTRY": "off",
+
+    "REPORT_LINKS": "on"            // login-free /r/<id> link to a machine's own report
   }
 }

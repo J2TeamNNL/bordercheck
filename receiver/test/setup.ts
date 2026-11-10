@@ -8,5 +8,8 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await e.DB.batch(["machines", "checks", "reports", "alerts", "meta"].map((t) => e.DB.prepare(`DELETE FROM ${t}`)));
+  await e.DB.batch([
+      "machines", "checks", "reports", "alerts", "meta", "enrollments", "machine_waivers", "invites", "roles", "audit",
+      "rate_limits", "report_links",
+    ].map((t) => e.DB.prepare(`DELETE FROM ${t}`)));
 });
