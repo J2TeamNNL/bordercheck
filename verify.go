@@ -15,7 +15,8 @@ import (
 // runVerify checks downloaded release files the way self-update does: that
 // SHA256SUMS is signed by the trusted key and that each file matches its line.
 // The installers use it when no other ed25519 verifier is at hand. A binary
-// vouching for its own release proves little on its own; see README, Install.
+// vouching for its own release proves little on its own; see docs/install.md,
+// "What the install script proves".
 func runVerify(args []string) int {
 	fs := flag.NewFlagSet("bordercheck verify", flag.ContinueOnError)
 	key := fs.String("key", "", "base64 ed25519 public key; default: the official release key built into this binary")

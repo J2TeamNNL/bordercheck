@@ -9,7 +9,7 @@ running it, has the binary check the ed25519 signature on SHA256SUMS with the
 key pinned below, then runs `bordercheck install <policies URL or invite link>`. Any mismatch
 stops the install. Windows PowerShell 5.1 has no ed25519, so unlike install.sh
 with OpenSSL 3 the signature is always checked by the downloaded binary; see
-README, "What the install script proves".
+docs/install.md, "What the install script proves".
 
 .EXAMPLE
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/policies.json

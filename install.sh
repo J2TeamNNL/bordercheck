@@ -24,7 +24,7 @@
 #   2. the binary matches its line in SHA256SUMS,
 #   3. without OpenSSL 3 (stock macOS), the signature is checked by the
 #      downloaded binary itself (`bordercheck verify`) once step 2 passed.
-# Any mismatch stops the install. See README, "What the install script proves".
+# Any mismatch stops the install. See docs/install.md, "What the install script proves".
 #
 # The whole script is one function called on the last line, so a download cut
 # short runs nothing.

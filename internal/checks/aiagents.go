@@ -19,7 +19,7 @@ import (
 )
 
 // Config files of AI coding agents, from each vendor's documentation. Only
-// documented locations and settings are listed; see the README for those left out.
+// documented locations and settings are listed.
 type aiConfig struct {
 	agent    string
 	paths    func(home, goos string) []string
