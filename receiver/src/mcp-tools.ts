@@ -24,6 +24,7 @@
 import { MCP_ACTOR, MCP_READ_ACTOR, audit } from "./audit";
 import { alertRows, checkStats, FILTERS, type Filter, machineRows, type MachineListRow, parseStatuses, waitingRows } from "./dashboard";
 import { installCommands, publicOrigin } from "./enroll";
+import { english } from "./i18n";
 import { config, DAY, type Env } from "./env";
 import { parseGeo, place } from "./geo";
 import {
@@ -719,8 +720,8 @@ async function roleWrite(tool: string, a: Record<string, unknown>, ctx: Ctx, id?
   }
   const r = await saveRole(ctx.env, ctx.who, { id, name, policyText: text }, extraFor(tool, a));
   if (!r.ok) {
-    await refused(ctx, tool, a, r.errors);
-    return fail("Not saved.", r.errors);
+    await refused(ctx, tool, a, r.errors.map(english));
+    return fail("Not saved.", r.errors.map(english));
   }
   return okData({ ok: true, role_id: r.id, name: r.name, policy_changed: r.policyChanged, note: "Machines pick up the policy at their next hourly refresh." });
 }
@@ -794,8 +795,8 @@ const createInvites: Tool = {
       { maxBulk: MCP_BULK_INVITES, extra: extraFor("create_invites", a) },
     );
     if (!r.ok) {
-      await refused(ctx, "create_invites", a, r.errors);
-      return fail("Nothing created.", r.errors);
+      await refused(ctx, "create_invites", a, r.errors.map(english));
+      return fail("Nothing created.", r.errors.map(english));
     }
     return okData({ ok: true, role: r.role, expires_in_days: r.days, invites: issuedOut(ctx, r.issued), note: "Codes are shown only now. Each works once, for one machine." });
   },
@@ -809,7 +810,7 @@ const revokeInvite: Tool = {
   write: true,
   async run(a, ctx) {
     const r = await revokeInviteOp(ctx.env, ctx.who, a.invite_id as number, extraFor("revoke_invite", a));
-    if (!r.ok) return fail(r.errors[0]);
+    if (!r.ok) return fail(english(r.errors[0]));
     return okData({ ok: true, invite_id: a.invite_id, email: r.email, status: "revoked" });
   },
 };
@@ -822,7 +823,7 @@ const reissueInvite: Tool = {
   write: true,
   async run(a, ctx) {
     const r = await reissueInviteOp(ctx.env, ctx.who, a.invite_id as number, extraFor("reissue_invite", a));
-    if (!r.ok) return fail(r.errors[0]);
+    if (!r.ok) return fail(english(r.errors[0]));
     return okData({ ok: true, replaced_invite_id: a.invite_id, invite: issuedOut(ctx, [r.issued])[0], note: "The code is shown only now." });
   },
 };
@@ -834,8 +835,8 @@ async function machineWrite(tool: string, action: MachineAction, a: Record<strin
   if (!exists) return fail("No such machine.");
   const r = await machineAction(ctx.env, ctx.who, id, action, params, extraFor(tool, a));
   if (r.error) {
-    if (r.status === 400) await refused(ctx, tool, a, [r.error]);
-    return fail(r.error);
+    if (r.status === 400) await refused(ctx, tool, a, [english(r.error)]);
+    return fail(english(r.error));
   }
   return okData({ ok: true, install_id: id, ...(r.detail ?? {}) });
 }

@@ -1,3 +1,5 @@
+import { type I18n, type Key, LANG_NAME, LANG_SHORT, LANGS } from "./i18n";
+
 // A tiny HTML template: every interpolated value is escaped unless it is
 // itself the output of html``. Report contents (hostnames, emails, summaries,
 // evidence) are attacker-controlled, so nothing reaches the page unescaped.
@@ -18,7 +20,7 @@ export function escape(s: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
-function render(v: unknown): string {
+export function render(v: unknown): string {
   if (v instanceof Html) return v.value;
   if (Array.isArray(v)) return v.map(render).join("");
   if (v === null || v === undefined || v === false) return "";
@@ -36,6 +38,35 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): Html 
 const CSP =
   "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 
+// The portal's one script: Copy buttons, on exactly two pages (the admin page
+// showing freshly issued invites, and the invite page /i/<code>). Every other
+// page is served with CSP above and runs no script at all.
+//
+// What it does: on a click on an element with data-copy="<id>", copy that
+// element's textContent with navigator.clipboard (falling back to selecting
+// the text), and show the button's data-done label for two seconds. Buttons
+// are rendered `hidden` and un-hidden by the script, so without scripts they
+// are simply absent and the one-click-select code blocks still work. It reads
+// only text the server rendered; it builds no HTML, loads nothing, sends
+// nothing anywhere.
+//
+// It is allowed by its SHA-256 hash, and only on the pages that include it
+// (COPY_CSP). Changing one byte of it means updating COPY_SCRIPT_HASH; a test
+// recomputes the hash from the page as served.
+export const COPY_SCRIPT =
+  `(function(){var live=document.getElementById("copy-status");` +
+  `function sel(el){var r=document.createRange();r.selectNodeContents(el);var s=window.getSelection();if(s){s.removeAllRanges();s.addRange(r)}}` +
+  `document.addEventListener("click",function(e){var b=e.target instanceof Element?e.target.closest("[data-copy]"):null;if(!b)return;` +
+  `var el=document.getElementById(b.getAttribute("data-copy")||"");if(!el)return;` +
+  `var label=b.getAttribute("data-label")||"",done=b.getAttribute("data-done")||"";` +
+  `function ok(){b.textContent=done;if(live)live.textContent=done;setTimeout(function(){b.textContent=label;if(live)live.textContent=""},2000)}` +
+  `function no(){sel(el)}` +
+  `if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(el.textContent||"").then(ok,no)}else{no()}});` +
+  `var bs=document.querySelectorAll("[data-copy]");for(var i=0;i<bs.length;i++)bs[i].hidden=false})();`;
+export const COPY_SCRIPT_HASH = "sha256-fRZPvsKfmsR0Pg84Bsxw4Mc+qbaPX7EyEGpbV66f3vQ=";
+export const COPY_CSP = `${CSP}; script-src '${COPY_SCRIPT_HASH}'`;
+export const COPY_HEADERS = { "content-security-policy": COPY_CSP };
+
 export function page(body: Html, status = 200, headers: Record<string, string> = {}): Response {
   return new Response("<!doctype html>" + body.value, {
     status,
@@ -45,6 +76,8 @@ export function page(body: Html, status = 200, headers: Record<string, string> =
       "x-content-type-options": "nosniff",
       "referrer-policy": "no-referrer",
       "cache-control": "no-store",
+      // The language comes from these two headers.
+      vary: "Accept-Language, Cookie",
       ...headers,
     },
   });
@@ -65,6 +98,8 @@ const STYLE = `
 --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue","Segoe UI",system-ui,Roboto,sans-serif;
 --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:400 15px/1.5 var(--font);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:
@@ -92,6 +127,11 @@ a.brand:hover{background:var(--glass-hi)}
 .nav a:hover,.nav a:focus-visible{background:var(--text);color:#000;outline:none}
 .who{margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--faint);font-size:13px}
 .who form{margin:0}
+.langs{display:inline-flex;gap:2px;padding:3px;margin:0;border-radius:999px;background:var(--glass);box-shadow:var(--hl)}
+.langs button{padding:5px 10px;font-size:12.5px;font-weight:600;border-radius:999px;background:transparent;box-shadow:none;color:var(--dim)}
+.langs button:hover,.langs button:focus-visible{transform:none}
+.langs button.on{background:var(--glass-hi);color:var(--text)}
+body.public .langs{margin-left:auto}
 
 main{max-width:1280px;margin:0 auto;padding:clamp(24px,5vh,48px) clamp(16px,4vw,48px) 96px}
 .eyebrow{color:var(--dim);font-size:13px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;margin:0 0 8px}
@@ -249,6 +289,8 @@ button.ghost{background:transparent;box-shadow:inset 0 0 0 1px var(--line);color
 .cmd+.cmd,.cmd+p{margin-top:14px}
 .cmd-h{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 16px;font-size:12px;font-weight:650;letter-spacing:.04em;color:var(--faint);background:rgba(255,255,255,.04);box-shadow:0 1px 0 var(--line)}
 .cmd-h b{color:var(--dim);letter-spacing:0;font-size:13px}
+.cmd-h{align-items:center}.cmd-h .copy{margin:-4px -6px -4px auto;padding:5px 12px;font-size:12.5px;letter-spacing:0}
+.cmd code.msg{font:14px/1.6 var(--font);word-break:normal;overflow-wrap:anywhere}
 .cmd code{display:block;padding:16px 18px;font:13.5px/1.6 var(--mono);color:#e8e8ed;white-space:pre-wrap;word-break:break-all;-webkit-user-select:all;user-select:all;cursor:text}
 .cmd code:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:0}
 .cmd.big code{font-size:15px;padding:20px 22px}
@@ -272,6 +314,16 @@ details.alt>div{padding:0 22px 22px}
 .foot{margin-top:40px;color:var(--faint);font-size:13.5px}
 .center-card{max-width:460px;margin:clamp(16px,8vh,80px) auto 0}
 
+/* Chinese: no uppercase or letter-spacing (they do nothing useful for Han
+   characters and space them apart), a little more line height. Vietnamese
+   keeps uppercase labels (the system fonts render its stacked diacritics) but
+   with less tracking. */
+:lang(zh) .eyebrow,:lang(zh) th,:lang(zh) dl.facts dt,:lang(zh) .fix b,:lang(zh) .sev,:lang(zh) .cmd-h{text-transform:none;letter-spacing:0}
+:lang(zh) body{line-height:1.6}
+:lang(zh) h1{line-height:1.15;letter-spacing:0}:lang(zh) h2,:lang(zh) h3{letter-spacing:0}
+:lang(vi) .eyebrow,:lang(vi) th,:lang(vi) dl.facts dt,:lang(vi) .fix b,:lang(vi) .sev{letter-spacing:.02em}
+:lang(vi) h1{line-height:1.15}
+
 /* Status tones last, so they override each component's default --c. */
 .s-fail{--c:var(--fail)}.s-warn{--c:var(--warn)}.s-error{--c:var(--err)}.s-pass{--c:var(--ok)}.s-skip{--c:var(--skip)}.s-waived{--c:var(--waived)}.s-other{--c:var(--other)}
 @media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr)}}
@@ -279,6 +331,7 @@ details.alt>div{padding:0 22px 22px}
 .top{gap:10px 12px;padding:10px 16px}
 .nav{order:3;width:100%}
 .who .id{display:none}
+.langs button{padding:5px 8px}
 main{padding:22px 16px 72px}
 h2{margin-top:40px}
 .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -301,35 +354,71 @@ export const MARK = new Html(
 
 export type NavItem = "Machines" | "Checks" | "Alerts" | "Roles" | "Invites" | "Audit";
 
-const NAV: [NavItem, string][] = [
-  ["Machines", "/admin"],
-  ["Checks", "/admin/checks"],
-  ["Alerts", "/admin/alerts"],
-  ["Roles", "/admin/roles"],
-  ["Invites", "/admin/invites"],
-  ["Audit", "/admin/audit"],
+const NAV: [NavItem, string, Key][] = [
+  ["Machines", "/admin", "nav.machines"],
+  ["Checks", "/admin/checks", "nav.checks"],
+  ["Alerts", "/admin/alerts", "nav.alerts"],
+  ["Roles", "/admin/roles", "nav.roles"],
+  ["Invites", "/admin/invites", "nav.invites"],
+  ["Audit", "/admin/audit", "nav.audit"],
 ];
+
+// switcher is the language choice: a POST form with one button per language
+// (no script).
+// - "lang" (admin and sign-in pages): posts to /lang with the page's path in
+//   `next`; /lang sets the cookie and goes back there, validated as a
+//   same-origin path.
+// - "self" (the capability pages /i/<code> and /r/<id>): no action, so the
+//   form posts to the page's own URL, which sets the cookie and redirects to
+//   that same path. The code or id is not copied into the page, another URL
+//   or a form field, and the GET that follows never consumes an invite.
+function switcher(L: I18n, mode: "lang" | "self"): Html {
+  return html`<form class="langs" method="post"${mode === "lang" ? html` action="/lang"` : ""} role="group" aria-label="${L.s("lang.label")}">${
+    mode === "lang" ? html`<input type="hidden" name="next" value="${L.path}">` : ""
+  }${LANGS.map(
+    (l) => html`<button name="lang" value="${l}" lang="${l === "zh" ? "zh-Hans" : l}" title="${LANG_NAME[l]}" aria-label="${LANG_NAME[l]}"${l === L.lang ? html` class="on" aria-current="true"` : ""}>${LANG_SHORT[l]}</button>`,
+  )}</form>`;
+}
+
+export interface LayoutOptions {
+  // "self" on the capability pages (see switcher); false on pages that exist
+  // only as the answer to a POST (codes shown once): going "back" there would
+  // lose them.
+  switcher?: false | "self";
+  // Include COPY_SCRIPT. The response must then carry COPY_HEADERS.
+  copy?: boolean;
+}
+
+// copyButton copies the text of the element with id `target`. Hidden until
+// the script runs. Its labels are rendered here, escaped; the script only
+// moves them between data- attributes and textContent.
+export function copyButton(L: I18n, target: string, label: Key): Html {
+  return html`<button type="button" class="sm copy" hidden data-copy="${target}" data-label="${L.s(label)}" data-done="${L.s("copy.done")}">${L.t(label)}</button>`;
+}
 
 // layout wraps a page. With `who` (a signed-in admin) it has the portal's
 // navigation; without, it is a public page (sign-in, invite, report link)
 // with only the name and no links into /admin.
-export function layout(title: string, who: string | null, body: Html, active?: NavItem): Html {
-  return html`<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+export function layout(L: I18n, title: string, who: string | null, body: Html, active?: NavItem, opts: LayoutOptions = {}): Html {
+  const langs = opts.switcher === false ? "" : switcher(L, opts.switcher === "self" ? "self" : "lang");
+  return html`<html lang="${L.htmlLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark"><meta name="theme-color" content="#000000">
 <title>${title} · bordercheck</title><style>${new Html(STYLE)}</style></head><body class="${who ? "admin" : "public"}">
 <header class="top">${
     who
-      ? html`<a class="brand" href="/admin"><span class="mark">${MARK}</span>bordercheck</a><nav class="nav" aria-label="Sections">${NAV.map(
-          ([label, href]) => html`<a href="${href}"${label === active ? html` class="on" aria-current="page"` : ""}>${label}</a>`,
+      ? html`<a class="brand" href="/admin"><span class="mark">${MARK}</span>bordercheck</a><nav class="nav" aria-label="${L.s("nav.sections")}">${NAV.map(
+          ([item, href, key]) => html`<a href="${href}"${item === active ? html` class="on" aria-current="page"` : ""}>${L.t(key)}</a>`,
         )}</nav>
-<div class="who"><span class="id">${who}</span>${
+<div class="who">${langs}<span class="id">${who}</span>${
           who === "admin token"
-            ? html`<form method="post" action="/admin/logout"><button class="sm ghost">Sign out</button></form>`
+            ? html`<form method="post" action="/admin/logout"><button class="sm ghost">${L.t("nav.signOut")}</button></form>`
             : ""
         }</div>`
-      : html`<span class="brand"><span class="mark">${MARK}</span>bordercheck</span>`
+      : html`<span class="brand"><span class="mark">${MARK}</span>bordercheck</span>${langs}`
   }</header>
-<main>${body}</main></body></html>`;
+<main>${body}</main>${
+    opts.copy ? html`<span id="copy-status" class="sr-only" aria-live="polite"></span><script>${new Html(COPY_SCRIPT)}</script>` : ""
+  }</body></html>`;
 }
 
 export function statusClass(s: string): string {
@@ -337,26 +426,28 @@ export function statusClass(s: string): string {
 }
 
 // badge is a status pill: colour, a dot and the status word, so it never
-// relies on colour alone.
-export function badge(s: string): Html {
-  return html`<span class="pill ${statusClass(s)}">${s}</span>`;
+// relies on colour alone. Known statuses are translated; anything else (a
+// status from a newer bordercheck) is shown as received.
+export function badge(L: I18n, s: string): Html {
+  return html`<span class="pill ${statusClass(s)}">${L.status(s)}</span>`;
 }
 
 // pill is a coloured label with fixed text, e.g. "non-compliant", "revoked".
-export function pill(cls: string, text: string): Html {
+export function pill(cls: string, text: string | Html): Html {
   return html`<span class="pill ${cls}">${text}</span>`;
 }
 
-// sev is a severity chip; only the known severities get a colour class.
-export function sev(s: string): Html | string {
+// sev is a severity chip; only the known severities get a colour class and a
+// translation.
+export function sev(L: I18n, s: string): Html | string {
   if (!s) return "";
   const known = ["high", "medium", "low", "info"].includes(s) ? ` sev-${s}` : "";
-  return html`<span class="sev${known}">${s}</span>`;
+  return html`<span class="sev${known}">${L.severity(s)}</span>`;
 }
 
 // count renders a number, coloured when it is not zero.
-export function count(n: number, cls: string): Html {
-  return n ? html`<span class="${cls}">${n}</span>` : html`<span class="zero">0</span>`;
+export function count(L: I18n, n: number, cls: string): Html {
+  return n ? html`<span class="${cls}">${L.num(n)}</span>` : html`<span class="zero">${L.num(0)}</span>`;
 }
 
 export function note(m: string | Html, cls = ""): Html | string {
@@ -367,26 +458,4 @@ export function note(m: string | Html, cls = ""): Html | string {
 export function pct(part: number, whole: number): string {
   if (!whole || !part) return "0%";
   return `${Math.max(0, Math.min(100, (part / whole) * 100)).toFixed(2)}%`;
-}
-
-export function ago(iso: string | null | undefined, now: number): string {
-  if (!iso) return "never";
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return "?";
-  const s = Math.max(0, Math.round((now - t) / 1000));
-  if (s < 90) return "just now";
-  if (s < 90 * 60) return `${Math.round(s / 60)} min ago`;
-  if (s < 36 * 3600) return `${Math.round(s / 3600)} h ago`;
-  return `${Math.round(s / 86400)} d ago`;
-}
-
-// age is ago() without "ago": how long something has been so ("3 d").
-export function age(iso: string | null | undefined, now: number): string {
-  const a = ago(iso, now);
-  return a.endsWith(" ago") ? a.slice(0, -4) : a;
-}
-
-export function when(iso: string | null | undefined): string {
-  if (!iso) return "";
-  return iso.replace("T", " ").replace(/\.\d+Z$|Z$/, " UTC");
 }

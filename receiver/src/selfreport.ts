@@ -12,8 +12,9 @@
 // admin controls, audit data, IPs or locations.
 
 import { config, type Env } from "./env";
-import { CAPABILITY_HEADERS } from "./enroll";
-import { badge, Html, html, layout, MARK, page, sev, statusClass, when } from "./html";
+import { CAPABILITY_HEADERS, SELF, tooManyRequests } from "./enroll";
+import { forRequest, type I18n } from "./i18n";
+import { badge, Html, html, layout, MARK, page, sev, statusClass } from "./html";
 
 const GLYPH_OK = new Html(
   `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5.5 12.5 4.2 4.2 8.8-9.2" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
@@ -25,24 +26,19 @@ import { hit } from "./ratelimit";
 import { parseReport, type Result, statusRank } from "./report";
 import { LINK_RE, sha256hex } from "./tokens";
 
-function notFound(): Response {
+function notFound(L: I18n): Response {
   return page(
-    layout("Not found", null, html`<div class="center-card"><span class="mark lg">${MARK}</span><p class="eyebrow">bordercheck</p><h1>Link not valid</h1>
-<p class="lead">This report link is unknown or has expired. Run <code>bordercheck status</code> on your computer, or ask your IT team.</p></div>`),
+    layout(L, L.s("common.notFound"), null, html`<div class="center-card"><span class="mark lg">${MARK}</span><p class="eyebrow">bordercheck</p><h1>${L.t("rep.badTitle")}</h1>
+<p class="lead">${L.t("rep.badLead")}</p></div>`, undefined, SELF),
     404,
     CAPABILITY_HEADERS,
   );
 }
 
-export async function selfReportPage(req: Request, env: Env, id: string, now = new Date()): Promise<Response> {
-  if (!config(env).reportLinks) return notFound();
+export async function selfReportPage(req: Request, env: Env, id: string, now = new Date(), L: I18n = forRequest(req)): Promise<Response> {
+  if (!config(env).reportLinks) return notFound(L);
   const rl = await hit(env, req, "page", now.getTime());
-  if (!rl.ok) {
-    return page(layout("Slow down", null, html`<h1>Too many requests</h1><p>Wait a few minutes and reload.</p>`), 429, {
-      ...CAPABILITY_HEADERS,
-      "retry-after": String(rl.retryAfter),
-    });
-  }
+  if (!rl.ok) return tooManyRequests(L, rl.retryAfter);
   // Same work for every id: hash, then one query.
   const h = await sha256hex(id);
   const row = await env.DB.prepare(
@@ -54,7 +50,7 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   )
     .bind(h, LINK_RE.test(id) ? 1 : 0, now.toISOString())
     .first<{ email: string; hostname: string; last_seen: string; report: string }>();
-  if (!row) return notFound();
+  if (!row) return notFound(L);
 
   let results: Result[] = [];
   try {
@@ -69,30 +65,26 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
 
   const failing = problems.some((r) => r.status === "fail");
   const tone = problems.length === 0 ? "s-pass" : failing ? "s-fail" : "s-warn";
-  const headline =
-    problems.length === 0 ? "All clear" : problems.length === 1 ? "One thing to fix" : `${problems.length} things to fix`;
+  const headline = problems.length === 0 ? L.t("rep.allClear") : L.t("rep.toFixHeadline", { n: problems.length });
   const body = html`<div class="status-mark ${tone}">${problems.length === 0 ? GLYPH_OK : GLYPH_ATTENTION}</div>
-<p class="eyebrow">Your bordercheck report</p><h1>${headline}</h1>
-<p class="lead">For <b>${row.email || "(no email)"}</b> on <b>${row.hostname || "(no hostname)"}</b>, checked ${when(row.last_seen)}.
-${problems.length === 0
-    ? "This computer meets your organisation's checks. Nothing for you to do."
-    : "Each item below says what's wrong and how to fix it. bordercheck checks again on its own, so a fix shows up here after its next run."}</p>
-<div class="chips"><span class="chip"><b>${okCount}</b> passed or did not apply</span>${waived.length ? html`<span class="chip"><b>${waived.length}</b> exempted for now</span>` : ""}</div>
+<p class="eyebrow">${L.t("rep.eyebrow")}</p><h1>${headline}</h1>
+<p class="lead">${L.t("rep.for", { email: row.email || L.s("common.noEmail"), host: row.hostname || L.s("common.noHostname"), when: L.when(row.last_seen) })}${L.lang === "zh" ? "" : " "}${problems.length === 0 ? L.t("rep.okText") : L.t("rep.fixText")}</p>
+<div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}</div>
 ${problems.length === 0
     ? ""
-    : html`<h2>To fix (${problems.length})</h2>${problems.map(
-        (r) => html`<div class="result ${statusClass(r.status)}"><div class="head">${badge(r.status)} ${sev(r.severity)}</div>
+    : html`<h2>${L.t("rep.toFix", { n: problems.length })}</h2>${problems.map(
+        (r) => html`<div class="result ${statusClass(r.status)}"><div class="head">${badge(L, r.status)} ${sev(L, r.severity)}</div>
 <h3>${r.title || r.id}</h3>
 ${r.summary ? html`<div class="body">${r.summary}</div>` : ""}
-${r.fix ? html`<div class="fix"><b>How to fix</b><span>${r.fix}</span></div>` : ""}</div>`,
+${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${r.fix}</span></div>` : ""}</div>`,
       )}`}
 ${waived.length
-    ? html`<h2>Exempted for now (${waived.length})</h2><p class="dim">IT has agreed these can wait until the date shown.</p>${waived.map(
-        (r) => html`<div class="result s-waived"><div class="head">${badge(r.status)}</div><h3>${r.title || r.id}</h3>
-<div class="waiver">Until ${r.waived?.until || "?"}${r.waived?.reason ? html`: <span class="body">${r.waived.reason}</span>` : ""}</div>
-${r.fix ? html`<div class="fix"><b>How to fix</b><span>${r.fix}</span></div>` : ""}</div>`,
+    ? html`<h2>${L.t("rep.exemptedTitle", { n: waived.length })}</h2><p class="dim">${L.t("rep.exemptedText")}</p>${waived.map(
+        (r) => html`<div class="result s-waived"><div class="head">${badge(L, r.status)}</div><h3>${r.title || r.id}</h3>
+<div class="waiver">${L.t("rep.until", { date: r.waived?.until ? L.day(r.waived.until) : "?" })}${r.waived?.reason ? html`: <span class="body">${r.waived.reason}</span>` : ""}</div>
+${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${r.fix}</span></div>` : ""}</div>`,
       )}`
     : ""}
-<p class="foot">This page shows only this computer's latest results; if this is not your computer, close it. Details such as file paths are not shown here: run <code>bordercheck</code> on this computer to see them.</p>`;
-  return page(layout("Your report", null, body), 200, CAPABILITY_HEADERS);
+<p class="foot">${L.t("rep.foot")}</p>`;
+  return page(layout(L, L.s("rep.title"), null, body, undefined, SELF), 200, CAPABILITY_HEADERS);
 }
