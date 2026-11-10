@@ -7,7 +7,8 @@
 // The install folder holds the binary, policies.json beside it, and:
 //
 //	config.json     the user's email and this install's ID
-//	state.json      when the last report was sent, and the last error
+//	state.json      when the last report was sent, the last error, and which
+//	                problems the person at the machine was last notified of
 //	bordercheck.log what each scheduled run did
 package agent
 
@@ -82,6 +83,9 @@ type State struct {
 	LastError       string    `json:"last_error,omitempty"`
 	LastUpdateCheck time.Time `json:"last_update_check,omitzero"`
 	UpdateError     string    `json:"update_error,omitempty"`
+	// Notified maps each problem announced on the desktop (notify.Key) and
+	// still present at the last check to when it was last announced.
+	Notified map[string]time.Time `json:"notified,omitempty"`
 }
 
 func readJSON(path string, v any) error {
@@ -215,7 +219,7 @@ func Send(ctx context.Context, env Env, force bool) error {
 	}
 	now := time.Now()
 	if force || now.Sub(st.LastSent) >= pol.Report.Every() {
-		err = sendReport(ctx, env, cfg, pol, &st, now)
+		err = sendReport(ctx, env, cfg, pol, &st, now, force)
 	} else {
 		fmt.Fprintf(env.Out, "%s next report due %s\n", now.Format(time.RFC3339),
 			st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339))
@@ -228,9 +232,14 @@ func Send(ctx context.Context, env Env, force bool) error {
 	return errors.Join(err, writeJSON(filepath.Join(env.Dir, "state.json"), st))
 }
 
-func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time) error {
-	rep := report.New(env.Version, pol.Name, check.RunAll(ctx, checks.All(pol)))
+func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time, force bool) error {
+	results := check.RunAll(ctx, checks.All(pol))
+	results = pol.Waive(results, identity(cfg), now)
+	rep := report.New(env.Version, pol.Name, results)
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID
+	// After the report is posted, whether or not it got through; a notification
+	// never holds up or fails a report.
+	defer notifyUser(ctx, env, pol.Notify, results, st, now, force)
 	if !pol.Report.IncludeEvidence {
 		for i := range rep.Results {
 			rep.Results[i].Evidence = nil
@@ -245,8 +254,8 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 	}
 	st.LastSent, st.LastError = now, ""
 	c := rep.Counts
-	fmt.Fprintf(env.Out, "%s report sent to %s: %d fail, %d warn, %d pass\n",
-		now.Format(time.RFC3339), hostOf(pol.Report.URL), c.Fail, c.Warn, c.Pass)
+	fmt.Fprintf(env.Out, "%s report sent to %s: %d fail, %d warn, %d pass, %d waived\n",
+		now.Format(time.RFC3339), hostOf(pol.Report.URL), c.Fail, c.Warn, c.Pass, c.Waived)
 	return nil
 }
 

@@ -27,7 +27,7 @@ bordercheck -only secrets,tailscale
 bordercheck -list
 ```
 
-Exit status: `0` no failures, `1` at least one failure, `2` error. `sudo bordercheck` also shows ports held
+Exit status: `0` no failures (waived ones do not count), `1` at least one failure, `2` error. `sudo bordercheck` also shows ports held
 by system services on macOS. A plain run only reads; it changes nothing and sends nothing.
 
 ## For organisations: policies.json
@@ -55,6 +55,16 @@ beside the binary, else uses the built-in one.
     "repo": "ptrinh/bordercheck",                   // pinned at install, see below
     "public_key": ""                                // "" = the official release key
   },
+  "notify": {
+    "enabled": true,                                // desktop notifications for the person at the machine
+    "statuses": ["fail"],                           // "fail" and/or "warn"
+    "severities": ["high", "medium"],               // a result without a severity counts as medium
+    "remind_every": "24h"                           // re-announce a problem still there; "0" = never
+  },
+  "waivers": [
+    { "check": "listeners", "email": "an@acme.com", "until": "2026-12-01",
+      "reason": "Postgres on 5432 for the data migration" }
+  ],
   "checks": {
     "listeners": { "on_problem": "fail", "allow": [{ "process": "rapportd" }] },
     "firewall":  { "require_stealth": false },
@@ -68,6 +78,28 @@ beside the binary, else uses the built-in one.
 ```
 
 Every check takes `enabled` and `on_problem` (`"fail"` or `"warn"`, to override how strict it is).
+
+### Waivers
+
+A waiver exempts one machine from one check for a while, without loosening the rule for everyone:
+
+| Field | |
+|---|---|
+| `check` | the check ID (`bordercheck -list`) |
+| `email`, `install_id`, `hostname` | which machine; at least one, and every one given must match. `email` is the one bordercheck was installed with, `install_id` is in its reports, `hostname` is the report's `host.hostname` (case and a trailing `.local` are ignored). Hostnames are set by the user, so prefer `email` or `install_id`. |
+| `until` | required, `YYYY-MM-DD`: the last day it applies, by the machine's local date. At most a year ahead; a waiver without an end is rejected. |
+| `reason` | required; shown to the person and sent in the report |
+
+While a waiver applies, a `fail` or `warn` from that check reports as `waived`: it keeps its severity, summary and
+fix, gains `"waived": {"until": "2026-12-01", "reason": "…"}` in the JSON, counts under `counts.waived`, does not
+make bordercheck exit 1 and does not notify. A pass stays a pass. The text report shows waived results as `WAIV`,
+says when a waiver ends within 14 days, and says when a waiver for a failing check has ended; an ended waiver
+changes nothing else.
+
+The installed service matches on its email, install ID and hostname. A plain `bordercheck` run uses the same
+identity when this user has installed bordercheck (it reads `config.json` in the install folder, writes nothing),
+so what you see matches what IT sees. Without an install there is no email or install ID, so only waivers that name
+nothing but a `hostname` apply.
 
 ## Install as a service
 
@@ -84,6 +116,24 @@ That copies both files to `~/Library/Application Support/bordercheck` (macOS) or
 `%LOCALAPPDATA%\bordercheck` (Windows), registers an hourly per-user service (launchd LaunchAgent / Task
 Scheduler; no admin rights), and sends a first report straight away. The service sends a report whenever
 `report.interval` has passed since the last one that got through, so a failed send retries the next hour.
+
+### Notifications
+
+Each time the service checks the machine (when a report is due), it shows a desktop notification for problems that
+are new since the last check: the check IDs and summaries, and "Run bordercheck in a terminal to see how to fix it".
+It never shows evidence (paths, ports, variable names), let alone a secret. A problem still there is announced again
+every `notify.remind_every`; a fixed problem is forgotten, so it counts as new if it comes back; waived results and
+passing machines stay silent. What was announced is kept in `state.json`.
+
+| OS | How | Needs |
+|---|---|---|
+| macOS | `osascript` `display notification` | nothing; listed as Script Editor in System Settings → Notifications |
+| Windows | a toast through Windows PowerShell 5.1 | nothing; shown while the user is logged on |
+| Linux | `notify-send`, else `gdbus` to the desktop's notification service | a desktop session |
+
+A notification that cannot be shown is logged in `bordercheck.log` and tried at the next check; it never holds up a
+report. `bordercheck send -force` (and the first report at install) is run by someone at a terminal, so it prints the
+problems there instead and the next scheduled run does not repeat them. A plain `bordercheck` never notifies.
 
 ```sh
 bordercheck status               # email, policy, service, last report, updates
@@ -125,7 +175,7 @@ The report is the same JSON as `bordercheck -json`, plus `email` and `install_id
   "tool": "bordercheck", "version": "v0.2.0", "policy": "Acme", "time": "2026-10-30T14:46:07Z",
   "host": { "os": "darwin", "arch": "arm64", "hostname": "ans-mbp" },
   "email": "an@acme.com", "install_id": "4f1c…",
-  "counts": { "fail": 1, "error": 0, "warn": 1, "pass": 3, "skip": 1 },
+  "counts": { "fail": 1, "error": 0, "warn": 1, "pass": 3, "skip": 1, "waived": 0 },
   "results": [ { "id": "firewall", "title": "Firewall is on", "status": "fail", "severity": "high",
                  "summary": "The macOS firewall is off.", "fix": "…" } ]
 }

@@ -18,6 +18,26 @@
     "repo": "ptrinh/bordercheck",
     "public_key": ""
   },
+  "notify": {
+    "enabled": true,
+    "statuses": [
+      "fail"
+    ],
+    "severities": [
+      "high",
+      "medium"
+    ],
+    "remind_every": "24h"
+  },
+  "waivers": [
+    {
+      "check": "listeners",
+      "email": "dev@example.com",
+      "hostname": "dev-mbp",
+      "until": "2026-12-01",
+      "reason": "Postgres on 5432 for the data migration; ticket IT-123"
+    }
+  ],
   "checks": {
     "firewall": {
       "require_stealth": true

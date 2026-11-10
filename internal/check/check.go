@@ -16,6 +16,9 @@ const (
 	Fail  Status = "fail"
 	Skip  Status = "skip"  // does not apply here, e.g. the software is not installed
 	Error Status = "error" // could not tell
+	// Waived is a fail or warn that a policy waiver exempts this machine from
+	// until a date; the result keeps its severity, summary and fix.
+	Waived Status = "waived"
 )
 
 // Severity ranks a warn or a fail.
@@ -36,6 +39,17 @@ type Result struct {
 	Summary  string   `json:"summary"`
 	Evidence []string `json:"evidence,omitempty"`
 	Fix      string   `json:"fix,omitempty"`
+	// Waived is set when Status is Waived.
+	Waived *Waiver `json:"waived,omitempty"`
+	// WaiverEnded is the end date (YYYY-MM-DD) of a waiver that matched this
+	// fail or warn but has expired. Shown in the text report only.
+	WaiverEnded string `json:"-"`
+}
+
+// Waiver says until when, and why, a result is waived.
+type Waiver struct {
+	Until  string `json:"until"` // YYYY-MM-DD, the last day the waiver applies
+	Reason string `json:"reason"`
 }
 
 // Check is one thing bordercheck looks at. Run only reads; it never changes the machine.

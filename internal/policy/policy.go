@@ -23,6 +23,11 @@ type Policy struct {
 	Name   string `json:"name"`
 	Report Report `json:"report"`
 	Update Update `json:"update"`
+	Notify Notify `json:"notify"` // desktop notifications, see notify.go
+
+	// Waivers exempt one machine from one check until a date; see waiver.go.
+	Waivers []Waiver `json:"waivers"`
+
 	Checks Checks `json:"checks"`
 }
 
@@ -141,6 +146,10 @@ func Default() Policy {
 		Name:   "built-in",
 		Report: Report{Headers: map[string]string{}, Interval: "24h", EmailDomains: []string{}},
 		Update: Update{Interval: "24h", Repo: "ptrinh/bordercheck"},
+		Notify: defaultNotify(),
+
+		Waivers: []Waiver{},
+
 		Checks: Checks{
 			Firewall: Firewall{RequireStealth: ptr(true)},
 			Listeners: Listeners{Allow: []ListenerRule{
@@ -242,6 +251,12 @@ func (p Policy) validate() error {
 		if raw, err := base64.StdEncoding.DecodeString(u.PublicKey); err != nil || len(raw) != 32 {
 			return errors.New("update.public_key must be a base64 ed25519 public key")
 		}
+	}
+	if err := p.Notify.validate(); err != nil {
+		return err
+	}
+	if err := validateWaivers(p.Waivers, now()); err != nil {
+		return err
 	}
 	c := p.Checks
 	for id, on := range map[string]check.Status{

@@ -26,6 +26,8 @@ type Counts struct {
 	Warn  int `json:"warn"`
 	Pass  int `json:"pass"`
 	Skip  int `json:"skip"`
+	// Fails and warns a policy waiver exempts this machine from.
+	Waived int `json:"waived"`
 }
 
 type Report struct {
@@ -57,6 +59,8 @@ func New(version, policy string, results []check.Result) Report {
 			r.Counts.Pass++
 		case check.Skip:
 			r.Counts.Skip++
+		case check.Waived:
+			r.Counts.Waived++
 		}
 	}
 	return r
@@ -73,12 +77,16 @@ var styles = map[check.Status]struct {
 	label, color string
 	rank         int
 }{
-	check.Fail:  {"FAIL", "\x1b[31m", 0},
-	check.Error: {"ERR ", "\x1b[35m", 1},
-	check.Warn:  {"WARN", "\x1b[33m", 2},
-	check.Pass:  {"PASS", "\x1b[32m", 3},
-	check.Skip:  {"SKIP", "\x1b[90m", 4},
+	check.Fail:   {"FAIL", "\x1b[31m", 0},
+	check.Error:  {"ERR ", "\x1b[35m", 1},
+	check.Warn:   {"WARN", "\x1b[33m", 2},
+	check.Waived: {"WAIV", "\x1b[36m", 3},
+	check.Pass:   {"PASS", "\x1b[32m", 4},
+	check.Skip:   {"SKIP", "\x1b[90m", 5},
 }
+
+// expiringSoon is how close to its end a waiver is called out in the text report.
+const expiringSoon = 14 * 24 * time.Hour
 
 // WriteText prints the worst results first.
 func (r Report) WriteText(w io.Writer, color bool) {
@@ -94,12 +102,19 @@ func (r Report) WriteText(w io.Writer, color bool) {
 	for _, res := range results {
 		st := styles[res.Status]
 		line := paint(st.color, st.label) + "  " + res.Title
-		if res.Severity != "" && (res.Status == check.Fail || res.Status == check.Warn) {
+		if res.Severity != "" && (res.Status == check.Fail || res.Status == check.Warn || res.Status == check.Waived) {
 			line += paint("\x1b[90m", " ["+string(res.Severity)+"]")
 		}
 		fmt.Fprintln(w, line)
 		if res.Summary != "" {
 			fmt.Fprintln(w, "      "+res.Summary)
+		}
+		if note := waiverNote(res, r.Time); note != "" {
+			code := "\x1b[36m"
+			if res.Waived == nil {
+				code = "\x1b[33m" // ended
+			}
+			fmt.Fprintln(w, "      "+paint(code, note))
 		}
 		for _, e := range res.Evidence {
 			fmt.Fprintln(w, "        · "+e)
@@ -114,10 +129,43 @@ func (r Report) WriteText(w io.Writer, color bool) {
 	for _, p := range []struct {
 		n    int
 		name string
-	}{{c.Fail, "fail"}, {c.Error, "error"}, {c.Warn, "warn"}, {c.Pass, "pass"}, {c.Skip, "skip"}} {
+	}{{c.Fail, "fail"}, {c.Error, "error"}, {c.Warn, "warn"}, {c.Pass, "pass"}, {c.Skip, "skip"}, {c.Waived, "waived"}} {
 		if p.n > 0 {
 			parts = append(parts, fmt.Sprintf("%d %s", p.n, p.name))
 		}
 	}
 	fmt.Fprintln(w, strings.Join(parts, " · "))
+}
+
+// waiverNote says until when a result is waived, warning when that is soon, or
+// that a waiver for it has ended.
+func waiverNote(res check.Result, now time.Time) string {
+	switch {
+	case res.Waived != nil:
+		note := "Waived until " + res.Waived.Until
+		if end, err := time.ParseInLocation("2006-01-02", res.Waived.Until, time.Local); err == nil {
+			// The waiver covers the whole of its last day.
+			if left := end.AddDate(0, 0, 1).Sub(now); left <= expiringSoon {
+				note += fmt.Sprintf(" (ends in %s)", days(left))
+			}
+		}
+		if res.Waived.Reason != "" {
+			note += ": " + res.Waived.Reason
+		}
+		return note
+	case res.WaiverEnded != "":
+		return "A waiver for this check ended on " + res.WaiverEnded + "; ask IT to extend it or fix the problem."
+	}
+	return ""
+}
+
+func days(d time.Duration) string {
+	switch n := int(d.Hours() / 24); n {
+	case 0:
+		return "less than a day"
+	case 1:
+		return "1 day"
+	default:
+		return fmt.Sprintf("%d days", n)
+	}
 }

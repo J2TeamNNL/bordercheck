@@ -111,7 +111,7 @@ func runCheck(args []string) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	rep := report.New(version, pol.Name, check.RunAll(ctx, selected))
+	rep := report.New(version, pol.Name, pol.Waive(check.RunAll(ctx, selected), waiverIdentity(), time.Now()))
 	if *jsonOut {
 		if err := rep.WriteJSON(os.Stdout); err != nil {
 			return fail(err)
@@ -138,6 +138,18 @@ func loadPolicy(path string) (policy.Policy, error) {
 		}
 	}
 	return policy.Default(), nil
+}
+
+// waiverIdentity is who this machine is for the policy's waivers: the email and
+// install ID of this user's install, if bordercheck is installed (read, never
+// written), and the hostname. Uninstalled, only hostname-only waivers apply.
+func waiverIdentity() policy.Identity {
+	dir, err := agent.Dir()
+	if err != nil {
+		host, _ := os.Hostname()
+		return policy.Identity{Hostname: host}
+	}
+	return agent.Identity(dir)
 }
 
 func runAgent(cmd string, args []string) int {
