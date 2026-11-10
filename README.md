@@ -122,7 +122,8 @@ A waiver exempts one machine from one check for a while, without loosening the r
 | Field | |
 |---|---|
 | `check` | the check ID (`bordercheck -list`) |
-| `email`, `install_id`, `hostname` | which machine; at least one, and every one given must match. `email` is the one bordercheck was installed with, `install_id` is in its reports, `hostname` is the report's `host.hostname` (case and a trailing `.local` are ignored). Hostnames are set by the user, so prefer `email` or `install_id`. |
+| `email`, `install_id` | which machine; at least one. `email` is the one bordercheck was installed with, `install_id` is in its reports and in `bordercheck status`. |
+| `hostname` | optional, narrows the waiver to one of that person's machines: the report's `host.hostname` (case and a trailing `.local` are ignored). Never enough alone, since users set their own hostname. Every field given must match. |
 | `until` | required, `YYYY-MM-DD`: the last day it applies, by the machine's local date. At most a year ahead; a waiver without an end is rejected. |
 | `reason` | required; shown to the person and sent in the report |
 
@@ -134,8 +135,7 @@ changes nothing else.
 
 The installed service matches on its email, install ID and hostname. A plain `bordercheck` run uses the same
 identity when this user has installed bordercheck (it reads `config.json` in the install folder, writes nothing),
-so what you see matches what IT sees. Without an install there is no email or install ID, so only waivers that name
-nothing but a `hostname` apply.
+so what you see matches what IT sees. Without an install there is no email or install ID, so no waiver applies.
 
 ## Install as a service
 
@@ -290,8 +290,9 @@ sat in shell history or a synced folder.
 ## Download
 
 - **Script**: see [Install as a service](#install-as-a-service).
-- **Homebrew** (macOS, Linux): `brew install ptrinh/tap/bordercheck`, then `bordercheck install <url>`. The
-  service runs its own copy, which updates itself; `brew upgrade` updates the one on your PATH.
+- **Homebrew** (macOS, Linux), not published yet: each release carries a formula, and once it is in the tap,
+  `brew install ptrinh/tap/bordercheck`, then `bordercheck install <url>`. The service runs its own copy, which
+  updates itself; `brew upgrade` updates the one on your PATH.
 - **By hand**: get `bordercheck-<version>-<os>-<arch>` from
   [Releases](https://github.com/ptrinh/bordercheck/releases/latest) (macOS, Linux and Windows; arm64 and amd64)
   with `SHA256SUMS` and `SHA256SUMS.sig`. Compare `shasum -a 256 <file>` with its line in `SHA256SUMS`; then

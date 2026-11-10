@@ -129,8 +129,9 @@ func validateWaivers(ws []Waiver, at time.Time) error {
 		switch {
 		case !ids[w.Check]:
 			return fmt.Errorf("%s: check must be one of the check IDs (see bordercheck -list), not %q", name, w.Check)
-		case w.Email == "" && w.InstallID == "" && w.Hostname == "":
-			return fmt.Errorf("%s: say which machine with email, install_id and/or hostname", name)
+		case w.Email == "" && w.InstallID == "":
+			// A hostname is whatever the user sets it to, so it can narrow a waiver but not carry one.
+			return fmt.Errorf("%s: say which machine with email or install_id (hostname can only narrow it further)", name)
 		case w.Email != "" && !strings.Contains(w.Email, "@"):
 			return fmt.Errorf("%s: email %q is not an email address", name, w.Email)
 		case strings.ContainsAny(w.Hostname, " \t/\\"):

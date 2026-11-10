@@ -146,7 +146,8 @@ func loadPolicy(path string) (policy.Policy, error) {
 
 // waiverIdentity is who this machine is for the policy's waivers: the email and
 // install ID of this user's install, if bordercheck is installed (read, never
-// written), and the hostname. Uninstalled, only hostname-only waivers apply.
+// written), and the hostname. Uninstalled, no waiver applies: each names an
+// email or install ID.
 func waiverIdentity() policy.Identity {
 	dir, err := agent.Dir()
 	if err != nil {

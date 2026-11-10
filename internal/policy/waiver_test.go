@@ -25,8 +25,8 @@ func TestWaiveMatchesAndExpires(t *testing.T) {
 		{Check: "listeners", Email: "An@Acme.com", Until: "2026-12-01", Reason: "Postgres for the migration"},
 		{Check: "listeners", Email: "an@acme.com", Until: "2026-11-20", Reason: "shorter"},
 		{Check: "docker", InstallID: "id1", Hostname: "ans-mbp", Until: "2026-11-10", Reason: "ends today"},
-		{Check: "firewall", Hostname: "ANS-MBP", Until: "2026-11-09", Reason: "ended yesterday"},
-		{Check: "tailscale", Hostname: "ans-mbp", Until: "2027-01-01", Reason: "hostname only"},
+		{Check: "firewall", Email: "an@acme.com", Hostname: "ANS-MBP", Until: "2026-11-09", Reason: "ended yesterday"},
+		{Check: "tailscale", Email: "an@acme.com", Hostname: "ans-mbp", Until: "2027-01-01", Reason: "narrowed by hostname"},
 	}
 	results := []check.Result{
 		{ID: "listeners", Status: check.Warn, Severity: check.Medium, Summary: "1 port", Fix: "close it"},
@@ -59,9 +59,9 @@ func TestWaiveMatchesAndExpires(t *testing.T) {
 		t.Error("Waive must not change its input")
 	}
 
-	// Not installed: only the hostname is known, so only hostname-only waivers apply.
+	// Not installed: only the hostname is known, and no waiver rests on that alone.
 	plain := p.Waive(results, Identity{Hostname: "ans-mbp"}, today)
-	if plain[0].Status != check.Warn || plain[1].Status != check.Fail || plain[2].WaiverEnded == "" {
+	if plain[0].Status != check.Warn || plain[1].Status != check.Fail || plain[2].WaiverEnded != "" {
 		t.Errorf("uninstalled: %+v", plain)
 	}
 	// Every identity field set must match.
@@ -86,7 +86,7 @@ func TestWaivedJSON(t *testing.T) {
 func TestWaiverValidation(t *testing.T) {
 	withClock(t)
 	ok := `{"waivers": [{"check": "listeners", "email": "an@acme.com", "until": "2027-11-10", "reason": "r"},
-		{"check": "secrets", "hostname": "ans-mbp", "until": "2020-01-01", "reason": "ended long ago is fine"}]}`
+		{"check": "secrets", "install_id": "id1", "hostname": "ans-mbp", "until": "2020-01-01", "reason": "ended long ago is fine"}]}`
 	if p, err := load(t, ok); err != nil || len(p.Waivers) != 2 {
 		t.Fatalf("valid waivers: %v", err)
 	}
@@ -95,6 +95,7 @@ func TestWaiverValidation(t *testing.T) {
 		`{"waivers": [{"check": "listeners", "email": "an@acme.com", "until": "2028-01-01", "reason": "r"}]}`:         "days ahead",
 		`{"waivers": [{"check": "listeners", "email": "an@acme.com", "until": "12/01/2026", "reason": "r"}]}`:         "date like",
 		`{"waivers": [{"check": "listeners", "until": "2026-12-01", "reason": "r"}]}`:                                 "which machine",
+		`{"waivers": [{"check": "listeners", "hostname": "ans-mbp", "until": "2026-12-01", "reason": "r"}]}`:          "which machine",
 		`{"waivers": [{"check": "listener", "email": "an@acme.com", "until": "2026-12-01", "reason": "r"}]}`:          "check must be",
 		`{"waivers": [{"check": "listeners", "email": "an@acme.com", "until": "2026-12-01"}]}`:                        "reason",
 		`{"waivers": [{"check": "listeners", "email": "an", "until": "2026-12-01", "reason": "r"}]}`:                  "not an email",
