@@ -158,6 +158,7 @@ The options of each check follow. Paths may start with `~`. "Globs" match the pa
 | Field | Default | |
 |---|---|---|
 | `require_stealth` | `true` | macOS: warn (low) when stealth mode is off. |
+| `suggest_outbound` | `true` | macOS: warn (low) when no outbound firewall app is installed, and suggest the free, open-source [LuLu](https://objective-see.org/products/lulu.html) from Objective-See. The built-in firewall only filters incoming connections; an outbound firewall asks before an app connects out. Recognised: LuLu, Little Snitch, Radio Silence and Vallum in `/Applications` or `~/Applications`. When the firewall itself is off, the result asks only for that. |
 
 macOS: Application Firewall and stealth mode. Windows: Windows Firewall on for every profile. Linux: ufw or
 firewalld on, or nftables/iptables rules. Without root Linux shows only firewall configuration, not live

@@ -43,7 +43,8 @@
   ],
   "checks": {
     "firewall": {
-      "require_stealth": true
+      "require_stealth": true,
+      "suggest_outbound": true
     },
     "disk-encryption": {},
     "listeners": {

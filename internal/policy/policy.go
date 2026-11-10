@@ -101,6 +101,9 @@ func (c Common) IsEnabled() bool { return c.Enabled == nil || *c.Enabled }
 type Firewall struct {
 	Common
 	RequireStealth *bool `json:"require_stealth,omitempty"` // macOS stealth mode
+	// SuggestOutbound warns (low) on a Mac with no outbound firewall app such
+	// as LuLu, and suggests installing one.
+	SuggestOutbound bool `json:"suggest_outbound"`
 }
 
 type Listeners struct {
@@ -252,7 +255,7 @@ func Default() Policy {
 		Waivers: []Waiver{},
 
 		Checks: Checks{
-			Firewall: Firewall{RequireStealth: ptr(true)},
+			Firewall: Firewall{RequireStealth: ptr(true), SuggestOutbound: true},
 			Listeners: Listeners{Allow: []ListenerRule{
 				{Process: "rapportd"}, // Apple Handoff/Continuity
 			}},

@@ -23,7 +23,13 @@ func All(p policy.Policy) []check.Check {
 		policy.Common
 	}{
 		{check.Check{ID: "firewall", Title: "Firewall is on",
-			Run: func(ctx context.Context) check.Result { return firewall(ctx, *c.Firewall.RequireStealth) }}, c.Firewall.Common},
+			Run: func(ctx context.Context) check.Result {
+				r := firewall(ctx, *c.Firewall.RequireStealth)
+				if found, ok := outboundFirewalls(); ok && c.Firewall.SuggestOutbound {
+					r = withOutbound(r, found)
+				}
+				return r
+			}}, c.Firewall.Common},
 		{check.Check{ID: "disk-encryption", Title: "Disk is encrypted", Run: diskEncryption}, c.DiskEncryption},
 		{check.Check{ID: "listeners", Title: "Nothing listens beyond localhost",
 			Run: func(ctx context.Context) check.Result { return listeners(ctx, c.Listeners.Allow) }}, c.Listeners.Common},
