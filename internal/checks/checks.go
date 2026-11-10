@@ -31,6 +31,9 @@ func All(p policy.Policy) []check.Check {
 		{check.Check{ID: "docker", Title: "Docker containers stay isolated",
 			Run: func(ctx context.Context) check.Result { return docker(ctx, c.Docker) }}, c.Docker.Common},
 		{check.Check{ID: "secrets", Title: "No plain-text secrets", Run: secrets(c.Secrets)}, c.Secrets.Common},
+		{check.Check{ID: "os-updates", Title: "OS and browsers are up to date", Run: osUpdates(c.OSUpdates)}, c.OSUpdates.Common},
+		{check.Check{ID: "screen-lock", Title: "Screen locks with a password", Run: screenLock(c.ScreenLock)}, c.ScreenLock.Common},
+		{check.Check{ID: "remote-access", Title: "Remote login and sharing are off", Run: remoteAccess(c.RemoteAccess)}, c.RemoteAccess.Common},
 	}
 	var out []check.Check
 	for _, a := range all {

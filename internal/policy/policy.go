@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -66,6 +67,10 @@ type Checks struct {
 	Tailscale      Common    `json:"tailscale"`
 	Docker         Docker    `json:"docker"`
 	Secrets        Secrets   `json:"secrets"`
+
+	OSUpdates    OSUpdates    `json:"os-updates"`
+	ScreenLock   ScreenLock   `json:"screen-lock"`
+	RemoteAccess RemoteAccess `json:"remote-access"`
 }
 
 // Common is what every check accepts.
@@ -133,6 +138,37 @@ type SecretPattern struct {
 	ShowTail bool   `json:"show_tail,omitempty"` // safe only for long random tokens
 }
 
+// OSUpdates judges the OS and browsers from what the machine already knows, with
+// no network: day limits of 0 turn that rule off.
+type OSUpdates struct {
+	Common
+	// MinOSVersions maps "macos", "windows" (a build number such as "26100") or a
+	// Linux os-release ID ("ubuntu", "debian", "fedora"…) to the oldest version
+	// allowed. Keys merge with the defaults; "" removes a minimum.
+	MinOSVersions      map[string]string `json:"min_os_versions"`
+	RequireAutoUpdate  *bool             `json:"require_auto_update,omitempty"` // the OS checks for and installs security updates by itself
+	MaxCheckAgeDays    int               `json:"max_check_age_days"`            // days since the OS last checked for updates
+	MaxPendingDays     int               `json:"max_pending_days"`              // days an update the OS has found may wait to be installed
+	MaxDaysSinceUpdate int               `json:"max_days_since_update"`         // Windows and Linux: days since an OS update was last installed
+	CheckBrowsers      *bool             `json:"check_browsers,omitempty"`      // Chrome, Edge, Firefox, Brave
+	MaxBrowserAgeDays  int               `json:"max_browser_age_days"`          // days since the installed browser build landed on disk
+	MinBrowserVersions map[string]string `json:"min_browser_versions"`          // "chrome", "edge", "firefox", "brave" → oldest version allowed
+}
+
+type ScreenLock struct {
+	Common
+	RequirePassword *bool `json:"require_password,omitempty"` // a password is needed after sleep or the screen saver
+	MaxLockMinutes  int   `json:"max_lock_minutes"`           // the screen must lock after at most this many idle minutes; 0 = don't check
+}
+
+// RemoteAccessServices are the names RemoteAccess.Allow accepts.
+var RemoteAccessServices = []string{"ssh", "screen-sharing", "remote-management", "remote-apple-events", "rdp", "winrm", "guest"}
+
+type RemoteAccess struct {
+	Common
+	Allow []string `json:"allow"` // services from RemoteAccessServices that may be on
+}
+
 func ptr[T any](v T) *T { return &v }
 
 // Default is the built-in policy.
@@ -155,6 +191,13 @@ func Default() Policy {
 				ShowTail:           ptr(true),
 				WalkDepth:          5,
 			},
+			OSUpdates: OSUpdates{
+				MinOSVersions:     map[string]string{"macos": "15", "windows": "26100", "ubuntu": "22.04", "debian": "12", "fedora": "43"},
+				RequireAutoUpdate: ptr(true), MaxCheckAgeDays: 14, MaxPendingDays: 14, MaxDaysSinceUpdate: 45,
+				CheckBrowsers: ptr(true), MaxBrowserAgeDays: 60, MinBrowserVersions: map[string]string{},
+			},
+			ScreenLock:   ScreenLock{RequirePassword: ptr(true), MaxLockMinutes: 10},
+			RemoteAccess: RemoteAccess{Allow: []string{}},
 		},
 	}
 }
@@ -248,6 +291,7 @@ func (p Policy) validate() error {
 		"firewall": c.Firewall.OnProblem, "disk-encryption": c.DiskEncryption.OnProblem,
 		"listeners": c.Listeners.OnProblem, "tailscale": c.Tailscale.OnProblem,
 		"docker": c.Docker.OnProblem, "secrets": c.Secrets.OnProblem,
+		"os-updates": c.OSUpdates.OnProblem, "screen-lock": c.ScreenLock.OnProblem, "remote-access": c.RemoteAccess.OnProblem,
 	} {
 		if on != "" && on != check.Fail && on != check.Warn {
 			return fmt.Errorf("checks.%s.on_problem must be \"fail\" or \"warn\", not %q", id, on)
@@ -276,6 +320,41 @@ func (p Policy) validate() error {
 		}
 		if _, err := regexp.Compile(sp.Regex); err != nil {
 			return fmt.Errorf("checks.secrets.extra_patterns %q: %w", sp.Kind, err)
+		}
+	}
+	if err := c.OSUpdates.validate(); err != nil {
+		return err
+	}
+	if m := c.ScreenLock.MaxLockMinutes; m < 0 || m > 240 {
+		return errors.New("checks.screen-lock.max_lock_minutes must be between 0 and 240")
+	}
+	for _, s := range c.RemoteAccess.Allow {
+		if !slices.Contains(RemoteAccessServices, s) {
+			return fmt.Errorf("checks.remote-access.allow: unknown service %q (known: %s)", s, strings.Join(RemoteAccessServices, ", "))
+		}
+	}
+	return nil
+}
+
+var versionRe = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*$`)
+
+func (o OSUpdates) validate() error {
+	for name, days := range map[string]int{"max_check_age_days": o.MaxCheckAgeDays, "max_pending_days": o.MaxPendingDays,
+		"max_days_since_update": o.MaxDaysSinceUpdate, "max_browser_age_days": o.MaxBrowserAgeDays} {
+		if days < 0 || days > 3650 {
+			return fmt.Errorf("checks.os-updates.%s must be between 0 and 3650", name)
+		}
+	}
+	for field, m := range map[string]map[string]string{"min_os_versions": o.MinOSVersions, "min_browser_versions": o.MinBrowserVersions} {
+		for k, v := range m {
+			if v != "" && !versionRe.MatchString(v) {
+				return fmt.Errorf("checks.os-updates.%s %q: %q is not a version like \"15\" or \"22.04\"", field, k, v)
+			}
+		}
+	}
+	for k := range o.MinBrowserVersions {
+		if !slices.Contains([]string{"chrome", "edge", "firefox", "brave"}, k) {
+			return fmt.Errorf("checks.os-updates.min_browser_versions: unknown browser %q (known: chrome, edge, firefox, brave)", k)
 		}
 	}
 	return nil
