@@ -25,6 +25,8 @@ func docker(ctx context.Context, opts policy.Docker) check.Result {
 			"/Applications/Docker.app/Contents/Resources/bin/docker"}
 	case "windows":
 		fallbacks = []string{`C:\Program Files\Docker\Docker\resources\bin\docker.exe`}
+	case "linux":
+		fallbacks = []string{"/usr/bin/docker", "/usr/local/bin/docker", "/snap/bin/docker"}
 	}
 	bin, ok := sysx.Find("docker", fallbacks...)
 	if !ok {
@@ -32,6 +34,10 @@ func docker(ctx context.Context, opts policy.Docker) check.Result {
 	}
 	ids, err := sysx.Run(ctx, bin, "ps", "-q")
 	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "permission denied") {
+			// Linux: the socket belongs to root and the docker group.
+			return check.Skipped("Docker is installed, but this user may not use it (not in the docker group), so its containers were not checked.")
+		}
 		return check.Skipped("Docker is not running.")
 	}
 	if len(strings.Fields(ids)) == 0 {

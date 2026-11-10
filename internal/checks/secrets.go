@@ -28,7 +28,7 @@ const (
 // Files under the home folder that often hold keys, on any OS.
 var secretFiles = []string{
 	".zshrc", ".zprofile", ".zshenv", ".bashrc", ".bash_profile", ".profile",
-	".zsh_history", ".bash_history", ".config/fish/config.fish",
+	".zsh_history", ".bash_history", ".config/fish/config.fish", ".local/share/fish/fish_history",
 	".aws/credentials", ".npmrc", ".netrc", ".pypirc", ".git-credentials", ".docker/config.json",
 	"AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt",
 	"Documents/PowerShell/Microsoft.PowerShell_profile.ps1",
@@ -41,6 +41,7 @@ var secretSkipDirs = map[string]bool{
 	".Trash": true, ".cache": true, ".npm": true, ".pnpm-store": true, ".yarn": true, ".cargo": true,
 	".rustup": true, ".gradle": true, ".m2": true, ".venv": true, "venv": true, "__pycache__": true,
 	"vendor": true, "DerivedData": true, "Pictures": true, "Music": true, "Movies": true, "Applications": true,
+	".local": true, "snap": true, ".var": true, ".steam": true, // Linux app data (XDG, Snap, Flatpak, Steam)
 }
 
 type secretRule struct {
@@ -193,6 +194,9 @@ func secretFix() string {
 	case "windows":
 		return "Move each key into Windows Credential Manager or a password manager CLI (e.g. 1Password `op run`), " +
 			"then delete the line or file." + rotate
+	case "linux":
+		return "Move each key into the desktop keyring (secret-tool store / secret-tool lookup, from libsecret) or a " +
+			"password manager CLI such as pass or 1Password `op run`, then delete the line or file." + rotate
 	}
 	return "Move each key into a password manager or the OS keyring, then delete the line or file." + rotate
 }

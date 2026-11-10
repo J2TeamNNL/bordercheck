@@ -4,19 +4,24 @@
 
 Firewalls stop strangers on the internet. They don't stop a dev server listening on every network, a
 Tailscale peer that got hacked, a container with your home folder mounted, or an API key sitting in
-`.zshrc`. bordercheck looks for those on macOS and Windows and says how to close each one. Installed, it
-reports to your organisation's endpoint on a schedule.
+`.zshrc`. bordercheck looks for those on macOS, Linux and Windows and says how to close each one. Installed,
+it reports to your organisation's endpoint on a schedule.
 
 ## What it checks
 
-| Check | macOS | Windows |
-|---|---|---|
-| `firewall` | Application Firewall + stealth mode | Windows Firewall, every profile |
-| `disk-encryption` | FileVault | BitLocker (system drive) |
-| `listeners` | Ports reachable beyond localhost | same |
-| `tailscale` | "Allow incoming connections" is off (shields up) | same |
-| `docker` | Ports on 0.0.0.0, host network, privileged, mounts of `/`, home, `~/.ssh`, the Docker socket | same |
-| `secrets` | Keys in shell files, shell history, `~/.aws`, `~/.npmrc`, `.env` files, private key files | same, plus PowerShell history |
+| Check | macOS | Linux | Windows |
+|---|---|---|---|
+| `firewall` | Application Firewall + stealth mode | ufw or firewalld on; nftables/iptables rules with `sudo`¹ | Windows Firewall, every profile |
+| `disk-encryption` | FileVault | LUKS/dm-crypt under `/` and `/home`, or ZFS encryption | BitLocker (system drive) |
+| `listeners` | Ports reachable beyond localhost | same (`ss`, else `/proc/net/tcp`) | same |
+| `tailscale` | "Allow incoming connections" is off (shields up) | same | same |
+| `docker` | Ports on 0.0.0.0, host network, privileged, mounts of `/`, home, `~/.ssh`, the Docker socket | same | same |
+| `secrets` | Keys in shell files, shell history, `~/.aws`, `~/.npmrc`, `.env` files, private key files | same, plus fish history | same, plus PowerShell history |
+
+¹ Without root Linux shows only firewall configuration, not live rules. bordercheck passes ufw when
+`/etc/ufw/ufw.conf` enables it and firewalld when its service runs (and warns about zones such as
+FedoraWorkstation that open ports 1025–65535). When only an nftables or iptables service loads the rules, a plain
+run says it cannot tell and skips; `sudo bordercheck -only firewall` reads the rules.
 
 ## Use
 
@@ -103,19 +108,65 @@ nothing but a `hostname` apply.
 
 ## Install as a service
 
-Host your `policies.json` at an HTTPS URL and have people run:
+Host your `policies.json` at an HTTPS URL and have people run one command.
+
+macOS and Linux:
 
 ```sh
-./bordercheck install https://bordercheck.acme.com/policies.json   # asks for their work email
+curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.acme.com/policies.json
 ```
 
-Or hand them a zip with `bordercheck` and `policies.json` side by side and they run `./bordercheck install`.
-`-email you@acme.com` skips the question (for scripted rollouts).
+Windows (PowerShell):
 
-That copies both files to `~/Library/Application Support/bordercheck` (macOS) or
-`%LOCALAPPDATA%\bordercheck` (Windows), registers an hourly per-user service (launchd LaunchAgent / Task
-Scheduler; no admin rights), and sends a first report straight away. The service sends a report whenever
-`report.interval` has passed since the last one that got through, so a failed send retries the next hour.
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/policies.json
+```
+
+The script picks the latest release for the OS and CPU, checks it (below), and runs
+`bordercheck install <url>`, which asks for the person's work email on the terminal. For scripted rollouts add
+`--email an@acme.com` (`-Email` in PowerShell). Other options: `--version v1.2.3`, `--dry-run` (verify, then
+stop), and `--repo owner/name --key <base64>` for a fork.
+
+Already have the binary? `./bordercheck install https://bordercheck.acme.com/policies.json` does the same, or
+hand people a zip with `bordercheck` and `policies.json` side by side and they run `./bordercheck install`.
+`-email you@acme.com` skips the question.
+
+That copies both files to `~/Library/Application Support/bordercheck` (macOS), `~/.local/share/bordercheck`
+(Linux, or `$XDG_DATA_HOME/bordercheck`) or `%LOCALAPPDATA%\bordercheck` (Windows), registers an hourly
+per-user service (launchd LaunchAgent / systemd user timer / Task Scheduler; no admin rights), and sends a first
+report straight away. The service sends a report whenever `report.interval` has passed since the last one that
+got through, so a failed send retries the next hour.
+
+On Linux the timer is `~/.config/systemd/user/bordercheck.timer` and runs while the person's systemd user
+session is up, as the Mac LaunchAgent runs while they are logged in (`loginctl enable-linger` keeps it running
+when they are not). A login with no systemd user session (no systemd, some SSH or WSL setups) gets a line in
+the user's crontab instead; `bordercheck status` says which.
+
+### What the install script proves
+
+Before it runs anything it downloaded, the script checks that:
+
+1. `SHA256SUMS.sig` is an ed25519 signature of `SHA256SUMS` by the release key written into the script
+   (with OpenSSL 3, as on current Linux distributions), and
+2. the binary matches its line in `SHA256SUMS`.
+
+Stock macOS (LibreSSL) and Windows PowerShell cannot check ed25519, so there the downloaded binary checks the
+signature itself (`bordercheck verify`) with the key from the script, after step 2 passed. Any mismatch stops
+the install with a message and nothing installed.
+
+What that does and does not prove:
+
+- It catches a corrupted or truncated download, a binary swapped on the release without updating
+  `SHA256SUMS`, and (with OpenSSL 3) a release whose `SHA256SUMS` was changed without the signing key.
+- Without OpenSSL 3 the signature check runs inside the binary it is checking, so a binary planted by someone
+  who can edit the release can simply say yes. The checksum still ties it to `SHA256SUMS`, but not
+  `SHA256SUMS` to the key.
+- `curl | sh` trusts whoever controls the script's URL. The script and the release both live on GitHub, so
+  someone who takes over the GitHub account can change both. The signing key protects **updates** of installed
+  copies (which trust only their built-in key) far better than it protects the first install. To close the
+  gap, host `install.sh` yourself (next to `policies.json`) or pin it to a commit
+  (`raw.githubusercontent.com/ptrinh/bordercheck/<commit>/install.sh`), and prefer Homebrew or signed binaries
+  on Macs.
 
 ### Notifications
 
@@ -205,12 +256,22 @@ sat in shell history or a synced folder.
 
 ## Download
 
-Get the binary for your machine from [Releases](https://github.com/ptrinh/bordercheck/releases/latest) and
-check it against `SHA256SUMS`. Signed binaries, Homebrew and winget are planned.
+- **Script**: see [Install as a service](#install-as-a-service).
+- **Homebrew** (macOS, Linux): `brew install ptrinh/tap/bordercheck`, then `bordercheck install <url>`. The
+  service runs its own copy, which updates itself; `brew upgrade` updates the one on your PATH.
+- **By hand**: get `bordercheck-<version>-<os>-<arch>` from
+  [Releases](https://github.com/ptrinh/bordercheck/releases/latest) (macOS, Linux and Windows; arm64 and amd64)
+  with `SHA256SUMS` and `SHA256SUMS.sig`. Compare `shasum -a 256 <file>` with its line in `SHA256SUMS`; then
+  `./<file> verify SHA256SUMS SHA256SUMS.sig <file>` checks the signature (with the caveat above: a binary
+  checking itself).
+
+macOS release binaries are signed with a Developer ID and notarized once the signing secrets are set up (see
+[Releasing](#releasing)); until then, a browser download is blocked by Gatekeeper, while `install.sh` and Homebrew
+are not (they don't mark the file as downloaded). Windows binaries are not Authenticode-signed yet.
 
 ## Roadmap
 
-- Code-signed and notarized binaries; Homebrew tap and winget
+- Authenticode-signed Windows binaries; winget
 - SSH keys without a passphrase; Remote Login / Screen Sharing / RDP on
 - AI agent configs: tokens in MCP config files, agents running without a sandbox
 - Outdated OS, browsers and packages
@@ -220,8 +281,32 @@ check it against `SHA256SUMS`. Signed binaries, Homebrew and winget are planned.
 
 ```sh
 go test ./...
-scripts/build-all.sh v0.2.0      # dist/ for macOS and Windows, arm64 and amd64, plus SHA256SUMS
+scripts/build-all.sh v0.2.0      # dist/ for macOS, Linux and Windows, arm64 and amd64, plus SHA256SUMS
 ```
+
+### Releasing
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`: build → sign and notarize the macOS binaries →
+`SHA256SUMS` and its signature (after code signing, which changes the files) → check the release against the
+key built into bordercheck → GitHub release with the binaries, `SHA256SUMS`, `SHA256SUMS.sig` and a rendered
+Homebrew formula `bordercheck.rb`.
+
+Repo secrets:
+
+| Secret | |
+|---|---|
+| `BORDERCHECK_SIGNING_KEY` | required; the ed25519 key from `go run ./scripts/sign -keygen` |
+| `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD` | base64 of a `.p12` with the *Developer ID Application* certificate and key, and its password |
+| `MACOS_SIGNING_IDENTITY` | optional, e.g. `Developer ID Application: Acme Ltd (ABCDE12345)` |
+| `APPLE_NOTARY_KEY_P8`, `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID` | an App Store Connect API key for `notarytool` |
+
+Without the macOS secrets the release still goes out, unsigned, with a warning on the run. The signing steps
+have not run for real yet: on the first signed release, download a darwin binary with a browser and check
+`codesign -dv --verbose=2` and that it opens without a Gatekeeper prompt. A bare binary cannot be stapled, so
+Gatekeeper looks its notarization up online.
+
+Homebrew: copy `bordercheck.rb` from the release to `Formula/bordercheck.rb` in the tap repo
+(`ptrinh/homebrew-tap`) and push. `scripts/homebrew-formula.sh vX.Y.Z dist/SHA256SUMS` renders it locally.
 
 ## License
 

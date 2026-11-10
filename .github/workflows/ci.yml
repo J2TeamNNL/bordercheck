@@ -17,6 +17,16 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./...
       - run: go test ./...
+      - name: Lint the install scripts
+        if: runner.os == 'Linux'
+        run: shellcheck -s sh install.sh scripts/*.sh
+      - name: Parse install.ps1
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/install.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors; exit 1 }
       # Smoke run on the real OS; exit 1 (a failed check on the runner) is fine, a crash is not.
       - run: go run . -json > report.json || [ $? -eq 1 ]
         shell: bash

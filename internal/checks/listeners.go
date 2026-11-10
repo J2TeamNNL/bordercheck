@@ -2,9 +2,12 @@ package checks
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
@@ -31,6 +34,8 @@ var listenerHints = map[string]string{
 	"Spotify":             "Spotify Connect discovery",
 	"System":              "Windows file sharing (SMB) and other system services",
 	"svchost":             "Windows system service",
+	"sshd":                "SSH server; turn it off if unused (Linux: sudo systemctl disable --now ssh; Mac: Remote Login)",
+	"kdeconnectd":         "KDE Connect",
 }
 
 func listeners(ctx context.Context, allow []policy.ListenerRule) check.Result {
@@ -88,6 +93,57 @@ func parseWinListeners(out string) []listener {
 		if len(f) == 3 {
 			ls = append(ls, listener{Proc: f[0], Addr: f[1], Port: f[2]})
 		}
+	}
+	return ls
+}
+
+var ssProcRe = regexp.MustCompile(`users:\(\("([^"]+)"`)
+
+// parseSS reads `ss -l -t -n -p`: State Recv-Q Send-Q Local:Port Peer:Port
+// [users:(("name",pid=…,fd=…))]. Without root, only the user's own sockets
+// carry a process name.
+func parseSS(out string) []listener {
+	var ls []listener
+	for _, line := range strings.Split(out, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 5 || f[0] != "LISTEN" {
+			continue
+		}
+		local := f[3]
+		i := strings.LastIndex(local, ":")
+		if i < 0 {
+			continue
+		}
+		addr, _, _ := strings.Cut(local[:i], "%") // 127.0.0.53%lo: the interface the socket is bound to
+		l := listener{Addr: strings.Trim(addr, "[]"), Port: local[i+1:]}
+		if m := ssProcRe.FindStringSubmatch(line); m != nil {
+			l.Proc = m[1]
+		}
+		ls = append(ls, l)
+	}
+	return ls
+}
+
+// parseProcNetTCP reads /proc/net/tcp or tcp6, keeping sockets in state 0A
+// (LISTEN). Addresses are hex, each 32-bit word in host (little-endian) order.
+func parseProcNetTCP(out string) []listener {
+	var ls []listener
+	for _, line := range strings.Split(out, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 4 || f[3] != "0A" {
+			continue
+		}
+		hexAddr, hexPort, ok := strings.Cut(f[1], ":")
+		b, err := hex.DecodeString(hexAddr)
+		port, perr := strconv.ParseUint(hexPort, 16, 16)
+		if !ok || err != nil || perr != nil || (len(b) != 4 && len(b) != 16) {
+			continue
+		}
+		ip := make(net.IP, len(b))
+		for i := 0; i < len(b); i += 4 {
+			ip[i], ip[i+1], ip[i+2], ip[i+3] = b[i+3], b[i+2], b[i+1], b[i]
+		}
+		ls = append(ls, listener{Addr: ip.String(), Port: strconv.FormatUint(port, 10)})
 	}
 	return ls
 }
