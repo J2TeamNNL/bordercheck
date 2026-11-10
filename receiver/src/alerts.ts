@@ -255,6 +255,7 @@ export async function prune(env: Env, now: Date): Promise<void> {
        WHERE last_seen < ? AND (public_ip != '' OR geo != '' OR local_ips != '' OR device_location != '')`,
     ).bind(before),
     env.DB.prepare("DELETE FROM report_links WHERE expires_at < ?").bind(now.toISOString()),
+    env.DB.prepare("DELETE FROM api_idempotency WHERE expires_at <= ?").bind(now.toISOString()),
   ]);
   await pruneRateLimits(env, now.getTime());
 }

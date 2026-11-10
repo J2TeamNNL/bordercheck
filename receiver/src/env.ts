@@ -7,6 +7,9 @@ export interface Env {
   MCP_TOKEN?: string; // bearer token for the MCP server at /mcp: read and write tools
   MCP_READ_TOKEN?: string; // bearer token for the MCP server: read-only tools
   // Neither set (or both shorter than 16 characters): /mcp answers 404.
+  API_TOKEN?: string; // bearer token for the REST API at /api/v1: reads and writes
+  API_READ_TOKEN?: string; // bearer token for the REST API: GET only
+  // Neither usable (unset, shorter than 16 characters, or equal to ADMIN_TOKEN): /api/v1 answers 404.
 
   // Vars (wrangler.jsonc "vars").
   ACCESS_TEAM_DOMAIN?: string; // e.g. acme.cloudflareaccess.com
@@ -29,6 +32,7 @@ export interface Env {
   PAGE_RATE_LIMIT?: string; // /i/<code> and /r/<id> views per client IP per window (60)
   RATE_WINDOW_SECONDS?: string; // (600)
   MCP_RATE_LIMIT?: string; // /mcp requests per client IP per window (300)
+  API_RATE_LIMIT?: string; // /api/v1 requests per client IP per window (300)
 
   // Where reports come from. Personal data: see README "What is stored".
   STORE_PUBLIC_IP?: string; // "on" (default) | "off": public IP and the machine's local addresses
@@ -83,6 +87,7 @@ export const config = (env: Env) => ({
   pageRateLimit: num(env.PAGE_RATE_LIMIT, 60, 1),
   rateWindow: num(env.RATE_WINDOW_SECONDS, 600, 10),
   mcpRateLimit: num(env.MCP_RATE_LIMIT, 300, 1),
+  apiRateLimit: num(env.API_RATE_LIMIT, 300, 1),
   storeIp: flag(env.STORE_PUBLIC_IP, true),
   storeGeo: flag(env.STORE_GEO, true),
   alertNewCountry: flag(env.ALERT_NEW_COUNTRY, false),

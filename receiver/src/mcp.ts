@@ -88,7 +88,7 @@ export async function mcpAccess(req: Request, env: Env): Promise<"write" | "read
 
 // originAllowed: no Origin (not a browser) or this deployment's own origin.
 // Anything else, including "null", is a page somewhere else.
-function originAllowed(req: Request, env: Env): boolean {
+export function originAllowed(req: Request, env: Env): boolean {
   const o = req.headers.get("origin");
   if (o === null) return true;
   return o === new URL(req.url).origin || o === publicOrigin(env, req);

@@ -12,9 +12,9 @@ export function clientIP(req: Request): string {
   return (req.headers.get("cf-connecting-ip") ?? "").trim();
 }
 
-export async function hit(env: Env, req: Request, bucket: "enroll" | "page" | "mcp", nowMs = Date.now()): Promise<{ ok: boolean; retryAfter: number }> {
+export async function hit(env: Env, req: Request, bucket: "enroll" | "page" | "mcp" | "api", nowMs = Date.now()): Promise<{ ok: boolean; retryAfter: number }> {
   const cfg = config(env);
-  const limit = bucket === "enroll" ? cfg.enrollRateLimit : bucket === "mcp" ? cfg.mcpRateLimit : cfg.pageRateLimit;
+  const limit = { enroll: cfg.enrollRateLimit, mcp: cfg.mcpRateLimit, api: cfg.apiRateLimit, page: cfg.pageRateLimit }[bucket];
   const win = Math.floor(nowMs / 1000 / cfg.rateWindow);
   const key = `${bucket}:${(await sha256hex("bordercheck-rl:" + (clientIP(req) || "unknown"))).slice(0, 32)}`;
   const count = await env.DB.prepare(
