@@ -7,6 +7,16 @@ Tailscale peer that got hacked, a container with your home folder mounted, or an
 `.zshrc`. bordercheck looks for those on macOS, Linux and Windows and says how to close each one. Installed,
 it reports to your organisation's endpoint on a schedule.
 
+<p align="center"><img src="docs/img/portal-machines.png" width="860" alt="The portal's Machines page: tiles for failing, attention, silent, pending invites and awaiting first report; the checks failing most; and a table of every machine with its state, person, role, platform, where it reports from and counts."></p>
+
+<p align="center">
+<img src="docs/img/portal-invite.png" width="560" alt="The invite page an employee opens: what bordercheck is, and the one command to install it on this Mac.">
+<img src="docs/img/portal-report-phone.png" width="250" alt="The report page a person sees for their own machine, on a phone: 3 things to fix, each with how to fix it.">
+</p>
+
+The portal (`receiver/`, a Cloudflare Worker you host): the fleet for IT, the invite an employee opens, and the
+report page a person sees for their own machine.
+
 ## What it checks
 
 | Check | macOS | Linux | Windows |
