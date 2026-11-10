@@ -334,6 +334,7 @@ background:radial-gradient(circle at 30% 20%,color-mix(in srgb,var(--c) 70%,#fff
 .steps li::before{content:counter(s);flex:none;display:grid;place-items:center;width:28px;height:28px;margin-top:-2px;border-radius:50%;background:var(--glass-hi);color:var(--text);font-weight:700;font-size:13px}
 .steps li b{color:var(--text)}
 kbd{font:600 12px/1 var(--font);padding:3px 7px;border-radius:6px;background:var(--glass-hi);box-shadow:inset 0 -1px 0 rgba(0,0,0,.5);color:var(--text)}
+footer.credit{margin:48px auto 28px;padding:0 24px;text-align:center;font-size:12px;color:var(--dim);opacity:.7}
 details.adder{margin-top:28px}
 details.adder>summary{list-style:none}details.adder>summary::-webkit-details-marker{display:none}
 details.adder>summary::before{content:"+";font-weight:700;font-size:16px;line-height:1}
@@ -455,7 +456,7 @@ export function layout(L: I18n, title: string, who: string | null, body: Html, a
         }</div>`
       : html`<span class="brand"><span class="mark">${MARK}</span>bordercheck</span>${langs}`
   }</header>
-<main>${body}</main>${
+<main>${body}</main><footer class="credit">© Phil Trinh - SENPRINTS</footer>${
     opts.copy ? html`<span id="copy-status" class="sr-only" aria-live="polite"></span><script>${new Html(COPY_SCRIPT)}</script>` : ""
   }</body></html>`;
 }

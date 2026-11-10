@@ -174,6 +174,7 @@ main() {
 		# Served by GitHub's CDN, not the rate-limited API, like the updater.
 		sums_base=$releases/latest/download
 	fi
+	say "bordercheck · (c) Phil Trinh - SENPRINTS"
 	say "Fetching the release list for $os/$arch from github.com/$repo ..."
 	fetch "$sums_base/SHA256SUMS" "$tmp/SHA256SUMS" || die "could not download SHA256SUMS from $sums_base"
 	fetch "$sums_base/SHA256SUMS.sig" "$tmp/SHA256SUMS.sig" ||

@@ -256,6 +256,7 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 		return err
 	}
 	fmt.Fprintf(env.Out, "Done: bordercheck is installed and the first report is sent. Nothing else to do; it checks again on its own.\nTo see the details and how to fix anything it found, run: \"%s\"\n", filepath.Join(env.Dir, binName()))
+	fmt.Fprintf(env.Out, "\nbordercheck %s · %s\n", env.Version, report.Credit)
 	return nil
 }
 

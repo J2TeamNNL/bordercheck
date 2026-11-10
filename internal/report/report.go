@@ -99,6 +99,10 @@ func Progress(w io.Writer) check.Progress {
 	}
 }
 
+// Credit is shown where a person meets bordercheck: at install and under a
+// report in the terminal. (The portal's pages carry it in their footer.)
+const Credit = "(c) Phil Trinh - SENPRINTS"
+
 func (r Report) WriteJSON(w io.Writer) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
@@ -168,6 +172,7 @@ func (r Report) WriteText(w io.Writer, color bool) {
 		}
 	}
 	fmt.Fprintln(w, strings.Join(parts, " · "))
+	fmt.Fprintln(w, paint("\x1b[90m", r.Tool+" "+r.Version+" · "+Credit))
 }
 
 // waiverNote says until when a result is waived, warning when that is soon, or

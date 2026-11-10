@@ -81,6 +81,7 @@ try {
     $sumsBase = if ($Version) { "$releases/download/$Version" } else { "$releases/latest/download" }
     $sums = Join-Path $tmp 'SHA256SUMS'
     $sig = Join-Path $tmp 'SHA256SUMS.sig'
+    Say "bordercheck - (c) Phil Trinh - SENPRINTS"
     Say "Fetching the release list for windows/$arch from github.com/$Repo ..."
     try { Fetch "$sumsBase/SHA256SUMS" $sums } catch { Fail "Could not download SHA256SUMS from $sumsBase ($($_.Exception.Message))." }
     try { Fetch "$sumsBase/SHA256SUMS.sig" $sig } catch { Fail 'The release has no SHA256SUMS.sig, so it cannot be verified.' }
