@@ -320,7 +320,8 @@ func Status(env Env) (string, error) {
 		return "", err
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "Installed:  %s (%s)\nEmail:      %s\nPolicy:     %s", env.Dir, env.Version, cfg.Email, pol.Name)
+	fmt.Fprintf(&b, "Installed:  %s (%s)\nEmail:      %s\nInstall ID: %s\nPolicy:     %s", env.Dir, env.Version, cfg.Email,
+		cfg.InstallID, pol.Name)
 	if pol.Update.PolicyURL != "" {
 		fmt.Fprintf(&b, " (refreshed from %s)", pol.Update.PolicyURL)
 	}
@@ -330,6 +331,18 @@ func Status(env Env) (string, error) {
 	}
 	if st.LastError != "" {
 		fmt.Fprintf(&b, "Last error: %s (%s)\n", st.LastError, st.LastTry.Format(time.RFC1123))
+	}
+	if n := pol.Notify; n.Enabled {
+		fmt.Fprintf(&b, "Notify:     new %s (%s)", joinWords(n.Statuses), joinWords(n.Severities))
+		if n.Remind() > 0 {
+			fmt.Fprintf(&b, ", again every %s", n.RemindEvery)
+		}
+		b.WriteString("\n")
+	} else {
+		b.WriteString("Notify:     off\n")
+	}
+	for _, w := range pol.ActiveWaivers(identity(cfg), time.Now()) {
+		fmt.Fprintf(&b, "Waiver:     %s until %s (%s)\n", w.Check, w.Until, w.Reason)
 	}
 	if pol.Update.Binary {
 		fmt.Fprintf(&b, "Updates:    every %s from github.com/%s\n", pol.Update.Interval, cfg.UpdateRepo)
@@ -343,6 +356,15 @@ func Status(env Env) (string, error) {
 		fmt.Fprintf(&b, "Update err: %s\n", st.UpdateError)
 	}
 	return b.String(), nil
+}
+
+// joinWords joins string-like values with ", ".
+func joinWords[T ~string](vs []T) string {
+	out := make([]string, len(vs))
+	for i, v := range vs {
+		out[i] = string(v)
+	}
+	return strings.Join(out, ", ")
 }
 
 // currentPolicy refreshes policies.json from its update.policy_url, keeping the

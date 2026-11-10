@@ -89,6 +89,19 @@ func (p Policy) Waive(results []check.Result, who Identity, at time.Time) []chec
 	return out
 }
 
+// ActiveWaivers are the waivers that apply to who and have not ended, in policy
+// order.
+func (p Policy) ActiveWaivers(who Identity, at time.Time) []Waiver {
+	today := at.Format(DateFormat)
+	var out []Waiver
+	for _, w := range p.Waivers {
+		if w.matches(w.Check, who) && w.Until >= today {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
 // checkIDs are the check IDs a policy knows, from the json names in Checks, so
 // a check added there can be waived without touching this file.
 func checkIDs() map[string]bool {

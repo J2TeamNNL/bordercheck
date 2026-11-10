@@ -157,3 +157,16 @@ func TestCheckIDsFollowChecks(t *testing.T) {
 		}
 	}
 }
+
+func TestActiveWaivers(t *testing.T) {
+	at := time.Date(2026, 11, 10, 12, 0, 0, 0, time.Local)
+	p := Policy{Waivers: []Waiver{
+		{Check: "listeners", Email: "an@acme.com", Until: "2026-12-01", Reason: "db"},
+		{Check: "docker", Email: "an@acme.com", Until: "2026-11-01", Reason: "ended"},
+		{Check: "firewall", Email: "binh@acme.com", Until: "2026-12-01", Reason: "other machine"},
+	}}
+	got := p.ActiveWaivers(Identity{Email: "AN@acme.com"}, at)
+	if len(got) != 1 || got[0].Check != "listeners" {
+		t.Errorf("got %+v", got)
+	}
+}
