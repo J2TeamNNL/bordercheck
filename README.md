@@ -17,9 +17,13 @@ it reports to your organisation's endpoint on a schedule.
 | `tailscale` | "Allow incoming connections" is off (shields up) | same | same |
 | `docker` | Ports on 0.0.0.0, host network, privileged, mounts of `/`, home, `~/.ssh`, the Docker socket | same | same |
 | `secrets` | Keys in shell files, shell history, `~/.aws`, `~/.npmrc`, `.env` files, private key files | same, plus fish history | same, plus PowerShell history |
+| | Read format by format, each switchable in `locations`: Docker inline logins (not `credsStore`), kubeconfig inline tokens/keys (not exec plugins), `.netrc`, `.git-credentials` and `credential.helper=store`, gcloud ADC and credential DBs, Azure CLI plain-text token caches, `.pypirc`, `gh` `hosts.yml` tokens (not the keychain), Terraform `credentials.tfrc.json`, `.pgpass`, `.my.cnf` | same | same, `%APPDATA%` paths for gcloud, `gh`, Terraform, pgpass |
 | `os-updates` | macOS version ≥ policy minimum; Software Update checks, downloads and installs Security Responses; no update left waiting too long; Chrome, Edge, Firefox, Brave not stale (Safari updates with macOS) | Distro release ≥ minimum (`/etc/os-release`); unattended-upgrades / dnf-automatic on; package database not stale; same browsers | Windows build ≥ minimum; Windows Update not disabled or paused; last check, last installed update, pending restart; same browsers |
 | `screen-lock` | Password required right after sleep / screen saver; screen locks within `max_lock_minutes` | GNOME (`gsettings`) or KDE Plasma (`kscreenlockerrc`) locks within `max_lock_minutes`; other desktops are skipped | Sign-in required on wake; sleep, secure screen saver or inactivity limit within `max_lock_minutes` |
 | `remote-access` | Remote Login (SSH), Screen Sharing, Remote Management, Remote Application Scripting, Guest User are off | SSH server, xrdp / GNOME Remote Desktop, VNC servers, LightDM guest session are off | Remote Desktop, WinRM, OpenSSH Server, Guest account are off |
+| `ssh-keys` | Private keys in `~/.ssh` and named by `~/.ssh/config` without a passphrase or readable by others; `authorized_keys` entries (type, fingerprint, comment). Hardware (FIDO) keys pass | same | same, except file permissions (ACLs aren't read yet) |
+| `tunnels` | ngrok, cloudflared (quick and named), `tailscale funnel` / `serve`, localtunnel, bore, frp, zrok, VS Code tunnels, devtunnel, `ssh -R`. Tool and port only; arguments are never shown | same | same |
+| `ai-agents` | Plain-text tokens in MCP / agent configs (Claude Code, Claude Desktop, Cursor, Copilot, Windsurf, Codex, Gemini CLI, Continue, Zed) and settings that skip approvals or the sandbox | same, where the vendor documents a Linux path | same, where the vendor documents a Windows path |
 
 ¹ Without root Linux shows only firewall configuration, not live rules. bordercheck passes ufw when
 `/etc/ufw/ufw.conf` enables it and firewalld when its service runs (and warns about zones such as
@@ -83,7 +87,8 @@ beside the binary, else uses the built-in one.
     "docker":    { "allow_containers": ["devdb"], "allow_mounts": ["~/projects"] },
     "secrets":   { "ignore_paths": ["~/**/test-fixtures/**"],
                    "production_keywords": ["prod", "production", "live"],
-                   "extra_patterns": [{ "kind": "Acme token", "regex": "\\bacme_[A-Za-z0-9]{32}\\b", "high": true }] },
+                   "extra_patterns": [{ "kind": "Acme token", "regex": "\\bacme_[A-Za-z0-9]{32}\\b", "high": true }],
+                   "locations": { "gcloud": false } },            // each credential store switches off alone
     "tailscale": { "enabled": false },
     "os-updates": { "min_os_versions": { "macos": "15", "windows": "26100", "ubuntu": "22.04" }, // "" drops one
                     "require_auto_update": true,
@@ -93,7 +98,13 @@ beside the binary, else uses the built-in one.
                     "check_browsers": true, "max_browser_age_days": 60,
                     "min_browser_versions": { "chrome": "157.0.8103.39" } },   // e.g. after a zero-day
     "screen-lock": { "require_password": true, "max_lock_minutes": 10 },
-    "remote-access": { "allow": ["ssh"] }   // ssh, screen-sharing, remote-management, remote-apple-events, rdp, winrm, guest
+    "remote-access": { "allow": ["ssh"] },   // ssh, screen-sharing, remote-management, remote-apple-events, rdp, winrm, guest
+    "ssh-keys":  { "no_passphrase": true, "loose_permissions": true, "authorized_keys": false,
+                   "allow_keys": ["~/.ssh/ci_deploy"] },
+    "tunnels":   { "processes": true, "tailscale_funnel": true, "tailscale_serve": true,
+                   "allow": [], "lower_severity": ["cloudflared"] }, // the tunnel you tell staff to use
+    "ai-agents": { "tokens": true, "guardrails": true,
+                   "extra_paths": ["~/.config/acme-agent/mcp.json"], "ignore_paths": [] }
   }
 }
 ```
@@ -261,6 +272,8 @@ Reports are self-reported by the machine: they tell you who needs help, not proo
   Passwords show nothing.
 - Evidence (file paths, variable names, ports) leaves the machine only when the policy sets
   `include_evidence`.
+- SSH keys are judged by reading their file format; key material is never shown, only type, fingerprint and
+  comment. Tunnel command lines can hold auth tokens, so only the tool name and local port are shown.
 
 ## Fixing secrets
 
@@ -292,8 +305,6 @@ are not (they don't mark the file as downloaded). Windows binaries are not Authe
 ## Roadmap
 
 - Authenticode-signed Windows binaries; winget
-- SSH keys without a passphrase
-- AI agent configs: tokens in MCP config files, agents running without a sandbox
 - Outdated packages (Homebrew, npm, pip)
 - A reference report receiver (Cloudflare Worker) with a dashboard and alerts
 

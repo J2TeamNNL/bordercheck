@@ -78,6 +78,34 @@
           "high": true,
           "show_tail": true
         }
+      ],
+      "locations": {
+        "docker": true,
+        "kube": true,
+        "netrc": true,
+        "git_credentials": true,
+        "gcloud": true,
+        "azure": true,
+        "pypirc": true,
+        "gh": true,
+        "terraform": true,
+        "pgpass": true,
+        "mysql": true
+      }
+    },
+    "ssh-keys": {
+      "no_passphrase": true,
+      "loose_permissions": true,
+      "authorized_keys": true,
+      "allow_keys": []
+    },
+    "tunnels": {
+      "processes": true,
+      "tailscale_funnel": true,
+      "tailscale_serve": true,
+      "allow": [],
+      "lower_severity": [
+        "cloudflared"
       ]
     },
     "os-updates": {
@@ -102,6 +130,12 @@
     },
     "remote-access": {
       "allow": []
+    },
+    "ai-agents": {
+      "tokens": true,
+      "guardrails": true,
+      "extra_paths": [],
+      "ignore_paths": []
     }
   }
 }
