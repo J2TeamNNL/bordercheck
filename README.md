@@ -17,6 +17,10 @@ reports to your organisation's endpoint on a schedule.
 | `tailscale` | "Allow incoming connections" is off (shields up) | same |
 | `docker` | Ports on 0.0.0.0, host network, privileged, mounts of `/`, home, `~/.ssh`, the Docker socket | same |
 | `secrets` | Keys in shell files, shell history, `~/.aws`, `~/.npmrc`, `.env` files, private key files | same, plus PowerShell history |
+| | Read format by format, each switchable in `locations`: Docker inline logins (not `credsStore`), kubeconfig inline tokens/keys (not exec plugins), `.netrc`, `.git-credentials` and `credential.helper=store`, gcloud ADC and credential DBs, Azure CLI plain-text token caches, `.pypirc`, `gh` `hosts.yml` tokens (not the keychain), Terraform `credentials.tfrc.json`, `.pgpass`, `.my.cnf` | same, `%APPDATA%` paths for gcloud, `gh`, Terraform, pgpass |
+| `ssh-keys` | Private keys in `~/.ssh` and named by `~/.ssh/config` without a passphrase or readable by others; `authorized_keys` entries (type, fingerprint, comment). Hardware (FIDO) keys pass | same, except file permissions (ACLs aren't read yet) |
+| `tunnels` | ngrok, cloudflared (quick and named), `tailscale funnel` / `serve`, localtunnel, bore, frp, zrok, VS Code tunnels, devtunnel, `ssh -R`. Tool and port only; arguments are never shown | same |
+| `ai-agents` | Plain-text tokens in MCP / agent configs (Claude Code, Claude Desktop, Cursor, Copilot, Windsurf, Codex, Gemini CLI, Continue, Zed) and settings that skip approvals or the sandbox | same, where the vendor documents a Windows path |
 
 ## Use
 
@@ -61,8 +65,15 @@ beside the binary, else uses the built-in one.
     "docker":    { "allow_containers": ["devdb"], "allow_mounts": ["~/projects"] },
     "secrets":   { "ignore_paths": ["~/**/test-fixtures/**"],
                    "production_keywords": ["prod", "production", "live"],
-                   "extra_patterns": [{ "kind": "Acme token", "regex": "\\bacme_[A-Za-z0-9]{32}\\b", "high": true }] },
-    "tailscale": { "enabled": false }
+                   "extra_patterns": [{ "kind": "Acme token", "regex": "\\bacme_[A-Za-z0-9]{32}\\b", "high": true }],
+                   "locations": { "gcloud": false } },            // each credential store switches off alone
+    "tailscale": { "enabled": false },
+    "ssh-keys":  { "no_passphrase": true, "loose_permissions": true, "authorized_keys": false,
+                   "allow_keys": ["~/.ssh/ci_deploy"] },
+    "tunnels":   { "processes": true, "tailscale_funnel": true, "tailscale_serve": true,
+                   "allow": [], "lower_severity": ["cloudflared"] }, // the tunnel you tell staff to use
+    "ai-agents": { "tokens": true, "guardrails": true,
+                   "extra_paths": ["~/.config/acme-agent/mcp.json"], "ignore_paths": [] }
   }
 }
 ```
@@ -140,6 +151,8 @@ Reports are self-reported by the machine: they tell you who needs help, not proo
   Passwords show nothing.
 - Evidence (file paths, variable names, ports) leaves the machine only when the policy sets
   `include_evidence`.
+- SSH keys are judged by reading their file format; key material is never shown, only type, fingerprint and
+  comment. Tunnel command lines can hold auth tokens, so only the tool name and local port are shown.
 
 ## Fixing secrets
 
@@ -161,8 +174,7 @@ check it against `SHA256SUMS`. Signed binaries, Homebrew and winget are planned.
 ## Roadmap
 
 - Code-signed and notarized binaries; Homebrew tap and winget
-- SSH keys without a passphrase; Remote Login / Screen Sharing / RDP on
-- AI agent configs: tokens in MCP config files, agents running without a sandbox
+- Remote Login / Screen Sharing / RDP on
 - Outdated OS, browsers and packages
 - A reference report receiver (Cloudflare Worker) with a dashboard and alerts
 

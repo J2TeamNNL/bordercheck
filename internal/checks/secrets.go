@@ -29,7 +29,7 @@ const (
 var secretFiles = []string{
 	".zshrc", ".zprofile", ".zshenv", ".bashrc", ".bash_profile", ".profile",
 	".zsh_history", ".bash_history", ".config/fish/config.fish",
-	".aws/credentials", ".npmrc", ".netrc", ".pypirc", ".git-credentials", ".docker/config.json",
+	".aws/credentials", ".npmrc", // .netrc, .pypirc, .git-credentials, Docker…: see credLocations
 	"AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt",
 	"Documents/PowerShell/Microsoft.PowerShell_profile.ps1",
 	"Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1",
@@ -92,6 +92,9 @@ func (f secretFinding) high() bool { return f.prod || f.severe }
 
 func (f secretFinding) String() string {
 	s := fmt.Sprintf("%s:%d  %s", f.path, f.line, f.kind)
+	if f.line == 0 { // a format without useful lines, e.g. JSON
+		s = f.path + "  " + f.kind
+	}
 	if f.name != "" {
 		s += " (" + f.name + ")"
 	}
@@ -164,6 +167,7 @@ func secrets(p policy.Secrets) func(context.Context) check.Result {
 				found = append(found, s.scanFile(f, shown)...)
 			}
 		}
+		found = append(found, s.scanLocations(home, runtime.GOOS, p.Locations)...)
 		var shownBundles []string
 		for _, b := range bundles {
 			if shown := tildePath(home, b); !s.ignored(shown) {

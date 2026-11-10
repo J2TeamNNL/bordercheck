@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -66,6 +67,9 @@ type Checks struct {
 	Tailscale      Common    `json:"tailscale"`
 	Docker         Docker    `json:"docker"`
 	Secrets        Secrets   `json:"secrets"`
+	SSHKeys        SSHKeys   `json:"ssh-keys"`
+	Tunnels        Tunnels   `json:"tunnels"`
+	AIAgents       AIAgents  `json:"ai-agents"`
 }
 
 // Common is what every check accepts.
@@ -124,6 +128,54 @@ type Secrets struct {
 	ShowTail           *bool           `json:"show_tail,omitempty"` // last 4 characters of provider tokens
 	WalkDepth          int             `json:"walk_depth"`          // folders below home searched for .env and key files
 	ExtraPatterns      []SecretPattern `json:"extra_patterns"`      // the org's own token formats
+	Locations          SecretLocations `json:"locations"`           // credential stores read with format-aware rules
+}
+
+// SecretLocations switches each well-known credential store on or off.
+type SecretLocations struct {
+	Docker         bool `json:"docker"`          // ~/.docker/config.json inline auths (credsStore/credHelpers are fine)
+	Kube           bool `json:"kube"`            // ~/.kube/config inline tokens, passwords, client-key-data
+	Netrc          bool `json:"netrc"`           // ~/.netrc, ~/_netrc
+	GitCredentials bool `json:"git_credentials"` // ~/.git-credentials and credential.helper=store
+	GCloud         bool `json:"gcloud"`          // application default credentials, credential DBs
+	Azure          bool `json:"azure"`           // Azure CLI plain-text token caches
+	PyPI           bool `json:"pypirc"`          // ~/.pypirc passwords
+	GitHubCLI      bool `json:"gh"`              // gh hosts.yml token (absent when gh uses the OS keychain)
+	Terraform      bool `json:"terraform"`       // ~/.terraform.d/credentials.tfrc.json
+	PgPass         bool `json:"pgpass"`          // ~/.pgpass
+	MySQL          bool `json:"mysql"`           // ~/.my.cnf
+}
+
+// SSHKeys judges the SSH keys in ~/.ssh and those named by ~/.ssh/config.
+type SSHKeys struct {
+	Common
+	NoPassphrase     bool     `json:"no_passphrase"`     // private keys stored without a passphrase
+	LoosePermissions bool     `json:"loose_permissions"` // private keys other users can read (macOS, Linux)
+	AuthorizedKeys   bool     `json:"authorized_keys"`   // keys that can log in to this machine
+	AllowKeys        []string `json:"allow_keys"`        // globs on the shown path (~/.ssh/deploy_key) exempt from every rule
+}
+
+// TunnelTools are the names tunnels.allow and tunnels.lower_severity accept.
+var TunnelTools = []string{"tailscale-funnel", "tailscale-serve", "ngrok", "cloudflared", "localtunnel", "bore",
+	"frp", "zrok", "vscode-tunnel", "devtunnel", "ssh"}
+
+// Tunnels judges software that publishes this machine by dialling out.
+type Tunnels struct {
+	Common
+	Processes       bool     `json:"processes"`        // running tunnel clients: ngrok, cloudflared, ssh -R…
+	TailscaleFunnel bool     `json:"tailscale_funnel"` // tailscale funnel: public internet
+	TailscaleServe  bool     `json:"tailscale_serve"`  // tailscale serve: the tailnet
+	Allow           []string `json:"allow"`            // tool names (TunnelTools) that may run
+	LowerSeverity   []string `json:"lower_severity"`   // tools the org recommends: low severity, medium if open to anyone
+}
+
+// AIAgents judges AI coding-agent and MCP config files.
+type AIAgents struct {
+	Common
+	Tokens      bool     `json:"tokens"`       // plain-text tokens and API keys in MCP / agent configs
+	Guardrails  bool     `json:"guardrails"`   // agents set to skip approvals or run unsandboxed
+	ExtraPaths  []string `json:"extra_paths"`  // more config files to scan for tokens, ~ allowed
+	IgnorePaths []string `json:"ignore_paths"` // globs on the shown path
 }
 
 type SecretPattern struct {
@@ -154,7 +206,13 @@ func Default() Policy {
 				ProductionKeywords: []string{"prod", "production", "live"},
 				ShowTail:           ptr(true),
 				WalkDepth:          5,
+				Locations: SecretLocations{Docker: true, Kube: true, Netrc: true, GitCredentials: true, GCloud: true,
+					Azure: true, PyPI: true, GitHubCLI: true, Terraform: true, PgPass: true, MySQL: true},
 			},
+			SSHKeys: SSHKeys{NoPassphrase: true, LoosePermissions: true, AuthorizedKeys: true, AllowKeys: []string{}},
+			Tunnels: Tunnels{Processes: true, TailscaleFunnel: true, TailscaleServe: true, Allow: []string{},
+				LowerSeverity: []string{"cloudflared"}},
+			AIAgents: AIAgents{Tokens: true, Guardrails: true, ExtraPaths: []string{}, IgnorePaths: []string{}},
 		},
 	}
 }
@@ -248,6 +306,7 @@ func (p Policy) validate() error {
 		"firewall": c.Firewall.OnProblem, "disk-encryption": c.DiskEncryption.OnProblem,
 		"listeners": c.Listeners.OnProblem, "tailscale": c.Tailscale.OnProblem,
 		"docker": c.Docker.OnProblem, "secrets": c.Secrets.OnProblem,
+		"ssh-keys": c.SSHKeys.OnProblem, "tunnels": c.Tunnels.OnProblem, "ai-agents": c.AIAgents.OnProblem,
 	} {
 		if on != "" && on != check.Fail && on != check.Warn {
 			return fmt.Errorf("checks.%s.on_problem must be \"fail\" or \"warn\", not %q", id, on)
@@ -276,6 +335,33 @@ func (p Policy) validate() error {
 		}
 		if _, err := regexp.Compile(sp.Regex); err != nil {
 			return fmt.Errorf("checks.secrets.extra_patterns %q: %w", sp.Kind, err)
+		}
+	}
+	return c.validateNew()
+}
+
+func (c Checks) validateNew() error {
+	for field, globs := range map[string][]string{
+		"ssh-keys.allow_keys": c.SSHKeys.AllowKeys, "ai-agents.ignore_paths": c.AIAgents.IgnorePaths,
+	} {
+		for _, g := range globs {
+			if _, err := Glob(g); err != nil {
+				return fmt.Errorf("checks.%s %q: %w", field, g, err)
+			}
+		}
+	}
+	for field, tools := range map[string][]string{
+		"tunnels.allow": c.Tunnels.Allow, "tunnels.lower_severity": c.Tunnels.LowerSeverity,
+	} {
+		for _, t := range tools {
+			if !slices.Contains(TunnelTools, t) {
+				return fmt.Errorf("checks.%s: unknown tool %q, expected one of %s", field, t, strings.Join(TunnelTools, ", "))
+			}
+		}
+	}
+	for _, p := range c.AIAgents.ExtraPaths {
+		if strings.TrimSpace(p) == "" {
+			return errors.New("checks.ai-agents.extra_paths: empty path")
 		}
 	}
 	return nil
