@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -173,7 +174,7 @@ func TestOwnNotificationIsClickableAndOpensNothing(t *testing.T) {
 	if strings.Contains(r.Title+r.Body, "secret-page-id") {
 		t.Error("the link is in the visible text")
 	}
-	if f.perms[0] != 0o600 {
+	if runtime.GOOS != "windows" && f.perms[0] != 0o600 {
 		t.Errorf("request file mode %o", f.perms[0])
 	}
 	for _, a := range f.args {

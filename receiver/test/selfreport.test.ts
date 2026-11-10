@@ -193,3 +193,15 @@ describe("report page: titles, links, production secrets", () => {
     expect(body).not.toContain("<img");
   });
 });
+
+describe("report page: client version", () => {
+  it("shows which bordercheck version sent the report", async () => {
+    const m = await enrolled();
+    const res = await post(report({ version: "v9.8.7", results: [result("firewall", "pass")] }), { token: m.token });
+    const body = await (await open(await reportUrl(res))).text();
+    expect(body).toContain("bordercheck <b>v9.8.7</b>");
+    // A hostile version string is shown as text.
+    const res2 = await post(report({ version: "<img src=x>", results: [result("firewall", "pass")] }), { token: m.token });
+    expect(await (await open(await reportUrl(res2))).text()).not.toContain("<img");
+  });
+});

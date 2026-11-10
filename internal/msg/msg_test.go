@@ -51,7 +51,8 @@ func TestCatalogJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(got, want) {
+	// A Windows checkout may hold the file with CRLF line endings.
+	if !bytes.Equal(bytes.ReplaceAll(got, []byte("\r\n"), []byte("\n")), want) {
 		t.Fatalf("%s is out of date with internal/msg/catalog.go; run: go generate ./internal/msg", catalogJSON)
 	}
 }

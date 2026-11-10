@@ -57,8 +57,11 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   if (!row) return notFound(L);
 
   let results: Result[] = [];
+  let version = "";
   try {
-    results = parseReport(JSON.parse(row.report)).results;
+    const parsed = parseReport(JSON.parse(row.report));
+    results = parsed.results;
+    version = parsed.version;
   } catch {
     results = [];
   }
@@ -73,7 +76,7 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   const body = html`<div class="status-mark ${tone}">${problems.length === 0 ? GLYPH_OK : GLYPH_ATTENTION}</div>
 <p class="eyebrow">${L.t("rep.eyebrow")}</p><h1>${headline}</h1>
 <p class="lead">${L.t("rep.for", { email: row.email || L.s("common.noEmail"), host: row.hostname || L.s("common.noHostname"), when: L.when(row.last_seen) })}${L.lang === "zh" ? "" : " "}${problems.length === 0 ? L.t("rep.okText") : L.t("rep.fixText")}</p>
-<div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}</div>
+<div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}${version ? html`<span class="chip">bordercheck <b>${version}</b></span>` : ""}</div>
 ${problems.length === 0
     ? ""
     : html`<h2>${L.t("rep.toFix", { n: problems.length })}</h2>${problems.map(

@@ -252,7 +252,7 @@ func TestHelperWithFakeApp(t *testing.T) {
 			t.Errorf("the link is in the arguments: %q", c.args)
 		}
 		if c.mode == ModePost {
-			if c.perm != 0o600 {
+			if runtime.GOOS != "windows" && c.perm != 0o600 { // Windows has no mode bits
 				t.Errorf("request file mode %o", c.perm)
 			}
 			var got Request
