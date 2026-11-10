@@ -33,15 +33,10 @@ interface RoleRow {
   updated_at: string;
 }
 
-// What "Paste sample policy" fills in: every check with its main settings spelled
-// out at their defaults, to edit. internal/policy has a test that bordercheck accepts it.
+// What the new-role form starts with: every check with its main settings
+// spelled out at their defaults, to edit. internal/policy has a test that
+// bordercheck accepts it.
 export const SAMPLE_POLICY = JSON.stringify(samplePolicy, null, 2);
-
-const STARTER_POLICY = `{
-  "report": { "interval": "24h" },
-  "update": { "binary": true },
-  "checks": {}
-}`;
 
 function legacyTokens(env: Env): string[] {
   return [env.REPORT_TOKEN, env.REPORT_TOKEN_PREVIOUS].filter(usableToken);
@@ -73,9 +68,8 @@ ${rows.results.map(
   )}</tbody></table></div>
 ${rows.results.length === 0 ? html`<p class="muted">No roles yet. Create one to start inviting people.</p>` : ""}
 <h2 id="new-role">New role</h2>
-<form method="get" action="/admin/roles#new-role"><p><button name="sample" value="1">Paste sample policy</button>
-<span class="muted">Fills the box with a policy that spells out every check; edit it, then create the role.</span></p></form>
-${roleForm("/admin/roles", draft?.name ?? "", draft?.policy ?? STARTER_POLICY, "Create role")}`;
+<p class="muted">The box starts with a sample policy that spells out every check; edit it, then create the role.</p>
+${roleForm("/admin/roles", draft?.name ?? "", draft?.policy ?? SAMPLE_POLICY, "Create role")}`;
   return page(layout("Roles", who, body), status);
 }
 

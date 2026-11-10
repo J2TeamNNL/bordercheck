@@ -449,11 +449,9 @@ describe("role policy helpers", () => {
 });
 
 describe("sample policy", () => {
-  it("is offered on the roles page, fills the box, and can be saved as it is", async () => {
-    const plain = await (await adminGet("/admin/roles")).text();
-    expect(plain).toContain("Paste sample policy");
-    expect(plain).not.toContain("max_lock_minutes");
-    const filled = await (await adminGet("/admin/roles?sample=1")).text();
+  it("is what the new-role box starts with, and can be saved as it is", async () => {
+    const filled = await (await adminGet("/admin/roles")).text();
+    expect(filled).not.toContain("Paste sample policy");
     expect(filled).toContain("max_lock_minutes");
     expect(filled).toContain("&quot;ai-agents&quot;");
     const { SAMPLE_POLICY } = await import("../src/portal");
