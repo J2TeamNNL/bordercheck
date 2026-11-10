@@ -44,10 +44,10 @@ func remoteAccess(opts policy.RemoteAccess) func(context.Context) check.Result {
 
 func evalRemoteAccess(svcs []remoteService, notes, allow []string) check.Result {
 	var p issueList
-	var evidence, checked, allowed []string
+	var evidence, off, allowed []string
 	for _, s := range svcs {
-		checked = append(checked, s.Name)
 		if !s.On {
+			off = append(off, s.Name)
 			continue
 		}
 		line := s.Name
@@ -65,7 +65,7 @@ func evalRemoteAccess(svcs []remoteService, notes, allow []string) check.Result 
 	if len(allowed) > 0 {
 		notes = append([]string{"On but allowed by policy: " + strings.Join(allowed, ", ") + "."}, notes...)
 	}
-	pass := "Off: " + strings.Join(checked, ", ") + "."
+	pass := "Off: " + strings.Join(off, ", ") + "."
 	return p.result(pass, notes, evidence)
 }
 

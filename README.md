@@ -21,7 +21,7 @@ it reports to your organisation on a schedule.
 | `secrets` | Keys in shell files and history, `.env` files, private key files and a dozen credential stores (`~/.aws`, Docker, kubeconfig, `.netrc`, gcloud…) |
 | `os-updates` | OS version against your minimum, automatic updates on, nothing left waiting; Chrome, Edge, Firefox, Brave not stale |
 | `screen-lock` | A password after sleep, and the screen locks soon enough (Linux: GNOME and KDE only) |
-| `remote-access` | SSH server, screen sharing, remote management, RDP, WinRM and guest accounts are off |
+| `remote-access` | SSH server, screen sharing, remote management, RDP and WinRM are off (a guest account is accepted unless the policy says otherwise) |
 | `ssh-keys` | Private keys without a passphrase or readable by others; who can log in through `authorized_keys` |
 | `tunnels` | ngrok, cloudflared, `tailscale funnel`/`serve`, VS Code tunnels, `ssh -R` and others |
 | `ai-agents` | Plain-text tokens in MCP and agent configs, and settings that skip approvals or the sandbox |

@@ -134,7 +134,9 @@
       "max_lock_minutes": 10
     },
     "remote-access": {
-      "allow": []
+      "allow": [
+        "guest"
+      ]
     },
     "ai-agents": {
       "tokens": true,

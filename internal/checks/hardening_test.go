@@ -371,9 +371,16 @@ tcp6       0      0  ::1.8021               *.*                    LISTEN
 
 func TestMacRemoteServices(t *testing.T) {
 	opts := policy.Default().Checks.RemoteAccess
-	r := evalRemoteAccess(macRemoteServices(macDisabled, macNetstat, false, "true\n"), nil, opts.Allow) // captured: guest on
+	// Captured with the guest user on. A policy that allows nothing reports it;
+	// the default accepts a guest account and says so without also calling it off.
+	r := evalRemoteAccess(macRemoteServices(macDisabled, macNetstat, false, "true\n"), nil, nil)
 	if r.Status != check.Warn || r.Summary != "Guest user is on." {
-		t.Errorf("captured: got %s %q", r.Status, r.Summary)
+		t.Errorf("captured, nothing allowed: got %s %q", r.Status, r.Summary)
+	}
+	r = evalRemoteAccess(macRemoteServices(macDisabled, macNetstat, false, "true\n"), nil, opts.Allow)
+	if r.Status != check.Pass || !strings.Contains(r.Summary, "On but allowed by policy: Guest user.") ||
+		strings.Contains(strings.SplitN(r.Summary, "On but allowed", 2)[0], "Guest user") {
+		t.Errorf("captured, default policy: got %s %q", r.Status, r.Summary)
 	}
 	if r := evalRemoteAccess(macRemoteServices(macDisabled, macNetstat, false, "false"), nil, opts.Allow); r.Status != check.Pass {
 		t.Errorf("all off: got %s %q", r.Status, r.Summary)

@@ -290,8 +290,10 @@ func Default() Policy {
 				RequireAutoUpdate: ptr(true), MaxCheckAgeDays: 14, MaxPendingDays: 14, MaxDaysSinceUpdate: 45,
 				CheckBrowsers: ptr(true), MaxBrowserAgeDays: 60, MinBrowserVersions: map[string]string{},
 			},
-			ScreenLock:   ScreenLock{RequirePassword: ptr(true), MaxLockMinutes: 10},
-			RemoteAccess: RemoteAccess{Allow: []string{}},
+			ScreenLock: ScreenLock{RequirePassword: ptr(true), MaxLockMinutes: 10},
+			// A guest account is accepted unless a policy says otherwise: on macOS it
+			// is a sandboxed, throw-away session.
+			RemoteAccess: RemoteAccess{Allow: []string{"guest"}},
 			SSHKeys:      SSHKeys{NoPassphrase: true, LoosePermissions: true, AuthorizedKeys: true, AllowKeys: []string{}},
 			Tunnels: Tunnels{Processes: true, TailscaleFunnel: true, TailscaleServe: true, Allow: []string{},
 				LowerSeverity: []string{"cloudflared"}},

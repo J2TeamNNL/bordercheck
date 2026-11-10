@@ -289,7 +289,7 @@ Never goes online.
 
 | Field | Default | |
 |---|---|---|
-| `allow` | `[]` | Services that may be on: `ssh`, `screen-sharing`, `remote-management`, `remote-apple-events`, `rdp`, `winrm`, `guest`. |
+| `allow` | `["guest"]` | Services that may be on: `ssh`, `screen-sharing`, `remote-management`, `remote-apple-events`, `rdp`, `winrm`, `guest`. A guest account is accepted by default; `"allow": []` reports it too. |
 
 macOS: Remote Login (SSH), Screen Sharing, Remote Management, Remote Application Scripting, Guest User. Linux:
 SSH server, xrdp / GNOME Remote Desktop, VNC servers, LightDM guest session. Windows: Remote Desktop, WinRM,

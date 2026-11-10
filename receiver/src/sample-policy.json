@@ -54,6 +54,6 @@
       "max_browser_age_days": 60
     },
     "screen-lock": { "require_password": true, "max_lock_minutes": 10 },
-    "remote-access": { "allow": [] }
+    "remote-access": { "allow": ["guest"] }
   }
 }
