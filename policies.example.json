@@ -79,6 +79,29 @@
           "show_tail": true
         }
       ]
+    },
+    "os-updates": {
+      "min_os_versions": {
+        "macos": "15",
+        "windows": "26100",
+        "ubuntu": "22.04",
+        "debian": "12",
+        "fedora": "43"
+      },
+      "require_auto_update": true,
+      "max_check_age_days": 14,
+      "max_pending_days": 14,
+      "max_days_since_update": 45,
+      "check_browsers": true,
+      "max_browser_age_days": 60,
+      "min_browser_versions": {}
+    },
+    "screen-lock": {
+      "require_password": true,
+      "max_lock_minutes": 10
+    },
+    "remote-access": {
+      "allow": []
     }
   }
 }

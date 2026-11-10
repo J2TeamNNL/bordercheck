@@ -17,11 +17,18 @@ it reports to your organisation's endpoint on a schedule.
 | `tailscale` | "Allow incoming connections" is off (shields up) | same | same |
 | `docker` | Ports on 0.0.0.0, host network, privileged, mounts of `/`, home, `~/.ssh`, the Docker socket | same | same |
 | `secrets` | Keys in shell files, shell history, `~/.aws`, `~/.npmrc`, `.env` files, private key files | same, plus fish history | same, plus PowerShell history |
+| `os-updates` | macOS version ≥ policy minimum; Software Update checks, downloads and installs Security Responses; no update left waiting too long; Chrome, Edge, Firefox, Brave not stale (Safari updates with macOS) | Distro release ≥ minimum (`/etc/os-release`); unattended-upgrades / dnf-automatic on; package database not stale; same browsers | Windows build ≥ minimum; Windows Update not disabled or paused; last check, last installed update, pending restart; same browsers |
+| `screen-lock` | Password required right after sleep / screen saver; screen locks within `max_lock_minutes` | GNOME (`gsettings`) or KDE Plasma (`kscreenlockerrc`) locks within `max_lock_minutes`; other desktops are skipped | Sign-in required on wake; sleep, secure screen saver or inactivity limit within `max_lock_minutes` |
+| `remote-access` | Remote Login (SSH), Screen Sharing, Remote Management, Remote Application Scripting, Guest User are off | SSH server, xrdp / GNOME Remote Desktop, VNC servers, LightDM guest session are off | Remote Desktop, WinRM, OpenSSH Server, Guest account are off |
 
 ¹ Without root Linux shows only firewall configuration, not live rules. bordercheck passes ufw when
 `/etc/ufw/ufw.conf` enables it and firewalld when its service runs (and warns about zones such as
 FedoraWorkstation that open ports 1025–65535). When only an nftables or iptables service loads the rules, a plain
 run says it cannot tell and skips; `sudo bordercheck -only firewall` reads the rules.
+
+`os-updates`, `screen-lock` and `remote-access` never go online: "out of date" means what the machine already
+knows (the updates its OS has found, when it last checked, the version against your minimum, how long ago each
+browser build landed on disk).
 
 ## Use
 
@@ -77,10 +84,23 @@ beside the binary, else uses the built-in one.
     "secrets":   { "ignore_paths": ["~/**/test-fixtures/**"],
                    "production_keywords": ["prod", "production", "live"],
                    "extra_patterns": [{ "kind": "Acme token", "regex": "\\bacme_[A-Za-z0-9]{32}\\b", "high": true }] },
-    "tailscale": { "enabled": false }
+    "tailscale": { "enabled": false },
+    "os-updates": { "min_os_versions": { "macos": "15", "windows": "26100", "ubuntu": "22.04" }, // "" drops one
+                    "require_auto_update": true,
+                    "max_check_age_days": 14,       // the OS last looked for updates
+                    "max_pending_days": 14,         // an update it found may wait this long
+                    "max_days_since_update": 45,    // Windows and Linux: last OS update installed
+                    "check_browsers": true, "max_browser_age_days": 60,
+                    "min_browser_versions": { "chrome": "157.0.8103.39" } },   // e.g. after a zero-day
+    "screen-lock": { "require_password": true, "max_lock_minutes": 10 },
+    "remote-access": { "allow": ["ssh"] }   // ssh, screen-sharing, remote-management, remote-apple-events, rdp, winrm, guest
   }
 }
 ```
+
+Day limits of `0` turn that rule off. `min_os_versions` keys are `macos`, `windows` (a build number: 26100 is
+Windows 11 24H2) or a Linux `/etc/os-release` ID, and merge with the defaults. The defaults are a starting point;
+set them to the oldest versions your vendors still patch.
 
 Every check takes `enabled` and `on_problem` (`"fail"` or `"warn"`, to override how strict it is).
 
@@ -272,9 +292,9 @@ are not (they don't mark the file as downloaded). Windows binaries are not Authe
 ## Roadmap
 
 - Authenticode-signed Windows binaries; winget
-- SSH keys without a passphrase; Remote Login / Screen Sharing / RDP on
+- SSH keys without a passphrase
 - AI agent configs: tokens in MCP config files, agents running without a sandbox
-- Outdated OS, browsers and packages
+- Outdated packages (Homebrew, npm, pip)
 - A reference report receiver (Cloudflare Worker) with a dashboard and alerts
 
 ## Build
