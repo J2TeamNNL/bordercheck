@@ -1,6 +1,10 @@
-//go:build !darwin
+//go:build !darwin && !windows
 
 package checks
 
-// The outbound-firewall suggestion is for macOS only.
-func outboundFirewalls() ([]string, bool) { return nil, false }
+import "context"
+
+// The outbound-firewall suggestion is for macOS and Windows.
+func outboundFirewalls(context.Context) ([]string, outboundAdvice, bool) {
+	return nil, outboundAdvice{}, false
+}

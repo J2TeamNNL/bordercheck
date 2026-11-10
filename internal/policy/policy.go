@@ -101,8 +101,9 @@ func (c Common) IsEnabled() bool { return c.Enabled == nil || *c.Enabled }
 type Firewall struct {
 	Common
 	RequireStealth *bool `json:"require_stealth,omitempty"` // macOS stealth mode
-	// SuggestOutbound warns (low) on a Mac with no outbound firewall app such
-	// as LuLu, and suggests installing one.
+	// SuggestOutbound warns (low) on macOS or Windows when nothing controls
+	// which apps connect out, and suggests a free outbound firewall (LuLu,
+	// simplewall).
 	SuggestOutbound bool `json:"suggest_outbound"`
 }
 

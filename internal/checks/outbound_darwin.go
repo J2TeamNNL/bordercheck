@@ -1,13 +1,13 @@
 package checks
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 )
 
-// outboundFirewalls returns the outbound firewalls installed on this Mac, and
-// true because the suggestion applies here.
-func outboundFirewalls() ([]string, bool) {
+// outboundFirewalls returns the outbound firewalls installed on this Mac.
+func outboundFirewalls(context.Context) ([]string, outboundAdvice, bool) {
 	dirs := []string{"/Applications"}
 	if home, err := os.UserHomeDir(); err == nil {
 		dirs = append(dirs, filepath.Join(home, "Applications"))
@@ -21,5 +21,5 @@ func outboundFirewalls() ([]string, bool) {
 			}
 		}
 	}
-	return found, true
+	return found, outboundMac, true
 }

@@ -25,8 +25,10 @@ func All(p policy.Policy) []check.Check {
 		{check.Check{ID: "firewall", Title: "Firewall is on",
 			Run: func(ctx context.Context) check.Result {
 				r := firewall(ctx, *c.Firewall.RequireStealth)
-				if found, ok := outboundFirewalls(); ok && c.Firewall.SuggestOutbound {
-					r = withOutbound(r, found)
+				if c.Firewall.SuggestOutbound && (r.Status == check.Pass || r.Status == check.Warn) {
+					if found, adv, ok := outboundFirewalls(ctx); ok {
+						r = withOutbound(r, found, adv)
+					}
 				}
 				return r
 			}}, c.Firewall.Common},

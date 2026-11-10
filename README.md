@@ -13,7 +13,7 @@ it reports to your organisation on a schedule.
 
 | Check | |
 |---|---|
-| `firewall` | macOS Application Firewall and stealth mode, plus an outbound firewall such as LuLu (suggested if missing); Windows Firewall on every profile; ufw, firewalld or nftables/iptables on Linux (live rules need `sudo`) |
+| `firewall` | macOS Application Firewall and stealth mode; Windows Firewall on every profile; on both, an outbound firewall (LuLu on macOS, simplewall on Windows, suggested if missing); ufw, firewalld or nftables/iptables on Linux (live rules need `sudo`) |
 | `disk-encryption` | FileVault, BitLocker, LUKS/dm-crypt or ZFS encryption |
 | `listeners` | Ports reachable beyond localhost |
 | `tailscale` | "Allow incoming connections" is off (shields up) |

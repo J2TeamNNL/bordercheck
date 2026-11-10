@@ -158,7 +158,20 @@ The options of each check follow. Paths may start with `~`. "Globs" match the pa
 | Field | Default | |
 |---|---|---|
 | `require_stealth` | `true` | macOS: warn (low) when stealth mode is off. |
-| `suggest_outbound` | `true` | macOS: warn (low) when no outbound firewall app is installed, and suggest the free, open-source [LuLu](https://objective-see.org/products/lulu.html) from Objective-See. The built-in firewall only filters incoming connections; an outbound firewall asks before an app connects out. Recognised: LuLu, Little Snitch, Radio Silence and Vallum in `/Applications` or `~/Applications`. When the firewall itself is off, the result asks only for that. |
+| `suggest_outbound` | `true` | macOS and Windows: warn (low) when nothing controls which apps connect out, and suggest a free, open-source outbound firewall. See below. |
+
+The built-in firewalls of macOS and, by default, Windows only filter incoming connections. An outbound firewall
+decides which apps may connect out, which is how malware phones home and how data leaves. With
+`suggest_outbound`, when none is found:
+
+| OS | Counts as already having one | Suggested |
+|---|---|---|
+| macOS | LuLu, Little Snitch, Radio Silence or Vallum in `/Applications` or `~/Applications` | [LuLu](https://objective-see.org/products/lulu.html) from Objective-See |
+| Windows | simplewall, Fort Firewall, Portmaster, TinyWall or Windows Firewall Control, found by an uninstall entry, a folder under Program Files or ProgramData, a running service or (simplewall, often portable) a running process; or Windows Firewall set to block outgoing connections by default, by Group Policy or locally, on the profile of every connected network | [simplewall](https://github.com/henrypp/simplewall); the fix warns that it blocks every app not yet allowed and asks the person to allow each one as it first connects |
+
+When one is found, nothing is suggested and the summary names it. A passing firewall becomes a low-severity
+`warn` when none is found, which changes neither the exit status nor, with the default `notify` settings, the
+notifications. When the firewall itself is off, the result asks only to turn it on.
 
 macOS: Application Firewall and stealth mode. Windows: Windows Firewall on for every profile. Linux: ufw or
 firewalld on, or nftables/iptables rules. Without root Linux shows only firewall configuration, not live
