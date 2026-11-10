@@ -287,3 +287,14 @@ func TestSecretPolicy(t *testing.T) {
 		t.Error("ignore_paths glob")
 	}
 }
+
+func TestIsPackageDir(t *testing.T) {
+	for name, want := range map[string]bool{
+		"Xcode.app": true, "Photos Library.photoslibrary": true, ".old.sparsebundle": true, "Backup.SPARSEBUNDLE": true,
+		"projects": false, ".ssh": false, "app": false, "notes.app.d": false,
+	} {
+		if got := isPackageDir(name); got != want {
+			t.Errorf("isPackageDir(%q) = %v", name, got)
+		}
+	}
+}

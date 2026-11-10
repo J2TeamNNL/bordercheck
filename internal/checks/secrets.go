@@ -235,10 +235,19 @@ func (s *secretScanner) find(ctx context.Context, home string) (scan, bundles []
 			return nil
 		}
 		name := d.Name()
+		// A file or folder kept only in iCloud Drive, Dropbox, OneDrive… is a
+		// placeholder: reading it makes macOS download it, which can take minutes
+		// and gigabytes, and blocks until it is done. A secret that is not on this
+		// disk is not this check's business, so placeholders are left alone.
+		if info, err := d.Info(); err == nil && cloudPlaceholder(info) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		if d.IsDir() {
 			rel, _ := filepath.Rel(home, p)
-			if secretSkipDirs[name] || strings.Count(rel, string(filepath.Separator)) >= s.depth ||
-				strings.HasSuffix(name, ".app") || strings.HasSuffix(name, ".photoslibrary") {
+			if secretSkipDirs[name] || strings.Count(rel, string(filepath.Separator)) >= s.depth || isPackageDir(name) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -261,6 +270,17 @@ func (s *secretScanner) find(ctx context.Context, home string) (scan, bundles []
 	return scan, bundles, incomplete
 }
 
+// isPackageDir reports folders that macOS shows as one file: apps, photo and
+// media libraries, disk images. They hold no dotfiles of yours and can be huge.
+func isPackageDir(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".app", ".photoslibrary", ".sparsebundle", ".backupbundle", ".musiclibrary", ".tvlibrary",
+		".imovielibrary", ".fcpbundle", ".logicx", ".framework", ".xcarchive":
+		return true
+	}
+	return false
+}
+
 func isEnvFile(name string) bool {
 	if name != ".env" && !strings.HasPrefix(name, ".env.") && !strings.HasSuffix(name, ".env") {
 		return false
@@ -274,6 +294,9 @@ func isEnvFile(name string) bool {
 }
 
 func (s *secretScanner) scanFile(p, shown string) []secretFinding {
+	if info, err := os.Lstat(p); err == nil && cloudPlaceholder(info) {
+		return nil // opening it would download it
+	}
 	f, err := os.Open(p)
 	if err != nil {
 		return nil

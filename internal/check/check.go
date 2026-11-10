@@ -3,8 +3,9 @@ package check
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"sync"
+	"time"
 )
 
 // Status is the outcome of one check.
@@ -63,18 +64,80 @@ func Skipped(summary string) Result { return Result{Status: Skip, Summary: summa
 
 func Errored(err error) Result { return Result{Status: Error, Summary: err.Error()} }
 
+// Timeout is how long RunAll waits for the checks. One that is still running
+// then (a folder that never answers, a command that hangs) reports an error
+// instead of holding up the others and whoever is waiting for the report.
+var Timeout = 90 * time.Second
+
+// Progress is called when the checks start and each time one finishes, with how
+// many are done and the IDs of those still running, in report order.
+type Progress func(done, total int, running []string)
+
 // RunAll runs the checks concurrently and returns their results in the same order.
-func RunAll(ctx context.Context, checks []Check) []Result {
-	results := make([]Result, len(checks))
-	var wg sync.WaitGroup
-	for i, c := range checks {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			results[i] = run(ctx, c)
-		}()
+func RunAll(ctx context.Context, checks []Check) []Result { return RunAllProgress(ctx, checks, nil) }
+
+// RunAllProgress is RunAll that reports how far it is.
+func RunAllProgress(ctx context.Context, checks []Check, progress Progress) []Result {
+	ctx, cancel := context.WithTimeout(ctx, Timeout)
+	defer cancel()
+	type finished struct {
+		i int
+		r Result
 	}
-	wg.Wait()
+	// Buffered, so a check that outlives the time limit can still finish and go away.
+	ch := make(chan finished, len(checks))
+	pending := make([]bool, len(checks))
+	for i, c := range checks {
+		pending[i] = true
+		go func() { ch <- finished{i, run(ctx, c)} }()
+	}
+	results := make([]Result, len(checks))
+	left := len(checks)
+	tell := func() {
+		if progress == nil {
+			return
+		}
+		var running []string
+		for i, p := range pending {
+			if p {
+				running = append(running, checks[i].ID)
+			}
+		}
+		progress(len(checks)-left, len(checks), running)
+	}
+	take := func(f finished) {
+		results[f.i], pending[f.i] = f.r, false
+		left--
+		tell()
+	}
+	tell()
+	for left > 0 {
+		select {
+		case f := <-ch:
+			take(f)
+			continue
+		case <-ctx.Done():
+		}
+		// Time is up, or the run was interrupted: keep what has finished, mark the rest.
+		for drained := false; !drained; {
+			select {
+			case f := <-ch:
+				take(f)
+			default:
+				drained = true
+			}
+		}
+		why := fmt.Sprintf("Did not finish within %s and was stopped; the other checks are unaffected.", Timeout)
+		if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			why = "Interrupted before it finished."
+		}
+		for i, p := range pending {
+			if p {
+				results[i] = Result{ID: checks[i].ID, Title: checks[i].Title, Status: Error, Summary: why}
+			}
+		}
+		break
+	}
 	return results
 }
 

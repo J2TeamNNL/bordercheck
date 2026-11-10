@@ -137,7 +137,10 @@ Either way, install copies bordercheck and its policy to:
 | Linux | `~/.local/share/bordercheck` (or `$XDG_DATA_HOME/bordercheck`) | systemd user timer `~/.config/systemd/user/bordercheck.timer`; runs while the person's systemd user session is up (`loginctl enable-linger` keeps it running when they are not) |
 | Windows | `%LOCALAPPDATA%\bordercheck` | Task Scheduler task |
 
-It registers an hourly per-user service (no admin rights) and sends a first report straight away. The service
+It registers an hourly per-user service (no admin rights) and sends a first report straight away. While that
+first check runs, the terminal shows how far it is (checks done, percentage, which are still running), and the
+install ends with a line saying it is done. The checks run together and get 90 seconds in all; one that is
+still running then reports an error and the rest go through. The service
 sends a report whenever `report.interval` has passed since the last one that got through, so a failed send
 retries the next hour. On Linux, a login with no systemd user session (no systemd, some SSH or WSL setups) gets
 a line in the user's crontab instead; `bordercheck status` says which.

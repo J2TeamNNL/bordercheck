@@ -233,8 +233,14 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 		fmt.Fprintf(env.Out, "Updates itself from github.com/%s releases.\n", pol.Update.Repo)
 	}
 	printSends(env.Out, pol)
-	fmt.Fprintln(env.Out)
-	return Send(ctx, env, true)
+	fmt.Fprintf(env.Out, "\nNow checking this computer for the first time. It usually takes under a minute, %s at most.\n", check.Timeout)
+	if err := Send(ctx, env, true); err != nil {
+		fmt.Fprintf(env.Out, "\nbordercheck is installed and will check every hour, but the first report did not get through (%v). It tries again on its own; \"%s\" send -force tries now.\n",
+			err, filepath.Join(env.Dir, binName()))
+		return err
+	}
+	fmt.Fprintf(env.Out, "Done: bordercheck is installed and the first report is sent. Nothing else to do; it checks again on its own.\nTo see the details and how to fix anything it found, run: \"%s\"\n", filepath.Join(env.Dir, binName()))
+	return nil
 }
 
 // printSends says, at install, when the report carries more than results.
@@ -326,7 +332,11 @@ func Send(ctx context.Context, env Env, force bool) error {
 }
 
 func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time, force bool, tok *bearer) error {
-	results := check.RunAll(ctx, checks.All(pol))
+	var progress check.Progress
+	if force && env.Term != nil { // someone is watching: show how far the checks are
+		progress = report.Progress(env.Term)
+	}
+	results := check.RunAllProgress(ctx, checks.All(pol), progress)
 	results = pol.Waive(results, identity(cfg), now)
 	rep := report.New(env.Version, pol.Name, results)
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID

@@ -80,6 +80,24 @@ func New(version, policy string, results []check.Result) Report {
 	return r
 }
 
+// Progress returns a check.Progress that keeps one line on a terminal up to
+// date: how many checks are done, the percentage, and which are still
+// running, so a slow check is seen for what it is rather than taken for a
+// hang. The line is cleared when the last check finishes.
+func Progress(w io.Writer) check.Progress {
+	return func(done, total int, running []string) {
+		if done >= total {
+			fmt.Fprint(w, "\r\x1b[K")
+			return
+		}
+		line := fmt.Sprintf("Checking this computer: %d of %d done (%d%%)", done, total, done*100/max(total, 1))
+		if len(running) > 0 && len(running) <= 4 {
+			line += " · still on: " + strings.Join(running, ", ")
+		}
+		fmt.Fprintf(w, "\r\x1b[K%s", line)
+	}
+}
+
 func (r Report) WriteJSON(w io.Writer) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")

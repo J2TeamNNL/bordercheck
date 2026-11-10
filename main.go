@@ -118,7 +118,11 @@ func runCheck(args []string) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	rep := report.New(version, pol.Name, pol.Waive(check.RunAll(ctx, selected), waiverIdentity(), time.Now()))
+	var progress check.Progress
+	if isTerminal(os.Stderr) {
+		progress = report.Progress(os.Stderr)
+	}
+	rep := report.New(version, pol.Name, pol.Waive(check.RunAllProgress(ctx, selected, progress), waiverIdentity(), time.Now()))
 	if *jsonOut {
 		if err := rep.WriteJSON(os.Stdout); err != nil {
 			return fail(err)
