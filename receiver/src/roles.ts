@@ -91,7 +91,7 @@ export function validateRolePolicy(p: unknown, now: Date, legacyTokens: string[]
     if (!isObj(p.report)) errs.push("report must be an object");
     else {
       const r = p.report;
-      keysIn(r, ["url", "headers", "interval", "include_evidence", "email_domains"], "report", errs);
+      keysIn(r, ["url", "headers", "interval", "include_evidence", "email_domains", "include_ips", "include_location"], "report", errs);
       if (r.url !== undefined && typeof r.url !== "string") errs.push("report.url must be a string");
       if (r.headers !== undefined) {
         if (!isObj(r.headers)) errs.push("report.headers must be an object");
@@ -107,7 +107,9 @@ export function validateRolePolicy(p: unknown, now: Date, legacyTokens: string[]
         const d = goDuration(r.interval);
         if (d === null || d < 15 * 60 * 1000) errs.push('report.interval must be a duration of at least 15m, like "24h"');
       }
-      if (r.include_evidence !== undefined && typeof r.include_evidence !== "boolean") errs.push("report.include_evidence must be true or false");
+      for (const k of ["include_evidence", "include_ips", "include_location"]) {
+        if (r[k] !== undefined && typeof r[k] !== "boolean") errs.push(`report.${k} must be true or false`);
+      }
       if (r.email_domains !== undefined) strList(r.email_domains, "report.email_domains", errs);
     }
   }
@@ -142,7 +144,8 @@ export function validateRolePolicy(p: unknown, now: Date, legacyTokens: string[]
     if (!isObj(p.notify)) errs.push("notify must be an object");
     else {
       const n = p.notify;
-      keysIn(n, ["enabled", "statuses", "severities", "remind_every"], "notify", errs);
+      keysIn(n, ["enabled", "statuses", "severities", "remind_every", "open_report"], "notify", errs);
+      if (n.open_report !== undefined && typeof n.open_report !== "boolean") errs.push("notify.open_report must be true or false");
       if (n.enabled !== undefined && typeof n.enabled !== "boolean") errs.push("notify.enabled must be true or false");
       if (n.statuses !== undefined) strList(n.statuses, "notify.statuses", errs, ["fail", "warn"]);
       if (n.severities !== undefined) strList(n.severities, "notify.severities", errs);
