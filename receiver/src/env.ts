@@ -2,11 +2,8 @@ export interface Env {
   DB: D1Database;
 
   // Secrets (wrangler secret put NAME).
-  REPORT_TOKEN?: string; // bearer token bordercheck sends with each report
-  REPORT_TOKEN_PREVIOUS?: string; // also accepted, while rotating REPORT_TOKEN
   ADMIN_TOKEN?: string; // dashboard login for people without Cloudflare Access
   ALERT_WEBHOOK_URL?: string; // Discord or Slack incoming webhook, or any URL taking JSON
-  POLICY_KEY?: string; // if set, GET /policies.json needs ?key=<POLICY_KEY>
   MCP_TOKEN?: string; // bearer token for the MCP server at /mcp: read and write tools
   MCP_READ_TOKEN?: string; // bearer token for the MCP server: read-only tools
   // Neither set (or both shorter than 16 characters): /mcp answers 404.
@@ -25,7 +22,6 @@ export interface Env {
   ALERT_WEBHOOK_FORMAT?: string; // discord | slack | json; default: from the URL
 
   // Enrollment portal.
-  LEGACY_MODE?: string; // "on" (default): shared REPORT_TOKEN and /policies.json work; "off": only enrolled machines
   INVITE_DAYS?: string; // default lifetime of an invite (7)
   INSTALL_SH_URL?: string; // install script shown in invite commands (macOS/Linux)
   INSTALL_PS1_URL?: string; // and for Windows
@@ -80,7 +76,6 @@ export const config = (env: Env) => ({
     .split(",")
     .map((d) => d.trim().toLowerCase().replace(/^@/, ""))
     .filter(Boolean),
-  legacy: flag(env.LEGACY_MODE, true),
   inviteDays: num(env.INVITE_DAYS, 7, 1),
   installSh: scriptURL(env.INSTALL_SH_URL, DEFAULT_INSTALL_SH),
   installPs1: scriptURL(env.INSTALL_PS1_URL, DEFAULT_INSTALL_PS1),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ADMIN_TOKEN, adminGet, BASE, call, post, report, result } from "./helpers";
+import { ADMIN_TOKEN, adminGet, BASE, call, enrolled, env, post, report, result } from "./helpers";
 
 const ID = "4f1c0000aaaabbbbccccdddd";
 
@@ -16,8 +16,9 @@ describe("dashboard auth", () => {
     expect((await call(new Request(`${BASE}/admin`), { ADMIN_TOKEN: "too-short" })).status).toBe(503);
   });
 
-  it("does not accept the report token", async () => {
-    const res = await call(new Request(`${BASE}/admin`, { headers: { authorization: "Bearer test-report-token-0123456789" } }));
+  it("does not accept a machine token", async () => {
+    const m = await enrolled();
+    const res = await call(new Request(`${BASE}/admin`, { headers: { authorization: `Bearer ${m.token}` } }));
     expect(res.status).toBe(401);
   });
 
@@ -40,12 +41,17 @@ describe("dashboard auth", () => {
     // Changing ADMIN_TOKEN signs everyone out.
     expect((await call(new Request(`${BASE}/admin`, { headers: { cookie: session } }), { ADMIN_TOKEN: "another-admin-token-xyz" })).status).toBe(303);
     // Cookie-authenticated writes need a same-origin request.
-    await post(report());
+    const m = await enrolled();
+    await post(report(), { token: m.token });
+    const machines = () => env.DB.prepare("SELECT COUNT(*) AS n FROM machines").first<number>("n");
     const forget = (origin: string) =>
-      call(new Request(`${BASE}/admin/machine/${ID}/forget`, { method: "POST", headers: { cookie: session, origin } }));
+      call(new Request(`${BASE}/admin/machine/${m.install_id}/forget`, { method: "POST", headers: { cookie: session, origin } }));
     expect((await forget("https://evil.example")).status).toBe(403);
+    expect(await machines()).toBe(1);
     expect((await forget(BASE)).status).toBe(303);
-    expect((await adminGet(`/admin/machine/${ID}`)).status).toBe(404);
+    expect(await machines()).toBe(0);
+    // The enrollment stays, so the page now says no report has arrived.
+    expect(await (await adminGet(`/admin/machine/${m.install_id}`)).text()).toContain("no report has arrived yet");
   });
 
   it("accepts a browser's form post, which says Origin: null under no-referrer", async () => {
@@ -70,11 +76,15 @@ describe("dashboard auth", () => {
 describe("dashboard pages", () => {
   const evil = '<script>alert(1)</script>';
   it("escapes everything from the report", async () => {
+    const m = await enrolled();
+    const ID = m.install_id;
+    const attr = `x"><img src=x onerror=alert(1)>`;
     await post(
-      report({ email: `x"><img src=x onerror=alert(1)>@acme.com`, host: { os: "darwin", arch: "arm64", hostname: evil } }, [
+      report({ version: attr, policy: evil, host: { os: attr, arch: evil, hostname: evil } }, [
         result("firewall", "fail", { severity: "high", title: evil, summary: evil, fix: evil, evidence: [evil, "a&b"] }),
-        result(`<b>id</b>`, "warn"),
+        result(`<b>id</b>`, "warn", { title: attr, severity: attr }),
       ]),
+      { token: m.token },
     );
     for (const path of ["/admin", `/admin/machine/${ID}`, "/admin/checks", "/admin/checks/firewall", "/admin/alerts"]) {
       const res = await adminGet(path);
@@ -91,13 +101,16 @@ describe("dashboard pages", () => {
   });
 
   it("lists machines, filters non-compliant, shows waivers and unknown statuses", async () => {
-    await post(report());
+    const an = await enrolled("an@acme.com");
+    const boM = await enrolled("bo@acme.com");
+    await post(report(), { token: an.token });
     await post(
-      report({ install_id: "second-machine-0001", email: "bo@acme.com", host: { os: "linux", arch: "amd64", hostname: "bo-box" } }, [
+      report({ host: { os: "linux", arch: "amd64", hostname: "bo-box" } }, [
         result("os-updates", "waived", { severity: "high", waived: { until: "2099-01-31", reason: "Vendor patch due" } }),
         result("screen-lock", "brand-new-status"),
         result("firewall", "pass"),
       ]),
+      { token: boM.token },
     );
     const all = await (await adminGet("/admin")).text();
     expect(all).toContain("an@acme.com");
@@ -109,7 +122,7 @@ describe("dashboard pages", () => {
     expect(search).toContain("bo@acme.com");
     expect(search).not.toContain("an@acme.com");
 
-    const bo = await (await adminGet("/admin/machine/second-machine-0001")).text();
+    const bo = await (await adminGet(`/admin/machine/${boM.install_id}`)).text();
     expect(bo).toContain("Waived until 2099-01-31");
     expect(bo).toContain("Vendor patch due");
     expect(bo).toContain("brand-new-status");
@@ -124,8 +137,9 @@ describe("dashboard pages", () => {
   });
 
   it("shows when a check started failing", async () => {
-    await post(report());
-    const body = await (await adminGet(`/admin/machine/${ID}`)).text();
+    const m = await enrolled();
+    await post(report(), { token: m.token });
+    const body = await (await adminGet(`/admin/machine/${m.install_id}`)).text();
     expect(body).toMatch(/since \d{4}-\d{2}-\d{2}/);
     expect(body).toContain("Turn it on.");
   });

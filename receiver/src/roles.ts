@@ -11,7 +11,6 @@
 // with `bordercheck -policy role.json -print-policy`.
 
 import { DAY } from "./env";
-import { PLACEHOLDER } from "./policy";
 
 type Obj = Record<string, unknown>;
 
@@ -73,15 +72,13 @@ function strList(v: unknown, where: string, errs: string[], allowed?: string[]) 
   if (allowed) for (const x of v) if (!allowed.includes(x)) errs.push(`${where}: "${x}" is not one of ${allowed.join(", ")}`);
 }
 
-function headerHasToken(name: string, value: unknown, tokens: string[]): boolean {
-  if (name.toLowerCase() === "authorization") return true;
-  return typeof value === "string" && (value.includes(PLACEHOLDER) || tokens.some((t) => t && value.includes(t)));
-}
+// Each machine sends its own token, so a role never carries one.
+const isAuthHeader = (name: string): boolean => name.toLowerCase() === "authorization";
 
 // validateRolePolicy returns problems that would stop bordercheck from
 // accepting the policy, or that must not be in a role; [] means it passed what
 // is checked here (see the comment at the top of this file).
-export function validateRolePolicy(p: unknown, now: Date, legacyTokens: string[] = []): string[] {
+export function validateRolePolicy(p: unknown, now: Date): string[] {
   const errs: string[] = [];
   if (!isObj(p)) return ["the policy must be a JSON object"];
   keysIn(p, ["name", "report", "update", "notify", "waivers", "checks"], "policy", errs);
@@ -98,7 +95,7 @@ export function validateRolePolicy(p: unknown, now: Date, legacyTokens: string[]
         else
           for (const [k, v] of Object.entries(r.headers)) {
             if (typeof v !== "string") errs.push(`report.headers.${k} must be a string`);
-            if (headerHasToken(k, v, legacyTokens)) {
+            if (isAuthHeader(k)) {
               errs.push(`report.headers.${k}: no report token in a role; each machine sends its own`);
             }
           }
@@ -221,7 +218,7 @@ export function composePolicy(
   const report = isObj(p.report) ? p.report : {};
   const headers: Obj = {};
   if (isObj(report.headers)) {
-    for (const [k, v] of Object.entries(report.headers)) if (!headerHasToken(k, v, [])) headers[k] = v;
+    for (const [k, v] of Object.entries(report.headers)) if (!isAuthHeader(k)) headers[k] = v;
   }
   p.report = { ...report, url: `${origin}/report`, headers };
 

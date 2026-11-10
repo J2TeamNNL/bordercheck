@@ -20,19 +20,6 @@ export function bearer(req: Request): string | null {
 
 export const usableToken = (t: string | undefined): t is string => !!t && t.length >= MIN_TOKEN_LENGTH;
 
-// reportAuth: "ok", "unauthorized", or "unconfigured" (no usable REPORT_TOKEN).
-export async function reportAuth(req: Request, env: Env): Promise<"ok" | "unauthorized" | "unconfigured"> {
-  if (!usableToken(env.REPORT_TOKEN)) return "unconfigured";
-  const got = bearer(req);
-  if (!got) return "unauthorized";
-  // Check both, always, so timing does not reveal which one matched.
-  const [a, b] = await Promise.all([
-    safeEqual(got, env.REPORT_TOKEN),
-    usableToken(env.REPORT_TOKEN_PREVIOUS) ? safeEqual(got, env.REPORT_TOKEN_PREVIOUS) : Promise.resolve(false),
-  ]);
-  return a || b ? "ok" : "unauthorized";
-}
-
 // ---- Cloudflare Access ----
 
 function b64urlDecode(s: string): Uint8Array {

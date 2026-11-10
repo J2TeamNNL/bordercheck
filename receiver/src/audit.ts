@@ -13,10 +13,12 @@ export function auditStmt(env: Env, who: string, action: string, target: string,
   return env.DB.prepare("INSERT INTO audit (at, who, action, target, detail) VALUES (?, ?, ?, ?, ?)").bind(...values(who, action, target, detail, at));
 }
 
-// auditStmtIf inserts only if `exists` (a SELECT) returns a row: for a change
-// in the same batch that may turn out to be a no-op.
+// auditStmtIf inserts only if the statement just before it in the batch
+// changed a row and `exists` (a SELECT) returns a row: for a change in the
+// same batch that may turn out to be a no-op. (`exists` alone is not enough:
+// a repeat of the same change within the same millisecond matches it too.)
 export function auditStmtIf(env: Env, exists: { sql: string; binds: unknown[] }, who: string, action: string, target: string, detail: Record<string, unknown> = {}, at = new Date()) {
-  return env.DB.prepare(`INSERT INTO audit (at, who, action, target, detail) SELECT ?, ?, ?, ?, ? WHERE EXISTS (${exists.sql})`).bind(
+  return env.DB.prepare(`INSERT INTO audit (at, who, action, target, detail) SELECT ?, ?, ?, ?, ? WHERE changes() > 0 AND EXISTS (${exists.sql})`).bind(
     ...values(who, action, target, detail, at),
     ...exists.binds,
   );

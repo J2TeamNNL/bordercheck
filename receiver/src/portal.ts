@@ -10,7 +10,6 @@ import { config, DAY, type Env } from "./env";
 import { html, type Html, layout, page, when } from "./html";
 import { CHECK_ID_RE, POLICY_CHECKS, today, validateRolePolicy, waiverDateError } from "./roles";
 import { newCode, sha256hex } from "./tokens";
-import { usableToken } from "./auth";
 
 const MAX_ROLE_POLICY = 256 * 1024;
 const MAX_BULK = 500;
@@ -38,10 +37,6 @@ interface RoleRow {
 // bordercheck accepts it.
 export const SAMPLE_POLICY = JSON.stringify(samplePolicy, null, 2);
 
-function legacyTokens(env: Env): string[] {
-  return [env.REPORT_TOKEN, env.REPORT_TOKEN_PREVIOUS].filter(usableToken);
-}
-
 // roleRows: every role with its active machines and pending invites.
 export async function roleRows(env: Env) {
   const rows = await env.DB.prepare(
@@ -58,7 +53,7 @@ export async function roleRows(env: Env) {
 export async function rolesPage(env: Env, who: string, message: string | Html = "", draft?: { name: string; policy: string }, status = 200) {
   const rows = { results: await roleRows(env) };
   const body = html`<h1>Roles</h1>
-<p class="muted">A role is a policy (the same JSON as policies.json) that enrolled machines get from <code>/policy</code>.
+<p class="muted">A role is a policy (the same JSON as bordercheck's policies.json) that enrolled machines get from <code>/policy</code>.
 When served, <code>report.url</code> and <code>update.policy_url</code> are set to this receiver, <code>report.headers</code>
 never carry a token (each machine sends its own), and the machine's waivers are added.</p>
 ${note(message)}
@@ -93,7 +88,7 @@ async function checkRole(env: Env, name: string, policyText: string, now: Date):
   } catch (e) {
     return { errs: [...errs, `Not valid JSON: ${(e as Error).message}`] };
   }
-  errs.push(...validateRolePolicy(p, now, legacyTokens(env)));
+  errs.push(...validateRolePolicy(p, now));
   return { errs, policy: JSON.stringify(p, null, 2) };
 }
 
@@ -489,11 +484,7 @@ export async function enrollmentSection(env: Env, id: string, e: EnrollmentRow |
 <p class="muted">Each accepted report gets a login-free link to that machine's own latest results, which bordercheck can open for
 the person at the machine. Reset to make every link issued so far stop working.</p>
 <form method="post" action="${machineLink(id)}/reset-link"><button>Reset report links</button></form>`;
-  if (!e) {
-    return html`<h2>Enrollment</h2><p><span class="badge s-skip">legacy</span> This machine reports with the shared
-REPORT_TOKEN and gets its policy from <code>/policies.json</code>. To manage it here (role, revoke, waivers), invite its
-user and have them reinstall with the invite link; it then appears as a new machine and this one goes silent.</p>${linkForm}`;
-  }
+  if (!e) return html`<h2>Enrollment</h2><p class="muted">No enrollment record for this machine.</p>${linkForm}`;
   const [waivers, options] = await Promise.all([
     env.DB.prepare("SELECT * FROM machine_waivers WHERE install_id = ? ORDER BY removed_at IS NOT NULL, until DESC LIMIT 200")
       .bind(id)
@@ -570,7 +561,7 @@ export async function machineAction(
     await db.batch([db.prepare("DELETE FROM report_links WHERE install_id = ?").bind(id), auditStmt(env, who, "machine.reset_link", id, { ...extra })]);
     return { status: 200, error: "" };
   }
-  if (!e) return { status: 409, error: "This machine is not enrolled (legacy); that can only be done for enrolled machines." };
+  if (!e) return { status: 409, error: "This machine is not enrolled." };
   switch (action) {
     case "revoke":
     case "restore": {

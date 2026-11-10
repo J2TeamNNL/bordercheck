@@ -1,12 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { alertLine, prune } from "../src/alerts";
 import type { Env } from "../src/env";
 import { geoFromCf } from "../src/geo";
 import { parseLocalIps, parseLocation, validIP } from "../src/report";
-import { adminGet, BASE, call, env, REPORT_TOKEN, report } from "./helpers";
-import { adminPost } from "./portal";
+import { adminGet, adminPost, BASE, call, enrolled, env, report } from "./helpers";
 
-const ID = "4f1c0000aaaabbbbccccdddd";
+// Reports come from one enrolled machine.
+let ID = "";
+let TOKEN = "";
+beforeEach(async () => {
+  const m = await enrolled();
+  ID = m.install_id;
+  TOKEN = m.token;
+});
 
 const CF = {
   country: "GB",
@@ -20,7 +26,7 @@ const CF = {
 };
 
 function postFrom(body: unknown, opts: { ip?: string; cf?: Record<string, unknown>; e?: Partial<Env>; headers?: Record<string, string> } = {}) {
-  const headers: Record<string, string> = { "content-type": "application/json", authorization: `Bearer ${REPORT_TOKEN}`, ...opts.headers };
+  const headers: Record<string, string> = { "content-type": "application/json", authorization: `Bearer ${TOKEN}`, ...opts.headers };
   if (opts.ip) headers["cf-connecting-ip"] = opts.ip;
   const init = { method: "POST", headers, body: JSON.stringify(body), cf: opts.cf } as RequestInit;
   return call(new Request(`${BASE}/report`, init), opts.e);

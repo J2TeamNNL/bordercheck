@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Env } from "../src/env";
-import { ADMIN_TOKEN, adminGet, BASE, call, env, post, REPORT_TOKEN, report, result } from "./helpers";
+import { ADMIN_TOKEN, adminGet, BASE, call, env, post, report, result } from "./helpers";
 import { enroll, enrolled, getPolicy, HOST, makeRole } from "./portal";
 
 const MCP = "test-mcp-token-0123456789abcdef";
@@ -67,7 +67,7 @@ describe("MCP access", () => {
   });
 
   it("needs its own bearer token; admin, report and wrong tokens are refused", async () => {
-    for (const token of [null, "nope-nope-nope-nope-nope", ADMIN_TOKEN, REPORT_TOKEN, MCP + "x"]) {
+    for (const token of [null, "nope-nope-nope-nope-nope", ADMIN_TOKEN, MCP + "x"]) {
       const res = await rpc("tools/list", {}, { token });
       expect(res.status, String(token)).toBe(401);
       expect(res.headers.get("www-authenticate")).toContain("Bearer");
@@ -240,8 +240,9 @@ describe("MCP tools/list", () => {
 async function fleet() {
   const m = await enrolled("an@acme.com", "Dev");
   await post(report({}, [result("firewall", "fail", { severity: "high", fix: "Turn it on.", evidence: ["/etc/pf.conf"] }), result("secrets", "pass")]), { token: m.token });
-  await post(report({ install_id: "legacy-machine-0001", email: "bo@acme.com", host: { os: "linux", arch: "amd64", hostname: "bo-box" } }, [result("firewall", "pass")]));
-  return m;
+  const bo = await enrolled("bo@acme.com", "Support");
+  await post(report({ host: { os: "linux", arch: "amd64", hostname: "bo-box" } }, [result("firewall", "pass")]), { token: bo.token });
+  return { ...m, bo };
 }
 
 describe("MCP read tools", () => {
@@ -249,7 +250,7 @@ describe("MCP read tools", () => {
     const m = await fleet();
     const s = (await tool("fleet_summary")).data;
     expect(s.notice).toContain("untrusted");
-    expect(s.machines).toMatchObject({ reporting: 2, failing: 1, legacy: 1, revoked: 0, enrolled_no_report_yet: 0 });
+    expect(s.machines).toEqual({ reporting: 2, failing: 1, attention_only: 0, silent: 0, revoked: 0, enrolled_no_report_yet: 0 });
     expect(s.most_failing_checks[0]).toMatchObject({ check_id: "firewall", fail: 1, high: 1 });
 
     const failing = (await tool("list_machines", { filter: "failing" })).data;
@@ -259,10 +260,10 @@ describe("MCP read tools", () => {
     const fw = (await tool("list_machines", { check: "firewall" })).data;
     expect(fw.machines.map((x: any) => x.install_id)).toEqual([m.install_id]);
     const fwPass = (await tool("list_machines", { check: "firewall", check_status: "pass" })).data;
-    expect(fwPass.machines.map((x: any) => x.install_id)).toEqual(["legacy-machine-0001"]);
-    const legacy = (await tool("list_machines", { filter: "legacy" })).data.machines[0];
-    expect(legacy.email).toBeNull();
-    expect(legacy.untrusted.email).toBe("bo@acme.com");
+    expect(fwPass.machines.map((x: any) => x.install_id)).toEqual([m.bo.install_id]);
+    expect(fwPass.machines[0]).toMatchObject({ email: "bo@acme.com", role: "Support" });
+    expect(fwPass.machines[0].untrusted.email).toBeUndefined();
+    expect((await tool("list_machines", { filter: "legacy" })).isError).toBe(true);
     expect((await tool("list_machines", { search: "bo-b" })).data.machines).toHaveLength(1);
     expect((await tool("list_machines", { role_id: m.roleId })).data.machines).toHaveLength(1);
     expect((await tool("list_machines", { filter: "bogus" })).isError).toBe(true);
@@ -298,8 +299,7 @@ describe("MCP read tools", () => {
     const list = (await tool("list_machines", {}, { e: { STORE_GEO: "off" } })).data;
     expect(JSON.stringify(list)).not.toContain("Hanoi");
 
-    const legacy = (await tool("get_machine", { install_id: "legacy-machine-0001" })).data;
-    expect(legacy.enrollment).toBeNull();
+    expect((await tool("get_machine", { install_id: m.bo.install_id })).data.enrollment).toMatchObject({ role: "Support", email: "bo@acme.com" });
     const none = await tool("get_machine", { install_id: "does-not-exist-0000" });
     expect(none.isError).toBe(true);
     expect(none.data.error).toBe("No such machine.");
@@ -309,15 +309,18 @@ describe("MCP read tools", () => {
   it("roles, invites, alerts, audit", async () => {
     const m = await fleet();
     const roles = (await tool("list_roles")).data.roles;
-    expect(roles).toEqual([expect.objectContaining({ role_id: m.roleId, name: "Dev", machines: 1, pending_invites: 0 })]);
+    expect(roles).toEqual([
+      expect.objectContaining({ role_id: m.roleId, name: "Dev", machines: 1, pending_invites: 0 }),
+      expect.objectContaining({ name: "Support", machines: 1, pending_invites: 0 }),
+    ]);
     const role = (await tool("get_role", { role_id: m.roleId })).data;
     expect(role.policy.checks.listeners.on_problem).toBe("fail");
     expect(role.machines[0].install_id).toBe(m.install_id);
     expect((await tool("get_role", { role_id: 999 })).isError).toBe(true);
 
     const used = (await tool("list_invites", { status: "used" })).data;
-    expect(used.invites[0]).toMatchObject({ email: "an@acme.com", role: "Dev", status: "used", used_install_id: m.install_id });
-    expect(used.counts.used).toBe(1);
+    expect(used.invites[1]).toMatchObject({ email: "an@acme.com", role: "Dev", status: "used", used_install_id: m.install_id });
+    expect(used.counts.used).toBe(2);
 
     const alerts = (await tool("list_alerts")).data.alerts;
     expect(alerts[0]).toMatchObject({ kind: "high_fail", install_id: m.install_id, check_id: "firewall", delivery: "pending" });
@@ -466,9 +469,7 @@ describe("MCP write tools", () => {
     expect((await tool("reset_report_links", { install_id: m.install_id })).isError).toBe(false);
     expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM report_links").first<number>("n")).toBe(0);
 
-    // Legacy and unknown machines.
-    await post(report({ install_id: "legacy-machine-0001" }));
-    expect((await tool("revoke_machine", { install_id: "legacy-machine-0001" })).data.error).toContain("legacy");
+    // Unknown machines.
     expect((await tool("revoke_machine", { install_id: "no-such-machine-01" })).data.error).toBe("No such machine.");
 
     const rows = (await auditRows()).filter((r) => r.who === "mcp");
@@ -528,12 +529,13 @@ describe("MCP and prompt injection", () => {
       ]),
       { token: m.token },
     );
-    await post(report({ install_id: "legacy-machine-0001", email: `${INJECT}@acme.com`, host: { os: "linux", arch: "amd64", hostname: nasty } }));
+    const bo = await enrolled("bo@acme.com");
+    await post(report({ version: INJECT, host: { os: "linux", arch: INJECT, hostname: nasty } }, [result("secrets", "pass", { title: nasty })]), { token: bo.token });
 
     const calls: [string, Record<string, unknown>][] = [
-      ["fleet_summary", {}], ["list_machines", {}], ["list_machines", { filter: "legacy" }], ["check_stats", {}], ["list_alerts", { pending_only: false }],
+      ["fleet_summary", {}], ["list_machines", {}], ["list_machines", { filter: "failing" }], ["check_stats", {}], ["list_alerts", { pending_only: false }],
       ["list_audit", {}], ["get_machine", { install_id: m.install_id, include_evidence: true, include_location: true }],
-      ["get_machine", { install_id: "legacy-machine-0001" }], ["get_role", { role_id: m.roleId }],
+      ["get_machine", { install_id: bo.install_id }], ["get_role", { role_id: m.roleId }],
     ];
     const needles = [INJECT, INJECT.toLowerCase().replace(/[^a-z]+/g, "-").slice(0, 30)];
     let seen = 0;
@@ -556,7 +558,7 @@ describe("MCP and prompt injection", () => {
     for (const n of needles) expect(list).not.toContain(n);
     const errs = [
       await tool("get_machine", { install_id: "nonexistent-machine" }),
-      await tool("revoke_machine", { install_id: "legacy-machine-0001" }),
+      await tool("change_machine_role", { install_id: bo.install_id, role_id: 999999 }),
       await tool("add_machine_waiver", { install_id: m.install_id, check: "firewall", until: "2001-01-01", reason: "x" }),
     ];
     for (const e of errs) {
@@ -576,7 +578,7 @@ describe("MCP and prompt injection", () => {
       ...(await env.DB.prepare("SELECT link_hash AS h FROM report_links").all<{ h: string }>()).results,
     ].map((r) => r.h);
     expect(hashes.length).toBeGreaterThanOrEqual(4);
-    const secrets = [...hashes, m.token, m.code, code, MCP, MCP_READ, ADMIN_TOKEN, REPORT_TOKEN];
+    const secrets = [...hashes, m.token, m.code, code, MCP, MCP_READ, ADMIN_TOKEN, m.bo.token];
     const outputs: string[] = [];
     for (const [name, args] of [
       ["fleet_summary", {}], ["list_machines", {}], ["get_machine", { install_id: m.install_id, include_evidence: true, include_location: true }],

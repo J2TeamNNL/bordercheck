@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCron } from "../src/alerts";
-import { BASE, call, env, post, report, result } from "./helpers";
-import { adminPost, enrolled } from "./portal";
+import type { Env } from "../src/env";
+import { adminPost, BASE, call, enrolled, env, post as postWith, report, result } from "./helpers";
 
-const ID = "4f1c0000aaaabbbbccccdddd";
+// Reports in these tests come from An's enrolled machine unless a token is given.
+let an: { install_id: string; token: string } | undefined;
+async function anMachine() {
+  if (!an || !(await env.DB.prepare("SELECT 1 FROM enrollments WHERE install_id = ?").bind(an.install_id).first())) an = await enrolled();
+  return an;
+}
+const post = async (body: unknown, opts: { token?: string; e?: Partial<Env> } = {}) =>
+  postWith(body, { token: opts.token ?? (await anMachine()).token, e: opts.e });
 
 const open = (url: string, ip = "203.0.113.50", e = {}) =>
   call(new Request(url.replace("https://bordercheck.example.com", BASE), { headers: { "cf-connecting-ip": ip } }), e);
@@ -49,7 +56,8 @@ describe("login-free report links", () => {
 
   it("cannot reach another machine, and unknown ids get one uniform 404", async () => {
     const urlA = await reportUrl(await post(report()));
-    await post(report({ install_id: "second-machine-0001", email: "bo@acme.com", host: { os: "linux", arch: "amd64", hostname: "bo-box" } }));
+    const bo = await enrolled("bo@acme.com");
+    await post(report({ host: { os: "linux", arch: "amd64", hostname: "bo-box" } }), { token: bo.token });
     const a = await (await open(urlA)).text();
     expect(a).not.toContain("bo@acme.com");
     const r1 = await open(`${BASE}/r/${"A".repeat(32)}`);
@@ -73,12 +81,7 @@ describe("login-free report links", () => {
     expect((await open(fresh)).status).toBe(404);
   });
 
-  it("keeps a few links per enrolled machine, only the newest per legacy machine, and links expire", async () => {
-    const legacy1 = await reportUrl(await post(report()));
-    const legacy2 = await reportUrl(await post(report()));
-    expect((await open(legacy1)).status).toBe(404);
-    expect((await open(legacy2)).status).toBe(200);
-
+  it("keeps a few links per machine, and links expire", async () => {
     const m = await enrolled();
     const urls = [];
     for (let i = 0; i < 4; i++) urls.push(await reportUrl(await post(report(), { token: m.token })));
@@ -91,7 +94,7 @@ describe("login-free report links", () => {
 
   it("forget removes links; the feature can be switched off", async () => {
     const url = await reportUrl(await post(report()));
-    await adminPost(`/admin/machine/${ID}/forget`);
+    await adminPost(`/admin/machine/${(await anMachine()).install_id}/forget`);
     expect((await open(url)).status).toBe(404);
 
     const off = { REPORT_LINKS: "off" };

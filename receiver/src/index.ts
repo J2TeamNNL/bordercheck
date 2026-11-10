@@ -12,7 +12,6 @@ import { alertsPage, checkPage, checksPage, forgetMachine, machinePage, machines
 import type { Env } from "./env";
 import { html, layout, page } from "./html";
 import { handleReport, json } from "./ingest";
-import { policyPage, savePolicy, servePolicy } from "./policy";
 import { audit } from "./audit";
 import { handleEnroll, invitePage, serveMachinePolicy } from "./enroll";
 import {
@@ -130,16 +129,6 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
     return m[2] === "revoke" ? revokeInvite(env, url, v.who, Number(m[1])) : reissueInvite(env, req, url, v.who, Number(m[1]));
   }
   if (path === "/admin/audit" && req.method === "GET") return auditPage(env, url, v.who);
-
-  if (path === "/admin/policy" && req.method === "GET") return policyPage(env, v.who);
-  if ((path === "/admin/policy" && req.method === "POST") || (path === "/admin/policies.json" && req.method === "PUT")) {
-    const isForm = (req.headers.get("content-type") ?? "").includes("form");
-    const text = isForm ? String((await req.formData()).get("policy") ?? "") : await req.text();
-    const err = await savePolicy(env, text);
-    if (!err) await audit(env, v.who, "legacy_policy.save", "policies.json");
-    if (!isForm) return err ? json({ error: err }, 400) : json({ ok: true });
-    return err ? policyPage(env, v.who, err, text) : policyPage(env, v.who, "Saved.");
-  }
   return page(layout("Not found", v.who, html`<h1>Not found</h1>`), 404);
 }
 
@@ -151,7 +140,6 @@ export default {
       if (req.method !== "POST") return json({ error: "POST a bordercheck report here" }, 405, { allow: "POST" });
       return handleReport(req, env);
     }
-    if (path === "/policies.json" && (req.method === "GET" || req.method === "HEAD")) return servePolicy(req, env);
     if (path === "/enroll") {
       if (req.method !== "POST") return json({ error: "bad_request", message: "POST an enrollment here" }, 405, { allow: "POST" });
       return handleEnroll(req, env);

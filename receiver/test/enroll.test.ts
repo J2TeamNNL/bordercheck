@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { composePolicy, goDuration, validateRolePolicy } from "../src/roles";
-import { ADMIN_TOKEN, adminGet, BASE, call, env, post, REPORT_TOKEN, report } from "./helpers";
+import { ADMIN_TOKEN, adminGet, BASE, call, env, post, report } from "./helpers";
 import { adminPost, DEV_POLICY, enroll, enrolled, getPolicy, HOST, makeInvites, makeRole } from "./portal";
 
 const sha = async (s: string) =>
@@ -165,15 +165,14 @@ describe("GET /policy", () => {
     expect(p.checks.listeners.on_problem).toBe("fail");
     expect(p.waivers).toEqual([]);
     expect(JSON.stringify(p)).not.toContain(m.token);
-    expect(JSON.stringify(p)).not.toContain(REPORT_TOKEN);
   });
 
   it("401s unknown and revoked tokens, distinguishably", async () => {
     expect((await getPolicy("bcm_" + "A".repeat(43))).status).toBe(401);
     expect(await (await getPolicy("whatever")).json()).toEqual({ error: "unauthorized" });
     expect((await call(new Request(`${BASE}/policy`))).status).toBe(401);
-    // The shared report token is not a machine token.
-    expect((await getPolicy(REPORT_TOKEN)).status).toBe(401);
+    // The admin token is not a machine token.
+    expect((await getPolicy(ADMIN_TOKEN)).status).toBe(401);
 
     const m = await enrolled();
     expect((await adminPost(`/admin/machine/${m.install_id}/revoke`)).status).toBe(303);
@@ -260,35 +259,19 @@ describe("reports from enrolled machines", () => {
     expect(list).toContain("an@acme.com");
   });
 
-  it("does not let the shared token write to an enrolled machine", async () => {
-    const m = await enrolled();
-    const res = await post(report({ install_id: m.install_id, email: "evil@acme.com" }));
-    expect(res.status).toBe(403);
+  it("does not let one machine's token write to another machine", async () => {
+    const an = await enrolled("an@acme.com");
+    const bo = await enrolled("bo@acme.com");
+    expect((await post(report({ install_id: an.install_id, email: "an@acme.com" }), { token: bo.token })).status).toBe(200);
+    const rows = await env.DB.prepare("SELECT install_id, email FROM machines").all<{ install_id: string; email: string }>();
+    expect(rows.results).toEqual([{ install_id: bo.install_id, email: "bo@acme.com" }]);
+  });
+
+  it("refuses reports without an enrolled machine's token", async () => {
+    expect((await post(report(), { token: null })).status).toBe(401);
+    expect((await post(report(), { token: ADMIN_TOKEN })).status).toBe(401);
+    expect((await call(new Request(`${BASE}/policies.json`))).status).toBe(404);
     expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM machines").first<number>("n")).toBe(0);
-  });
-});
-
-describe("legacy mode", () => {
-  it("is on by default: shared token and /policies.json work, machines show as legacy", async () => {
-    expect((await post(report())).status).toBe(200);
-    const list = await (await adminGet("/admin")).text();
-    expect(list).toContain("legacy");
-    const page = await (await adminGet(`/admin/machine/4f1c0000aaaabbbbccccdddd`)).text();
-    expect(page).toContain("legacy");
-    await call(new Request(`${BASE}/admin/policies.json`, { method: "PUT", headers: { authorization: `Bearer ${ADMIN_TOKEN}` }, body: "{}" }));
-    expect((await call(new Request(`${BASE}/policies.json`))).status).toBe(200);
-  });
-
-  it("off: the shared token and /policies.json stop working; machine tokens still do", async () => {
-    const off = { LEGACY_MODE: "off" };
-    const m = await enrolled();
-    expect((await post(report(), { e: off })).status).toBe(401);
-    expect((await post(report(), { e: { ...off, REPORT_TOKEN: "" } })).status).toBe(401);
-    expect((await call(new Request(`${BASE}/policies.json`), off)).status).toBe(410);
-    expect((await post(report(), { token: m.token, e: off })).status).toBe(200);
-    expect((await getPolicy(m.token, off)).status).toBe(200);
-    // Machine tokens need no REPORT_TOKEN at all.
-    expect((await post(report(), { token: m.token, e: { REPORT_TOKEN: "" } })).status).toBe(200);
   });
 });
 
@@ -305,7 +288,7 @@ describe("admin portal", () => {
     const m = await enrolled();
     const before = await env.DB.prepare("SELECT COUNT(*) AS n FROM audit").first<number>("n");
     for (const [method, path] of routes) {
-      for (const auth of [undefined, `Bearer ${REPORT_TOKEN}`, `Bearer ${m.token}`, "Bearer nope-nope-nope-nope"]) {
+      for (const auth of [undefined, `Bearer ${m.token}`, "Bearer nope-nope-nope-nope"]) {
         const headers: Record<string, string> = auth ? { authorization: auth } : {};
         const res = await call(new Request(BASE + path, { method, headers, body: method === "POST" ? new URLSearchParams({}) : undefined }));
         expect([303, 401], `${method} ${path} ${auth}`).toContain(res.status);
@@ -335,7 +318,7 @@ describe("admin portal", () => {
     };
     await bad("[1]");
     await bad("{nope");
-    expect(await bad(JSON.stringify({ report: { headers: { Authorization: "Bearer {{REPORT_TOKEN}}" } } }))).toContain("no report token");
+    expect(await bad(JSON.stringify({ report: { headers: { Authorization: "Bearer some-token" } } }))).toContain("no report token");
     expect(await bad(JSON.stringify({ reprot: {} }))).toContain("unknown field");
     expect(await bad(JSON.stringify({ checks: { firewal: {} } }))).toContain("unknown check");
     expect(await bad(JSON.stringify({ report: { interval: "5m" } }))).toContain("at least 15m");
@@ -423,7 +406,7 @@ describe("role policy helpers", () => {
     const now = new Date("2026-11-10T12:00:00Z");
     const p = composePolicy(
       {
-        report: { headers: { Authorization: "Bearer x", "X-Other": "keep", "X-Leak": "{{REPORT_TOKEN}}" } },
+        report: { headers: { Authorization: "Bearer x", "X-Other": "keep", authorization: "Bearer y" } },
         waivers: [
           { check: "docker", email: "AN@acme.com", until: "2026-12-01", reason: "ok" },
           { check: "docker", install_id: "other", until: "2026-12-01", reason: "no" },

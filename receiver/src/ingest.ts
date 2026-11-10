@@ -1,4 +1,4 @@
-import { bearer, reportAuth } from "./auth";
+import { bearer } from "./auth";
 import { type Enrollment, machineByToken } from "./enroll";
 import { config, DAY, type Env } from "./env";
 import { geoFromCf, parseGeo, publicIP } from "./geo";
@@ -46,28 +46,19 @@ interface PrevCheck {
   since: string;
 }
 
-// Live report links kept per machine: enrolled machines keep a few so a link
-// opened just as the next report lands still works; a legacy machine keeps
-// only the newest, because anyone with the shared token can report as any
-// legacy install_id and would otherwise hold a link to the real machine's
-// later results.
-const LINKS_ENROLLED = 3;
-const LINKS_LEGACY = 1;
+// Live report links kept per machine: a few, so a link opened just as the
+// next report lands still works.
+const LINKS_PER_MACHINE = 3;
 
-// handleReport takes a report. The bearer is either a machine token (from
-// /enroll), in which case install_id and email come from its enrollment and
-// whatever the body says is ignored, or, in legacy mode, the shared
-// REPORT_TOKEN. cf is request.cf, passed separately so tests can supply it.
+// handleReport takes a report. The bearer must be an enrolled machine's token
+// (from /enroll); install_id and email come from its enrollment and whatever
+// the body says is ignored. cf is request.cf, passed separately so tests can
+// supply it.
 export async function handleReport(req: Request, env: Env, now = new Date(), cf: unknown = (req as { cf?: unknown }).cf): Promise<Response> {
   const cfg = config(env);
   const machine: Enrollment | null = await machineByToken(env, bearer(req));
-  if (machine?.revoked_at) return json({ error: "revoked" }, 401, { "www-authenticate": "Bearer" });
-  if (!machine) {
-    if (!cfg.legacy) return json({ error: "unauthorized" }, 401, { "www-authenticate": "Bearer" });
-    const auth = await reportAuth(req, env);
-    if (auth === "unconfigured") return json({ error: "receiver has no REPORT_TOKEN set" }, 503);
-    if (auth === "unauthorized") return json({ error: "unauthorized" }, 401, { "www-authenticate": "Bearer" });
-  }
+  if (!machine) return json({ error: "unauthorized" }, 401, { "www-authenticate": "Bearer" });
+  if (machine.revoked_at) return json({ error: "revoked" }, 401, { "www-authenticate": "Bearer" });
 
   let text: string;
   try {
@@ -80,7 +71,7 @@ export async function handleReport(req: Request, env: Env, now = new Date(), cf:
   let rep;
   try {
     raw = JSON.parse(text);
-    if (machine && raw && typeof raw === "object" && !Array.isArray(raw)) {
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
       const o = raw as Record<string, unknown>;
       o.install_id = machine.install_id;
       o.email = machine.email;
@@ -100,15 +91,12 @@ export async function handleReport(req: Request, env: Env, now = new Date(), cf:
   const ts = now.toISOString();
   const db = env.DB;
   const id = rep.installId;
-  const [prevMachine, prevChecks, enrolledAs] = await Promise.all([
+  const [prevMachine, prevChecks] = await Promise.all([
     db.prepare("SELECT email, hostname, silent_alerted_at, last_seen, geo FROM machines WHERE install_id = ?")
       .bind(id)
       .first<{ email: string; hostname: string; silent_alerted_at: string | null; last_seen: string; geo: string }>(),
     db.prepare("SELECT check_id, status, severity, since FROM checks WHERE install_id = ?").bind(id).all<PrevCheck>(),
-    machine ? Promise.resolve(null) : db.prepare("SELECT 1 AS x FROM enrollments WHERE install_id = ?").bind(id).first(),
   ]);
-  // The shared token must not write to an enrolled machine's record.
-  if (enrolledAs) return json({ error: "this install_id is enrolled; report with its own token" }, 403);
   if (!prevMachine) {
     const n = await db.prepare("SELECT COUNT(*) AS n FROM machines").first<number>("n");
     if ((n ?? 0) >= cfg.maxMachines) return json({ error: "machine limit reached" }, 403);
@@ -226,7 +214,7 @@ export async function handleReport(req: Request, env: Env, now = new Date(), cf:
       db.prepare(
         `DELETE FROM report_links WHERE install_id = ?1 AND id NOT IN (
            SELECT id FROM report_links WHERE install_id = ?1 ORDER BY id DESC LIMIT ?2)`,
-      ).bind(id, machine ? LINKS_ENROLLED : LINKS_LEGACY),
+      ).bind(id, LINKS_PER_MACHINE),
     );
     reportUrl = `${new URL(req.url).origin}/r/${linkId}`;
   }

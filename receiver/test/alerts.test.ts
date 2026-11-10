@@ -1,15 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { chunk, lit, payload, runCron, webhookFormat } from "../src/alerts";
 import type { Env } from "../src/env";
 import { handleReport } from "../src/ingest";
-import { BASE, env, REPORT_TOKEN, report, result } from "./helpers";
+import { enrolled, env, report, reportRequest, result } from "./helpers";
 
 const DISCORD = "https://discord.com/api/webhooks/123/abc";
 const SLACK = "https://hooks.slack.com/services/T/B/X";
 
-function req(body: unknown) {
-  return new Request(`${BASE}/report`, { method: "POST", headers: { authorization: `Bearer ${REPORT_TOKEN}` }, body: JSON.stringify(body) });
-}
+// Reports come from one enrolled machine.
+let machine: { install_id: string; token: string };
+beforeEach(async () => {
+  machine = await enrolled();
+});
+const req = (body: unknown) => reportRequest(body, machine.token);
 const day = (d: number) => new Date(Date.UTC(2026, 10, d, 10));
 
 function recorder(fail = false) {
@@ -57,7 +60,7 @@ describe("cron", () => {
     const content: string = r.calls[0].body.content;
     expect(content).toContain("high-severity fail `firewall`");
     expect(content).toContain("`@everyone`");
-    expect(content).toContain("https://bordercheck.example.com/admin/machine/4f1c0000aaaabbbbccccdddd");
+    expect(content).toContain(`https://bordercheck.example.com/admin/machine/${machine.install_id}`);
     expect(r.calls[0].body.allowed_mentions).toEqual({ parse: [] });
 
     await handleReport(req(report()), e, day(2)); // still failing

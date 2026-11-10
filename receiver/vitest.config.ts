@@ -8,7 +8,6 @@ export default defineConfig({
       miniflare: {
         // Test-only values; real ones are Worker secrets.
         bindings: {
-          REPORT_TOKEN: "test-report-token-0123456789",
           ADMIN_TOKEN: "test-admin-token-0123456789",
           TEST_MIGRATIONS: await readD1Migrations("./migrations"),
         },

@@ -41,7 +41,7 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
     `SELECT m.email, m.hostname, m.last_seen, m.report
      FROM report_links l
      JOIN machines m ON m.install_id = l.install_id
-     LEFT JOIN enrollments e ON e.install_id = l.install_id
+     JOIN enrollments e ON e.install_id = l.install_id
      WHERE l.link_hash = ?1 AND ?2 = 1 AND l.expires_at > ?3 AND e.revoked_at IS NULL`,
   )
     .bind(h, LINK_RE.test(id) ? 1 : 0, now.toISOString())

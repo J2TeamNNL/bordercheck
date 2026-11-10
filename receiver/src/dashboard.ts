@@ -30,7 +30,6 @@ export const FILTERS = {
   failing: { label: "Failing", where: "m.fail > 0" },
   attention: { label: "Fail, error or warn", where: "(m.fail > 0 OR m.error > 0 OR m.warn > 0)" },
   silent: { label: "Silent", where: "m.last_seen < ?2" },
-  legacy: { label: "Legacy", where: "e.install_id IS NULL" },
   revoked: { label: "Revoked", where: "e.revoked_at IS NOT NULL" },
 } as const;
 export type Filter = keyof typeof FILTERS;
@@ -110,7 +109,7 @@ export async function machinesPage(env: Env, url: URL, who: string, now: number)
 <th>Fail</th><th>Error</th><th>Warn</th><th>Waived</th><th>State</th></tr></thead><tbody>
 ${rows.results.map(
     (m) => html`<tr><td><a href="${machineLink(m.install_id)}">${m.email || "(no email)"}</a></td>
-<td>${m.hostname}</td><td>${m.enrolled ? m.role : html`<span class="badge s-skip">legacy</span>`}${m.revoked_at ? html` <span class="badge s-fail">revoked</span>` : ""}</td>
+<td>${m.hostname}</td><td>${m.role ?? ""}${m.revoked_at ? html` <span class="badge s-fail">revoked</span>` : ""}</td>
 <td>${m.os}/${m.arch}</td><td>${m.version}</td>
 <td>${place(parseGeo(m.geo))}${m.public_ip ? html`<br><code class="muted">${m.public_ip}</code>` : ""}</td>
 <td title="${when(m.last_seen)}">${ago(m.last_seen, now)}</td>

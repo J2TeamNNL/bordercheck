@@ -77,7 +77,7 @@ export function layout(title: string, who: string | null, body: Html): Html {
 <title>${title} · bordercheck</title><style>${new Html(STYLE)}</style></head><body>
 <header><b>bordercheck</b>${
     who
-      ? html`<nav><a href="/admin">Machines</a><a href="/admin/checks">Checks</a><a href="/admin/alerts">Alerts</a><a href="/admin/roles">Roles</a><a href="/admin/invites">Invites</a><a href="/admin/audit">Audit</a><a href="/admin/policy">Legacy policy</a></nav>
+      ? html`<nav><a href="/admin">Machines</a><a href="/admin/checks">Checks</a><a href="/admin/alerts">Alerts</a><a href="/admin/roles">Roles</a><a href="/admin/invites">Invites</a><a href="/admin/audit">Audit</a></nav>
 <span class="who">${who}${
           who === "admin token"
             ? html` · <form method="post" action="/admin/logout" style="display:inline"><button>Sign out</button></form>`

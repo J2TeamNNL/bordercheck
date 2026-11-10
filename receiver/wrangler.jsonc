@@ -24,8 +24,8 @@
   // Hourly: silent machines, pending alerts, the digest, pruning.
   "triggers": { "crons": ["0 * * * *"] },
 
-  // Secrets are not set here. See README: REPORT_TOKEN, ADMIN_TOKEN,
-  // ALERT_WEBHOOK_URL, and optionally REPORT_TOKEN_PREVIOUS and POLICY_KEY.
+  // Secrets are not set here. See README: ADMIN_TOKEN, ALERT_WEBHOOK_URL,
+  // and optionally MCP_TOKEN / MCP_READ_TOKEN.
   "vars": {
     "DASHBOARD_URL": "",            // e.g. https://bordercheck.acme.com, for links in alerts
     "ACCESS_TEAM_DOMAIN": "",       // e.g. acme.cloudflareaccess.com
@@ -38,7 +38,6 @@
     "MAX_MACHINES": "10000",
 
     // Enrollment portal (see README "Enrollment").
-    "LEGACY_MODE": "on",            // "off" once every machine is enrolled: the shared REPORT_TOKEN stops working
     "INVITE_DAYS": "7",
 
     // Personal data about employees: see README "What is stored" before deploying.
