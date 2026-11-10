@@ -139,6 +139,9 @@
       "guardrails": true,
       "extra_paths": [],
       "ignore_paths": []
+    },
+    "cracked-software": {
+      "suggest_alternatives": true
     }
   }
 }

@@ -320,6 +320,25 @@ Continue and Zed, at the paths each vendor documents (on Linux and Windows only 
 | `extra_paths` | `[]` | More config files to scan for tokens. |
 | `ignore_paths` | `[]` | Globs of files to leave out. |
 
+### cracked-software
+
+Traces that cracks of paid software leave behind. Cracked installers are a common way to spread malware,
+information stealers above all, so any trace fails with high severity. The check never lists installed software
+and never goes online.
+
+| Looks for | Where |
+|---|---|
+| Adobe licensing and activation servers (`*.adobegenuine.com`; names under `adobe.com` and `adobe.io` that hold `activat`, `licens` or `genuine`, `3dns-…` and a few known ones such as `ic.adobe.io`) or Autodesk's (`activat`, `licens`, `genuine` under `autodesk.com`) sent to `0.0.0.0`, `::` or a loopback address in the hosts file | every OS (`/etc/hosts`; `%SystemRoot%\System32\drivers\etc\hosts`) |
+| Windows or Microsoft Office set to activate against a KMS server on the machine itself (loopback or `localhost`), which only a KMS emulator such as KMSpico or KMS_VL_ALL answers. A company KMS server on the network passes. | Windows |
+| KMSpico installed (`Program Files\KMSpico`) or its AutoKMS scheduler (`%SystemRoot%\AutoKMS`) | Windows |
+
+| Field | Default | |
+|---|---|---|
+| `suggest_alternatives` | `true` | The fix names free, open-source replacements from [ArtCraft](https://getartcraft.com) for the products found: PhotoCraft, VectorCraft, FilmCraft, LightCraft, EffectCraft, DesignCraft and PdfCraft for Adobe; WordCraft, GridCraft and DeckCraft for Office; CADCraft for Autodesk. Set it to `false` if your organisation provides licences instead. |
+
+The fix always says to remove the crack and its hosts entries, run a full malware scan, change the passwords and
+tokens used on the machine, and ask IT for a licensed copy.
+
 ## A fuller example
 
 ```json

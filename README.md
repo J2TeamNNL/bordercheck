@@ -25,6 +25,7 @@ it reports to your organisation on a schedule.
 | `ssh-keys` | Private keys without a passphrase or readable by others; who can log in through `authorized_keys` |
 | `tunnels` | ngrok, cloudflared, `tailscale funnel`/`serve`, VS Code tunnels, `ssh -R` and others |
 | `ai-agents` | Plain-text tokens in MCP and agent configs, and settings that skip approvals or the sandbox |
+| `cracked-software` | Traces of cracked Adobe, Autodesk, Windows or Office (blocked licensing servers, KMS emulators, KMSpico); suggests free alternatives |
 
 `os-updates`, `screen-lock` and `remote-access` never go online: they judge what the machine already knows.
 Details and options for each: [Policies](docs/policies.md#checks).

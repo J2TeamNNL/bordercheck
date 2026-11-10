@@ -37,6 +37,7 @@ func All(p policy.Policy) []check.Check {
 		{check.Check{ID: "ssh-keys", Title: "SSH keys are protected", Run: sshKeys(c.SSHKeys)}, c.SSHKeys.Common},
 		{check.Check{ID: "tunnels", Title: "Nothing is tunnelled to the internet", Run: tunnels(c.Tunnels)}, c.Tunnels.Common},
 		{check.Check{ID: "ai-agents", Title: "AI agents keep their guardrails", Run: aiAgents(c.AIAgents, c.Secrets)}, c.AIAgents.Common},
+		{check.Check{ID: "cracked-software", Title: "No cracked software", Run: crackedSoftware(c.CrackedSoftware)}, c.CrackedSoftware.Common},
 	}
 	var out []check.Check
 	for _, a := range all {

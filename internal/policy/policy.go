@@ -81,6 +81,8 @@ type Checks struct {
 	Tunnels        Tunnels   `json:"tunnels"`
 	AIAgents       AIAgents  `json:"ai-agents"`
 
+	CrackedSoftware CrackedSoftware `json:"cracked-software"`
+
 	OSUpdates    OSUpdates    `json:"os-updates"`
 	ScreenLock   ScreenLock   `json:"screen-lock"`
 	RemoteAccess RemoteAccess `json:"remote-access"`
@@ -192,6 +194,13 @@ type AIAgents struct {
 	IgnorePaths []string `json:"ignore_paths"` // globs on the shown path
 }
 
+// CrackedSoftware looks for traces of cracked paid software (Adobe, Autodesk,
+// Windows and Microsoft Office activation).
+type CrackedSoftware struct {
+	Common
+	SuggestAlternatives bool `json:"suggest_alternatives"` // the fix names free, open-source replacements
+}
+
 type SecretPattern struct {
 	Kind     string `json:"kind"`
 	Regex    string `json:"regex"`
@@ -268,7 +277,8 @@ func Default() Policy {
 			SSHKeys:      SSHKeys{NoPassphrase: true, LoosePermissions: true, AuthorizedKeys: true, AllowKeys: []string{}},
 			Tunnels: Tunnels{Processes: true, TailscaleFunnel: true, TailscaleServe: true, Allow: []string{},
 				LowerSeverity: []string{"cloudflared"}},
-			AIAgents: AIAgents{Tokens: true, Guardrails: true, ExtraPaths: []string{}, IgnorePaths: []string{}},
+			AIAgents:        AIAgents{Tokens: true, Guardrails: true, ExtraPaths: []string{}, IgnorePaths: []string{}},
+			CrackedSoftware: CrackedSoftware{SuggestAlternatives: true},
 		},
 	}
 }
@@ -373,6 +383,7 @@ func (p Policy) validate() error {
 		"docker": c.Docker.OnProblem, "secrets": c.Secrets.OnProblem,
 		"os-updates": c.OSUpdates.OnProblem, "screen-lock": c.ScreenLock.OnProblem, "remote-access": c.RemoteAccess.OnProblem,
 		"ssh-keys": c.SSHKeys.OnProblem, "tunnels": c.Tunnels.OnProblem, "ai-agents": c.AIAgents.OnProblem,
+		"cracked-software": c.CrackedSoftware.OnProblem,
 	} {
 		if on != "" && on != check.Fail && on != check.Warn {
 			return fmt.Errorf("checks.%s.on_problem must be \"fail\" or \"warn\", not %q", id, on)
