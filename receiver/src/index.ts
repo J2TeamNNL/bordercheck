@@ -23,6 +23,7 @@ import {
   invitesPage,
   type MachineAction,
   machineAction,
+  machineParams,
   reissueInvite,
   revokeInvite,
   rolePage,
@@ -30,6 +31,7 @@ import {
   updateRole,
 } from "./portal";
 import { selfReportPage } from "./selfreport";
+import { handleMcp } from "./mcp";
 
 const MAX_FORM_BYTES = 512 * 1024;
 
@@ -108,7 +110,7 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
   if (m && req.method === "POST") {
     const action = (m[3] ? "remove-waiver" : m[2]) as MachineAction;
     const form = await formOf(req);
-    const r = await machineAction(env, v.who, m[1], action, form, Number(m[3] ?? 0));
+    const r = await machineAction(env, v.who, m[1], action, machineParams(form, Number(m[3] ?? 0)));
     if (r.error) return page(layout("Not done", v.who, html`<h1>Not done</h1><div class="note">${r.error}</div><p><a href="/admin/machine/${m[1]}">Back</a></p>`), r.status);
     return redirect(`/admin/machine/${m[1]}`);
   }
@@ -127,7 +129,7 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
   if (m && req.method === "POST") {
     return m[2] === "revoke" ? revokeInvite(env, url, v.who, Number(m[1])) : reissueInvite(env, req, url, v.who, Number(m[1]));
   }
-  if (path === "/admin/audit" && req.method === "GET") return auditPage(env, v.who);
+  if (path === "/admin/audit" && req.method === "GET") return auditPage(env, url, v.who);
 
   if (path === "/admin/policy" && req.method === "GET") return policyPage(env, v.who);
   if ((path === "/admin/policy" && req.method === "POST") || (path === "/admin/policies.json" && req.method === "PUT")) {
@@ -163,6 +165,7 @@ export default {
     if (cap && req.method === "GET") return invitePage(req, env, cap[1]);
     cap = /^\/r\/([^/]{1,200})$/.exec(path);
     if (cap && req.method === "GET") return selfReportPage(req, env, cap[1]);
+    if (path === "/mcp") return handleMcp(req, env);
     if (path === "/healthz") return new Response("ok\n", { headers: { "cache-control": "no-store" } });
     if (path === "/" || path === "") return redirect("/admin");
     if (path === "/admin" || path.startsWith("/admin/")) return admin(req, env, url);

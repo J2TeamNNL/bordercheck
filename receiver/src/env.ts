@@ -7,6 +7,9 @@ export interface Env {
   ADMIN_TOKEN?: string; // dashboard login for people without Cloudflare Access
   ALERT_WEBHOOK_URL?: string; // Discord or Slack incoming webhook, or any URL taking JSON
   POLICY_KEY?: string; // if set, GET /policies.json needs ?key=<POLICY_KEY>
+  MCP_TOKEN?: string; // bearer token for the MCP server at /mcp: read and write tools
+  MCP_READ_TOKEN?: string; // bearer token for the MCP server: read-only tools
+  // Neither set (or both shorter than 16 characters): /mcp answers 404.
 
   // Vars (wrangler.jsonc "vars").
   ACCESS_TEAM_DOMAIN?: string; // e.g. acme.cloudflareaccess.com
@@ -29,6 +32,7 @@ export interface Env {
   ENROLL_RATE_LIMIT?: string; // /enroll attempts per client IP per window (10)
   PAGE_RATE_LIMIT?: string; // /i/<code> and /r/<id> views per client IP per window (60)
   RATE_WINDOW_SECONDS?: string; // (600)
+  MCP_RATE_LIMIT?: string; // /mcp requests per client IP per window (300)
 
   // Where reports come from. Personal data: see README "What is stored".
   STORE_PUBLIC_IP?: string; // "on" (default) | "off": public IP and the machine's local addresses
@@ -83,6 +87,7 @@ export const config = (env: Env) => ({
   enrollRateLimit: num(env.ENROLL_RATE_LIMIT, 10, 1),
   pageRateLimit: num(env.PAGE_RATE_LIMIT, 60, 1),
   rateWindow: num(env.RATE_WINDOW_SECONDS, 600, 10),
+  mcpRateLimit: num(env.MCP_RATE_LIMIT, 300, 1),
   storeIp: flag(env.STORE_PUBLIC_IP, true),
   storeGeo: flag(env.STORE_GEO, true),
   alertNewCountry: flag(env.ALERT_NEW_COUNTRY, false),

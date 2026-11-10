@@ -4,7 +4,7 @@ import { type Geo, mapLink, parseGeo, place } from "./geo";
 import { enrollmentOf, enrollmentSection } from "./portal";
 import { type DeviceLocation, parseReport, type Result, statusRank } from "./report";
 
-interface MachineRow {
+export interface MachineRow {
   install_id: string;
   email: string;
   hostname: string;
@@ -25,7 +25,7 @@ interface MachineRow {
   other: number;
 }
 
-const FILTERS = {
+export const FILTERS = {
   all: { label: "All", where: "1 = 1" },
   failing: { label: "Failing", where: "m.fail > 0" },
   attention: { label: "Fail, error or warn", where: "(m.fail > 0 OR m.error > 0 OR m.warn > 0)" },
@@ -33,7 +33,41 @@ const FILTERS = {
   legacy: { label: "Legacy", where: "e.install_id IS NULL" },
   revoked: { label: "Revoked", where: "e.revoked_at IS NOT NULL" },
 } as const;
-type Filter = keyof typeof FILTERS;
+export type Filter = keyof typeof FILTERS;
+
+export type MachineListRow = MachineRow & { public_ip: string; geo: string; enrolled: number; revoked_at: string | null; role: string | null };
+
+// machineRows is the machine list (dashboard front page, MCP list_machines):
+// a filter, a substring of email or hostname, and optionally only machines
+// whose latest report has `check` at `checkStatus`.
+export async function machineRows(
+  env: Env,
+  o: { filter: Filter; q: string; silentBefore: string; limit: number; check?: string; checkStatus?: string; roleId?: number },
+): Promise<MachineListRow[]> {
+  const like = `%${o.q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+  const rows = await env.DB.prepare(
+    `SELECT m.install_id, m.email, m.hostname, m.os, m.arch, m.version, m.policy, m.first_seen, m.last_seen, m.report_time,
+            m.fail, m.high_fail, m.error, m.warn, m.waived, m.pass, m.skip, m.other, m.public_ip, m.geo,
+            e.install_id IS NOT NULL AS enrolled, e.revoked_at, r.name AS role
+     FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id LEFT JOIN roles r ON r.id = e.role_id
+     WHERE ${FILTERS[o.filter].where} AND (?1 = '' OR m.email LIKE ?3 ESCAPE '\\' OR m.hostname LIKE ?3 ESCAPE '\\')
+       AND (?5 = '' OR EXISTS (SELECT 1 FROM checks c WHERE c.install_id = m.install_id AND c.check_id = ?5 AND (?6 = '' OR c.status = ?6)))
+       AND (?7 = 0 OR e.role_id = ?7)
+     ORDER BY m.fail > 0 DESC, m.high_fail DESC, m.fail DESC, m.last_seen DESC LIMIT ?4`,
+  )
+    .bind(o.q, o.silentBefore, like, o.limit, o.check ?? "", o.checkStatus ?? "", o.roleId ?? 0)
+    .all<MachineListRow>();
+  return rows.results;
+}
+
+export async function waitingRows(env: Env, limit: number) {
+  const r = await env.DB.prepare(
+    `SELECT e.install_id, e.email, e.hostname, e.enrolled_at, r.name AS role FROM enrollments e JOIN roles r ON r.id = e.role_id
+     WHERE e.revoked_at IS NULL AND NOT EXISTS (SELECT 1 FROM machines m WHERE m.install_id = e.install_id)
+     ORDER BY e.enrolled_at DESC LIMIT ?`,
+  ).bind(limit).all<{ install_id: string; email: string; hostname: string; enrolled_at: string; role: string }>();
+  return r.results;
+}
 
 function state(m: MachineRow, silentBefore: string): Html {
   const parts: Html[] = [];
@@ -51,22 +85,8 @@ export async function machinesPage(env: Env, url: URL, who: string, now: number)
   const filter: Filter = f in FILTERS ? f : "all";
   const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
   const silentBefore = new Date(now - config(env).silentDays * DAY).toISOString();
-  const like = `%${q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
-  const rows = await env.DB.prepare(
-    `SELECT m.install_id, m.email, m.hostname, m.os, m.arch, m.version, m.policy, m.first_seen, m.last_seen, m.report_time,
-            m.fail, m.high_fail, m.error, m.warn, m.waived, m.pass, m.skip, m.other, m.public_ip, m.geo,
-            e.install_id IS NOT NULL AS enrolled, e.revoked_at, r.name AS role
-     FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id LEFT JOIN roles r ON r.id = e.role_id
-     WHERE ${FILTERS[filter].where} AND (?1 = '' OR m.email LIKE ?3 ESCAPE '\\' OR m.hostname LIKE ?3 ESCAPE '\\')
-     ORDER BY m.fail > 0 DESC, m.high_fail DESC, m.fail DESC, m.last_seen DESC LIMIT 2000`,
-  )
-    .bind(q, silentBefore, like)
-    .all<MachineRow & { public_ip: string; geo: string; enrolled: number; revoked_at: string | null; role: string | null }>();
-  const waiting = await env.DB.prepare(
-    `SELECT e.install_id, e.email, e.hostname, e.enrolled_at, r.name AS role FROM enrollments e JOIN roles r ON r.id = e.role_id
-     WHERE e.revoked_at IS NULL AND NOT EXISTS (SELECT 1 FROM machines m WHERE m.install_id = e.install_id)
-     ORDER BY e.enrolled_at DESC LIMIT 500`,
-  ).all<{ install_id: string; email: string; hostname: string; enrolled_at: string; role: string }>();
+  const rows = { results: await machineRows(env, { filter, q, silentBefore, limit: 2000 }) };
+  const waiting = { results: await waitingRows(env, 500) };
   const totals = await env.DB.prepare(
     `SELECT COUNT(*) AS n, SUM(fail > 0) AS failing, SUM(last_seen < ?1) AS silent FROM machines`,
   )
@@ -144,7 +164,7 @@ function changes(prev: Record<string, string> | null, cur: Record<string, string
   return out;
 }
 
-function parseStatuses(s: string): Record<string, string> {
+export function parseStatuses(s: string): Record<string, string> {
   try {
     const v = JSON.parse(s);
     return v && typeof v === "object" ? v : {};
@@ -279,7 +299,7 @@ export async function forgetMachine(env: Env, id: string): Promise<void> {
   ]);
 }
 
-interface CheckStat {
+export interface CheckStat {
   check_id: string;
   title: string;
   fail: number;
@@ -291,13 +311,19 @@ interface CheckStat {
   total: number;
 }
 
-export async function checksPage(env: Env, who: string): Promise<Response> {
+// checkStats: each check across all machines' latest reports, most failing first.
+export async function checkStats(env: Env, limit = 1000): Promise<CheckStat[]> {
   const rows = await env.DB.prepare(
     `SELECT check_id, MAX(title) AS title, SUM(status = 'fail') AS fail, SUM(status = 'fail' AND severity = 'high') AS high,
             SUM(status = 'error') AS error, SUM(status = 'warn') AS warn, SUM(status = 'waived') AS waived,
             SUM(status = 'pass') AS pass, COUNT(*) AS total
-     FROM checks GROUP BY check_id ORDER BY fail DESC, high DESC, error DESC, warn DESC, check_id`,
-  ).all<CheckStat>();
+     FROM checks GROUP BY check_id ORDER BY fail DESC, high DESC, error DESC, warn DESC, check_id LIMIT ?`,
+  ).bind(limit).all<CheckStat>();
+  return rows.results;
+}
+
+export async function checksPage(env: Env, who: string): Promise<Response> {
+  const rows = { results: await checkStats(env) };
   const cell = (id: string, status: string, n: number) =>
     n ? html`<a class="${statusClass(status)}" href="/admin/checks/${encodeURIComponent(id)}?status=${status}">${n}</a>` : html`<span class="muted">0</span>`;
   const body = html`<h1>Checks across all machines</h1>
@@ -335,10 +361,26 @@ ${rows.results.map(
   return page(layout(title, who, body));
 }
 
-export async function alertsPage(env: Env, who: string): Promise<Response> {
+export interface AlertListRow {
+  id: number;
+  kind: string;
+  install_id: string;
+  check_id: string;
+  detail: string;
+  created_at: string;
+  sent_at: string | null;
+  delivery: string;
+}
+
+export async function alertRows(env: Env, limit: number, pendingOnly = false): Promise<AlertListRow[]> {
   const rows = await env.DB.prepare(
-    "SELECT id, kind, install_id, check_id, detail, created_at, sent_at, delivery FROM alerts ORDER BY id DESC LIMIT 200",
-  ).all<{ id: number; kind: string; install_id: string; check_id: string; detail: string; created_at: string; sent_at: string | null; delivery: string }>();
+    "SELECT id, kind, install_id, check_id, detail, created_at, sent_at, delivery FROM alerts WHERE ?1 = 0 OR sent_at IS NULL ORDER BY id DESC LIMIT ?2",
+  ).bind(pendingOnly ? 1 : 0, limit).all<AlertListRow>();
+  return rows.results;
+}
+
+export async function alertsPage(env: Env, who: string): Promise<Response> {
+  const rows = { results: await alertRows(env, 200) };
   const body = html`<h1>Alerts</h1>
 <p class="muted">Raised by reports and the hourly cron; delivered to the webhook by the cron.${
     env.ALERT_WEBHOOK_URL ? "" : " No webhook is set (ALERT_WEBHOOK_URL), so they are only listed here."
