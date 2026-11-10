@@ -185,8 +185,13 @@ export async function viewer(req: Request, env: Env, now = Date.now()): Promise<
 
 // sameOrigin guards state-changing requests made with cookies (Access or our
 // session) against cross-site form posts.
+//
+// Our pages send Referrer-Policy: no-referrer, and under that policy browsers
+// send "Origin: null" on a form post, even a same-origin one. So "null" says
+// nothing either way and Sec-Fetch-Site decides, as it does when Origin is
+// absent. A page cannot set either header.
 export function sameOrigin(req: Request): boolean {
   const origin = req.headers.get("origin");
-  if (origin) return origin === new URL(req.url).origin;
+  if (origin && origin !== "null") return origin === new URL(req.url).origin;
   return req.headers.get("sec-fetch-site") === "same-origin";
 }

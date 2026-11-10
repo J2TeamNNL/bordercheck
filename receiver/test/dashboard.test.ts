@@ -47,6 +47,24 @@ describe("dashboard auth", () => {
     expect((await forget(BASE)).status).toBe(303);
     expect((await adminGet(`/admin/machine/${ID}`)).status).toBe(404);
   });
+
+  it("accepts a browser's form post, which says Origin: null under no-referrer", async () => {
+    // What Chrome, Firefox and Safari send from a page with Referrer-Policy: no-referrer.
+    const browser = (site: string) =>
+      call(new Request(`${BASE}/admin/login`, {
+        method: "POST",
+        headers: { origin: "null", "sec-fetch-site": site },
+        body: new URLSearchParams({ token: ADMIN_TOKEN }),
+      }));
+    expect((await browser("same-origin")).status).toBe(303);
+    expect((await browser("cross-site")).status).toBe(403);
+    expect((await browser("same-site")).status).toBe(403);
+    // "null" with no Sec-Fetch-Site proves nothing.
+    const bare = await call(new Request(`${BASE}/admin/login`, { method: "POST", headers: { origin: "null" }, body: new URLSearchParams({ token: ADMIN_TOKEN }) }));
+    expect(bare.status).toBe(403);
+    // The sign-in page really is served with no-referrer, which is what makes browsers do this.
+    expect((await call(new Request(`${BASE}/admin/login`))).headers.get("referrer-policy")).toBe("no-referrer");
+  });
 });
 
 describe("dashboard pages", () => {
