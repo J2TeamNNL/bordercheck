@@ -11,9 +11,9 @@ export const json = (body: unknown, status = 200, headers: Record<string, string
     headers: { "content-type": "application/json", "cache-control": "no-store", ...headers },
   });
 
-class TooLarge extends Error {}
+export class TooLarge extends Error {}
 
-async function readLimited(req: Request, max: number): Promise<string> {
+export async function readLimited(req: Request, max: number): Promise<string> {
   const len = Number(req.headers.get("content-length") ?? "0");
   if (len > max) throw new TooLarge();
   if (!req.body) return "";
