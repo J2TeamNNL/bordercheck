@@ -342,9 +342,10 @@ export const vi: Catalog = {
 
   "audit.eyebrow": "Truy vết",
   "audit.title": "Nhật ký thay đổi",
-  "audit.lead": "Mọi thay đổi thực hiện trên trang quản trị, bằng token quản trị hoặc qua MCP server, và mọi lần đăng ký máy. Mới nhất trước, 500 mục gần nhất. Các dòng MCP ghi lại công cụ và tham số: hãy xem lại tại đây những gì mô hình đã làm.",
+  "audit.lead": "Mọi thay đổi thực hiện trên trang quản trị, bằng token quản trị, qua MCP server hoặc qua REST API, và mọi lần đăng ký máy. Mới nhất trước, 500 mục gần nhất. Các dòng MCP ghi lại công cụ và tham số (hãy xem lại tại đây những gì mô hình đã làm); các dòng API ghi lại phương thức, đường dẫn và tham số.",
   "audit.all": "tất cả",
   "audit.mcpOnly": "Chỉ MCP",
+  "audit.apiOnly": "Chỉ API",
   "audit.thWhen": "Thời điểm",
   "audit.thWho": "Người thực hiện",
   "audit.thAction": "Hành động",

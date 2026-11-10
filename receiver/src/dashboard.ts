@@ -44,37 +44,79 @@ export type MachineListRow = MachineRow & {
   failing_since: string | null; // the oldest `since` among its failing checks
 };
 
-// machineRows is the machine list (dashboard front page, MCP list_machines):
-// a filter, a substring of email or hostname, and optionally only machines
-// whose latest report has `check` at `checkStatus`.
-export async function machineRows(
-  env: Env,
-  o: { filter: Filter; q: string; silentBefore: string; limit: number; check?: string; checkStatus?: string; roleId?: number },
-): Promise<MachineListRow[]> {
-  const like = `%${o.q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+// machineRows is the machine list (dashboard front page, MCP list_machines,
+// REST GET /machines): a filter, a substring of email or hostname, and
+// optionally only machines whose latest report has `check` at `checkStatus`.
+// Worst first by default; byId orders by install_id and starts after `after`,
+// which is what a cursor needs (stable while reports keep arriving).
+export interface MachineQuery {
+  filter: Filter;
+  q: string;
+  silentBefore: string;
+  limit: number;
+  check?: string;
+  checkStatus?: string;
+  roleId?: number;
+  byId?: boolean;
+  after?: string;
+}
+
+const MACHINE_FROM = `FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id LEFT JOIN roles r ON r.id = e.role_id`;
+const machineWhere = (filter: Filter) =>
+  `WHERE ${FILTERS[filter].where} AND (?1 = '' OR m.email LIKE ?3 ESCAPE '\\' OR m.hostname LIKE ?3 ESCAPE '\\')
+       AND (?5 = '' OR EXISTS (SELECT 1 FROM checks c WHERE c.install_id = m.install_id AND c.check_id = ?5 AND (?6 = '' OR c.status = ?6)))
+       AND (?7 = 0 OR e.role_id = ?7) AND (?8 = '' OR m.install_id > ?8)`;
+const machineBinds = (o: MachineQuery, after: string) =>
+  [o.q, o.silentBefore, `%${o.q.replace(/[\\%_]/g, (c) => "\\" + c)}%`, o.limit, o.check ?? "", o.checkStatus ?? "", o.roleId ?? 0, after];
+
+export async function machineRows(env: Env, o: MachineQuery): Promise<MachineListRow[]> {
+  const order = o.byId ? "m.install_id" : "m.fail > 0 DESC, m.high_fail DESC, m.fail DESC, m.last_seen DESC";
   const rows = await env.DB.prepare(
     `SELECT m.install_id, m.email, m.hostname, m.os, m.arch, m.version, m.policy, m.first_seen, m.last_seen, m.report_time,
             m.fail, m.high_fail, m.error, m.warn, m.waived, m.pass, m.skip, m.other, m.public_ip, m.geo,
             e.install_id IS NOT NULL AS enrolled, e.revoked_at, r.name AS role,
             (SELECT MIN(c.since) FROM checks c WHERE c.install_id = m.install_id AND c.status = 'fail') AS failing_since
-     FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id LEFT JOIN roles r ON r.id = e.role_id
-     WHERE ${FILTERS[o.filter].where} AND (?1 = '' OR m.email LIKE ?3 ESCAPE '\\' OR m.hostname LIKE ?3 ESCAPE '\\')
-       AND (?5 = '' OR EXISTS (SELECT 1 FROM checks c WHERE c.install_id = m.install_id AND c.check_id = ?5 AND (?6 = '' OR c.status = ?6)))
-       AND (?7 = 0 OR e.role_id = ?7)
-     ORDER BY m.fail > 0 DESC, m.high_fail DESC, m.fail DESC, m.last_seen DESC LIMIT ?4`,
+     ${MACHINE_FROM}
+     ${machineWhere(o.filter)}
+     ORDER BY ${order} LIMIT ?4`,
   )
-    .bind(o.q, o.silentBefore, like, o.limit, o.check ?? "", o.checkStatus ?? "", o.roleId ?? 0)
+    .bind(...machineBinds(o, o.byId ? o.after ?? "" : ""))
     .all<MachineListRow>();
   return rows.results;
 }
 
-export async function waitingRows(env: Env, limit: number) {
+// machineCount: how many machines machineRows would list without a limit or cursor.
+export async function machineCount(env: Env, o: MachineQuery): Promise<number> {
+  const n = await env.DB.prepare(`SELECT COUNT(*) AS n ${MACHINE_FROM} ${machineWhere(o.filter)} AND ?4 = ?4`)
+    .bind(...machineBinds(o, ""))
+    .first<number>("n");
+  return n ?? 0;
+}
+
+// waitingRows: enrolled machines that never reported, newest enrollment
+// first; with byId, by install_id after `after` (for a cursor), optionally
+// narrowed by a substring of email or hostname and by role.
+export async function waitingRows(env: Env, limit: number, o: { byId?: boolean; after?: string; q?: string; roleId?: number } = {}) {
+  const q = o.q ?? "";
+  const like = `%${q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
   const r = await env.DB.prepare(
     `SELECT e.install_id, e.email, e.hostname, e.enrolled_at, r.name AS role FROM enrollments e JOIN roles r ON r.id = e.role_id
      WHERE e.revoked_at IS NULL AND NOT EXISTS (SELECT 1 FROM machines m WHERE m.install_id = e.install_id)
-     ORDER BY e.enrolled_at DESC LIMIT ?`,
-  ).bind(limit).all<{ install_id: string; email: string; hostname: string; enrolled_at: string; role: string }>();
+       AND (?2 = '' OR e.install_id > ?2) AND (?3 = '' OR e.email LIKE ?4 ESCAPE '\\' OR e.hostname LIKE ?4 ESCAPE '\\') AND (?5 = 0 OR e.role_id = ?5)
+     ORDER BY ${o.byId ? "e.install_id" : "e.enrolled_at DESC"} LIMIT ?1`,
+  ).bind(limit, o.byId ? o.after ?? "" : "", q, like, o.roleId ?? 0).all<{ install_id: string; email: string; hostname: string; enrolled_at: string; role: string }>();
   return r.results;
+}
+
+export async function waitingCount(env: Env, o: { q?: string; roleId?: number } = {}): Promise<number> {
+  const q = o.q ?? "";
+  const like = `%${q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+  const n = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM enrollments e
+     WHERE e.revoked_at IS NULL AND NOT EXISTS (SELECT 1 FROM machines m WHERE m.install_id = e.install_id)
+       AND (?1 = '' OR e.email LIKE ?2 ESCAPE '\\' OR e.hostname LIKE ?2 ESCAPE '\\') AND (?3 = 0 OR e.role_id = ?3)`,
+  ).bind(q, like, o.roleId ?? 0).first<number>("n");
+  return n ?? 0;
 }
 
 // The state of a machine as one pill (worst first), plus "silent".
@@ -451,10 +493,11 @@ export interface AlertListRow {
   delivery: string;
 }
 
-export async function alertRows(env: Env, limit: number, pendingOnly = false): Promise<AlertListRow[]> {
+// alertRows: newest first; `before` (an alert id) is where a cursor resumes.
+export async function alertRows(env: Env, limit: number, pendingOnly = false, before = 0): Promise<AlertListRow[]> {
   const rows = await env.DB.prepare(
-    "SELECT id, kind, install_id, check_id, detail, created_at, sent_at, delivery FROM alerts WHERE ?1 = 0 OR sent_at IS NULL ORDER BY id DESC LIMIT ?2",
-  ).bind(pendingOnly ? 1 : 0, limit).all<AlertListRow>();
+    "SELECT id, kind, install_id, check_id, detail, created_at, sent_at, delivery FROM alerts WHERE (?1 = 0 OR sent_at IS NULL) AND (?3 = 0 OR id < ?3) ORDER BY id DESC LIMIT ?2",
+  ).bind(pendingOnly ? 1 : 0, limit, before).all<AlertListRow>();
   return rows.results;
 }
 

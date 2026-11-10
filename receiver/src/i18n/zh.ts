@@ -341,9 +341,10 @@ export const zh: Catalog = {
 
   "audit.eyebrow": "可追溯",
   "audit.title": "审计日志",
-  "audit.lead": "记录在控制台中、通过管理员令牌或 MCP 服务器所做的每项更改，以及每次设备注册。按时间倒序，显示最近 500 条。MCP 记录包含工具名称及其参数，可在此审查模型做了什么。",
+  "audit.lead": "记录在控制台中、通过管理员令牌、MCP 服务器或 REST API 所做的每项更改，以及每次设备注册。按时间倒序，显示最近 500 条。MCP 记录包含工具名称及其参数（可在此审查模型做了什么）；API 记录包含请求方法、路径和参数。",
   "audit.all": "全部",
   "audit.mcpOnly": "仅 MCP",
+  "audit.apiOnly": "仅 API",
   "audit.thWhen": "时间",
   "audit.thWho": "操作者",
   "audit.thAction": "操作",
