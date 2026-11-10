@@ -1,7 +1,7 @@
 import { config, DAY, type Env } from "./env";
-import { badge, count, html, type Html, layout, note, page, pct, pill, sev, statusClass } from "./html";
+import { badge, count, html, type Html, layout, linkify, note, page, pct, pill, sev, statusClass } from "./html";
 import { type Geo, mapLink, parseGeo, place } from "./geo";
-import type { I18n, Key } from "./i18n";
+import { checkTitle, type I18n, type Key } from "./i18n";
 import { enrollmentOf, enrollmentSection } from "./portal";
 import { type DeviceLocation, parseReport, type Result, statusRank } from "./report";
 
@@ -146,7 +146,7 @@ ${n
 ${topFailing.length
     ? html`<div class="shelf"><h2>${L.t("top.title")}</h2><a href="/admin/checks">${L.t("top.all")}</a></div>
 <div class="shelf-row">${topFailing.map(
-        (c) => html`<a class="card" href="/admin/checks/${encodeURIComponent(c.check_id)}?status=fail"><span class="t">${c.title || c.check_id}</span><code class="muted">${c.check_id}</code>
+        (c) => html`<a class="card" href="/admin/checks/${encodeURIComponent(c.check_id)}?status=fail"><span class="t">${checkTitle(L, c.check_id, c.title)}</span><code class="muted">${c.check_id}</code>
 <span class="meta"><span class="big">${L.num(c.fail)}</span>${L.t("top.failing")}${c.high ? html` · ${L.t("top.high", { n: c.high })}` : ""} · ${L.t("top.of", { n: c.total })}</span></a>`,
       )}</div>`
     : ""}`;
@@ -273,11 +273,11 @@ function whereSection(L: I18n, m: { public_ip: string; geo: string; local_ips: s
 
 function resultCard(L: I18n, r: Result, since: string | undefined, now: number): Html {
   return html`<div class="result ${statusClass(r.status)}"><div class="head">${badge(L, r.status)} ${sev(L, r.severity)}
-<h3>${r.title || r.id}</h3> <code class="muted">${r.id}</code>${since ? html`<span class="since">${L.t("machine.since", { when: L.when(since) })}</span>` : ""}</div>
+<h3>${checkTitle(L, r.id, r.title)}</h3> <code class="muted">${r.id}</code>${since ? html`<span class="since">${L.t("machine.since", { when: L.when(since) })}</span>` : ""}</div>
 ${waiverNote(L, r, now)}
 ${r.summary ? html`<div class="body">${r.summary}</div>` : ""}
 ${r.evidence.length ? html`<ul class="evidence">${r.evidence.map((e) => html`<li class="ev">${e}</li>`)}</ul>` : ""}
-${r.fix ? html`<div class="fix"><b>${L.t("machine.fix")}</b><span>${r.fix}</span></div>` : ""}</div>`;
+${r.fix ? html`<div class="fix"><b>${L.t("machine.fix")}</b><span>${linkify(r.fix)}</span></div>` : ""}</div>`;
 }
 
 function statTile(L: I18n, n: number, label: Html, tone: string): Html {
@@ -345,7 +345,7 @@ ${problems.map((r) => resultCard(L, r, since.get(r.id), now))}
 <h2>${L.t("machine.fine", { n: fine.length })}</h2>
 ${fine.length
     ? html`<div class="compact">${fine.map(
-        (r) => html`<div>${badge(L, r.status)}<div><div class="t">${r.title || r.id}</div><div class="sub"><code>${r.id}</code>${r.summary ? html` · ${r.summary}` : ""}</div></div></div>`,
+        (r) => html`<div>${badge(L, r.status)}<div><div class="t">${checkTitle(L, r.id, r.title)}</div><div class="sub"><code>${r.id}</code>${r.summary ? html` · ${r.summary}` : ""}</div></div></div>`,
       )}</div>`
     : html`<div class="panel"><p class="muted">${L.t("common.none")}</p></div>`}
 <h2>${L.t("machine.details")}</h2>
@@ -404,7 +404,7 @@ export async function checksPage(env: Env, who: string, L: I18n): Promise<Respon
 <p class="lead">${L.t("checks.lead")}</p></div>
 <div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("common.check")}</th><th class="n">${L.t("common.fail")}</th><th class="n">${L.t("common.high")}</th><th class="n">${L.t("common.error")}</th><th class="n">${L.t("common.warn")}</th><th class="n">${L.t("common.waived")}</th><th class="n">${L.t("common.pass")}</th><th class="n">${L.t("checks.thReportedBy")}</th></tr></thead><tbody>
 ${rows.map(
-    (c) => html`<tr><td class="wrap"><a class="strong" href="/admin/checks/${encodeURIComponent(c.check_id)}">${c.title || c.check_id}</a> <code class="muted">${c.check_id}</code>
+    (c) => html`<tr><td class="wrap"><a class="strong" href="/admin/checks/${encodeURIComponent(c.check_id)}">${checkTitle(L, c.check_id, c.title)}</a> <code class="muted">${c.check_id}</code>
 <div class="minibar">${c.fail ? html`<i class="b-fail" style="width:${pct(c.fail, c.total)}"></i>` : ""}${c.error ? html`<i class="b-err" style="width:${pct(c.error, c.total)}"></i>` : ""}${
       c.warn ? html`<i class="b-warn" style="width:${pct(c.warn, c.total)}"></i>` : ""
     }${c.waived ? html`<i class="b-waived" style="width:${pct(c.waived, c.total)}"></i>` : ""}${c.pass ? html`<i class="b-ok" style="width:${pct(c.pass, c.total)}"></i>` : ""}</div></td>
@@ -425,7 +425,7 @@ export async function checkPage(env: Env, checkId: string, url: URL, who: string
   )
     .bind(checkId, status)
     .all<{ status: string; severity: string; title: string; since: string; install_id: string; email: string; hostname: string; last_seen: string }>();
-  const title = rows.results[0]?.title || checkId;
+  const title = checkTitle(L, checkId, rows.results[0]?.title);
   const n = rows.results.length;
   const body = html`<div class="hero"><p class="eyebrow"><a href="/admin/checks">${L.t("nav.checks")}</a> · <code>${checkId}</code></p><h1>${title}</h1>
 <p class="lead">${status ? L.t("check.leadStatus", { n, status: L.status(status) }) : L.t("check.lead", { n })}</p></div>

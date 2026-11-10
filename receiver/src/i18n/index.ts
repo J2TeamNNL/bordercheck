@@ -182,6 +182,14 @@ export interface I18n {
   day(ymd: string | null | undefined): string;
 }
 
+// checkTitle is the name of a check in the reader's language: the built-in
+// checks have translated titles; for any other ID the title the machine sent
+// (untrusted, escaped by the template) is shown.
+export function checkTitle(L: I18n, id: string, sent?: string | null): string {
+  const key = `checkTitle.${id}`;
+  return Object.hasOwn(en, key) ? L.s(key as Key) : sent || id;
+}
+
 const STATUS_KEYS: Record<string, Key> = {
   fail: "status.fail", warn: "status.warn", error: "status.error", pass: "status.pass", skip: "status.skip", waived: "status.waived",
 };

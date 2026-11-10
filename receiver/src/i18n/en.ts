@@ -432,6 +432,22 @@ export const en = {
   "rep.foot": "This page shows only this computer's latest results; if this is not your computer, close it. Details such as file paths are not shown here: run [code]bordercheck[/code] on this computer to see them.",
   "rep.badTitle": "Link not valid",
   "rep.badLead": "This report link is unknown or has expired. Run [code]bordercheck status[/code] on your computer, or ask your IT team.",
+  // Built-in checks, by ID: the machine sends its own (English) title, which is used for IDs not listed here.
+  "checkTitle.firewall": "Firewall is on",
+  "checkTitle.disk-encryption": "Disk is encrypted",
+  "checkTitle.listeners": "Nothing listens beyond localhost",
+  "checkTitle.tailscale": "Tailscale blocks incoming connections",
+  "checkTitle.docker": "Docker containers stay isolated",
+  "checkTitle.secrets": "No plain-text secrets",
+  "checkTitle.os-updates": "OS and browsers are up to date",
+  "checkTitle.screen-lock": "Screen locks with a password",
+  "checkTitle.remote-access": "Remote login and sharing are off",
+  "checkTitle.ssh-keys": "SSH keys are protected",
+  "checkTitle.tunnels": "Nothing is tunnelled to the internet",
+  "checkTitle.ai-agents": "AI agents keep their guardrails",
+  "checkTitle.cracked-software": "No cracked software",
+  "rep.prodSecrets": { one: "{n} production secret in plain text", other: "{n} production secrets in plain text" },
+  "rep.prodSecretsNote": "Names and files only; the values are never sent.",
 } satisfies Record<string, Entry>;
 
 export type Key = keyof typeof en;

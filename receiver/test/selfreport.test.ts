@@ -143,3 +143,53 @@ describe("login-free report links", () => {
     for (const t of tables) expect(t).not.toContain(id);
   });
 });
+
+describe("report page: titles, links, production secrets", () => {
+  it("translates built-in check titles, links only trusted hosts, and lists production secrets without their tails", async () => {
+    const { linkify } = await import("../src/html");
+    const { checkTitle, i18n } = await import("../src/i18n");
+    expect(checkTitle(i18n("vi"), "firewall", "Firewall is on")).toBe("Tường lửa được bật");
+    expect(checkTitle(i18n("zh"), "secrets", "x")).toBe("没有明文密钥");
+    // An ID bordercheck does not know keeps the title the machine sent.
+    expect(checkTitle(i18n("vi"), "custom-check", "Sent <b>title</b>")).toBe("Sent <b>title</b>");
+
+    const fix = 'Use touchenv (https://github.com/ptrinh/touch-env): then see https://evil.example/x and <b>https://github.com/a"onmouseover="x</b>.';
+    const out = linkify(fix).toString();
+    expect(out).toContain('<a href="https://github.com/ptrinh/touch-env" target="_blank" rel="noopener noreferrer">https://github.com/ptrinh/touch-env</a>)');
+    expect(out).not.toContain('href="https://evil.example');
+    expect(out).toContain("https://evil.example/x");
+    expect(out).not.toContain("<b>");
+    expect(out).not.toMatch(/href="[^"]*onmouseover/);
+    expect(linkify("https://github.com.evil.example/x https://user@github.com/x http://github.com/x").toString()).not.toContain("<a ");
+  });
+
+  it("lists production secrets by name and file, and nothing else from the evidence", async () => {
+    const m = await enrolled();
+    const res = await post(
+      report({
+        results: [
+          result("secrets", "fail", {
+            severity: "high",
+            evidence: [
+              "~/.zshrc:12  OpenAI key (OPENAI_PROD_KEY) …a1b2  [production]",
+              "~/work/.env  Generic secret (DB_PASSWORD_LIVE)  [production]",
+              "~/.npmrc:3  npm token (NPM_TOKEN) …zz99",
+              "~/notes/<img src=x>.env:1  Generic secret (X)  [production]",
+            ],
+          }),
+          result("listeners", "warn", { evidence: ["port 5432 postgres  [production]"] }),
+        ],
+      }),
+      { token: m.token },
+    );
+    const body = await (await open(await reportUrl(res))).text();
+    expect(body).toContain("3 production secrets in plain text");
+    expect(body).toContain("~/.zshrc:12  OpenAI key (OPENAI_PROD_KEY)");
+    expect(body).toContain("DB_PASSWORD_LIVE");
+    expect(body).not.toContain("a1b2"); // the tail of the value is dropped on a bearer link
+    expect(body).not.toContain("[production]");
+    expect(body).not.toContain("NPM_TOKEN"); // not marked production
+    expect(body).not.toContain("5432"); // only the secrets check
+    expect(body).not.toContain("<img");
+  });
+});

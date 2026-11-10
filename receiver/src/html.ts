@@ -33,6 +33,35 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): Html 
   return new Html(out);
 }
 
+// Hosts that fix text may link to. Fix text comes from the machine, so a link
+// in it is only made clickable when it points at one of the places
+// bordercheck's own advice names; any other URL stays plain text.
+const LINK_HOSTS = new Set([
+  "github.com", "objective-see.org", "getartcraft.com", "support.apple.com", "support.microsoft.com",
+  "learn.microsoft.com", "tailscale.com", "docs.docker.com", "developers.cloudflare.com",
+]);
+
+// linkify escapes text and turns https links to LINK_HOSTS into anchors.
+export function linkify(text: unknown): Html {
+  const s = String(text ?? "");
+  let out = "";
+  let last = 0;
+  for (const m of s.matchAll(/https:\/\/[A-Za-z0-9.-]+(?:\/[A-Za-z0-9._~%\/#?=&+@:-]*)?/g)) {
+    let url = m[0].replace(/[.,:;?]+$/, ""); // sentence punctuation is not part of the link
+    let host = "";
+    try {
+      const u = new URL(url);
+      if (u.protocol === "https:" && !u.username && !u.password && !u.port) host = u.hostname.replace(/^www\./, "");
+    } catch {
+      host = "";
+    }
+    if (!LINK_HOSTS.has(host)) continue;
+    out += escape(s.slice(last, m.index)) + `<a href="${escape(url)}" target="_blank" rel="noopener noreferrer">${escape(url)}</a>`;
+    last = m.index + url.length;
+  }
+  return new Html(out + escape(s.slice(last)));
+}
+
 // Content-Security-Policy: no scripts at all, inline styles only, forms post
 // to this origin, never framed.
 const CSP =
@@ -233,6 +262,7 @@ background:radial-gradient(90% 140% at 0% 0%,color-mix(in srgb,var(--c) 13%,tran
 .result .since{color:var(--faint);font-size:13px}
 .result ul.evidence{margin:12px 0 0;padding:12px 16px;list-style:none;border-radius:12px;background:rgba(0,0,0,.4);box-shadow:inset 0 0 0 1px var(--line)}
 .result ul.evidence li+li{margin-top:4px}
+.result p.prod{margin:14px 0 0}.result ul.evidence li{overflow-wrap:anywhere;padding:2px 0}.fix a{color:inherit;text-decoration:underline;text-underline-offset:3px}
 .fix{margin-top:12px;padding:12px 16px;border-radius:var(--r-sm);background:var(--glass-2)}
 .fix b{display:block;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin-bottom:2px}
 .fix span{overflow-wrap:anywhere;white-space:pre-line}
