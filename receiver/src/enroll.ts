@@ -5,7 +5,8 @@
 
 import { bearer } from "./auth";
 import { config, type Env } from "./env";
-import { html, layout, MARK, page } from "./html";
+import { COPY_HEADERS, copyButton, html, layout, MARK, page } from "./html";
+import { forRequest, type I18n, type Key } from "./i18n";
 import { json } from "./ingest";
 import { hit } from "./ratelimit";
 import { str } from "./report";
@@ -178,20 +179,31 @@ export function installCommands(env: Env, origin: string, code: string): Install
   };
 }
 
+// Capability pages post the language switcher to their own URL (see html.ts).
+export const SELF = { switcher: "self" } as const;
+
 export const CAPABILITY_HEADERS = { "x-robots-tag": "noindex, nofollow", "referrer-policy": "no-referrer", "cache-control": "no-store" };
 
 // The two install commands as copyable blocks: one click selects a whole
 // command (CSS user-select: all; there is no script to copy with).
-export function shBlock(c: InstallCommands, big = false) {
-  return html`<div class="cmd${big ? " big" : ""}"><div class="cmd-h"><b>macOS or Linux</b><span>Terminal</span></div><code tabindex="0">${c.sh}</code></div>`;
+// With `copyId`, the block gets that id and a Copy button (see COPY_SCRIPT in
+// html.ts; only on pages that include the script).
+function cmdBlock(L: I18n, title: Key, sub: Key, text: string, big: boolean, copyId?: string) {
+  return html`<div class="cmd${big ? " big" : ""}"><div class="cmd-h"><b>${L.t(title)}</b><span>${L.t(sub)}</span>${
+    copyId ? copyButton(L, copyId, "copy.command") : ""
+  }</div><code tabindex="0"${copyId ? html` id="${copyId}"` : ""}>${text}</code></div>`;
 }
 
-export function ps1Block(c: InstallCommands, big = false) {
-  return html`<div class="cmd${big ? " big" : ""}"><div class="cmd-h"><b>Windows</b><span>PowerShell</span></div><code tabindex="0">${c.ps1}</code></div>`;
+export function shBlock(L: I18n, c: InstallCommands, big = false, copyId?: string) {
+  return cmdBlock(L, "inv.cmdUnix", "inv.cmdTerminal", c.sh, big, copyId);
 }
 
-export function commandBlock(c: InstallCommands) {
-  return html`${shBlock(c)}${ps1Block(c)}`;
+export function ps1Block(L: I18n, c: InstallCommands, big = false, copyId?: string) {
+  return cmdBlock(L, "inv.cmdWindows", "inv.cmdPowerShell", c.ps1, big, copyId);
+}
+
+export function commandBlock(L: I18n, c: InstallCommands, copyPrefix?: string) {
+  return html`${shBlock(L, c, false, copyPrefix && `${copyPrefix}-sh`)}${ps1Block(L, c, false, copyPrefix && `${copyPrefix}-ps1`)}`;
 }
 
 type Platform = "mac" | "windows" | "linux" | "";
@@ -206,32 +218,30 @@ function platformOf(ua: string): Platform {
   return "";
 }
 
-function inviteSteps(p: Platform) {
-  if (p === "windows") {
-    return html`<ol class="steps"><li><span>Open <b>PowerShell</b>: press <kbd>Start</kbd>, type <b>PowerShell</b> and press <kbd>Enter</kbd>.</span></li>
-<li><span>Click the command below once to select it, copy it (<kbd>Ctrl</kbd> <kbd>C</kbd>), paste it into PowerShell and press <kbd>Enter</kbd>.</span></li>
-<li><span>Follow what it prints. When it's done, bordercheck checks this computer in the background.</span></li></ol>`;
-  }
-  const open = p === "mac"
-    ? html`Open <b>Terminal</b>: press <kbd>⌘</kbd> <kbd>Space</kbd>, type <b>Terminal</b> and press <kbd>Return</kbd>.`
-    : html`Open a <b>terminal</b> window.`;
-  const copy = p === "mac" ? html`<kbd>⌘</kbd> <kbd>C</kbd>` : html`<kbd>Ctrl</kbd> <kbd>C</kbd>`;
+function inviteSteps(L: I18n, p: Platform) {
+  const [open, copy] = p === "windows"
+    ? [L.t("inv.winOpen"), L.t("inv.winCopy")]
+    : p === "mac"
+      ? [L.t("inv.macOpen"), L.t("inv.macCopy")]
+      : [L.t("inv.linuxOpen"), L.t("inv.linuxCopy")];
   return html`<ol class="steps"><li><span>${open}</span></li>
-<li><span>Click the command below once to select it, copy it (${copy}), paste it into the terminal and press <kbd>${p === "mac" ? "Return" : "Enter"}</kbd>.</span></li>
-<li><span>Follow what it prints. When it's done, bordercheck checks this computer in the background.</span></li></ol>`;
+<li><span>${copy}</span></li>
+<li><span>${L.t("inv.follow")}</span></li></ol>`;
+}
+
+export function tooManyRequests(L: I18n, retryAfter: number): Response {
+  return page(layout(L, L.s("slow.title"), null, html`<h1>${L.t("slow.h1")}</h1><p>${L.t("slow.text")}</p>`, undefined, SELF), 429, {
+    ...CAPABILITY_HEADERS,
+    "retry-after": String(retryAfter),
+  });
 }
 
 // GET /i/<code>: a page for the person who got the invite. It reads the
 // invite's state but never consumes it, shows no email or role, and is
 // rate-limited like /enroll's sibling buckets.
-export async function invitePage(req: Request, env: Env, code: string, now = new Date()): Promise<Response> {
+export async function invitePage(req: Request, env: Env, code: string, now = new Date(), L: I18n = forRequest(req)): Promise<Response> {
   const rl = await hit(env, req, "page", now.getTime());
-  if (!rl.ok) {
-    return page(layout("Slow down", null, html`<h1>Too many requests</h1><p>Wait a few minutes and reload.</p>`), 429, {
-      ...CAPABILITY_HEADERS,
-      "retry-after": String(rl.retryAfter),
-    });
-  }
+  if (!rl.ok) return tooManyRequests(L, rl.retryAfter);
   const ok = CODE_RE.test(code);
   const h = await sha256hex(code);
   const inv = ok
@@ -239,15 +249,15 @@ export async function invitePage(req: Request, env: Env, code: string, now = new
         .bind(h)
         .first<{ used_at: string | null; revoked_at: string | null; expires_at: string }>()
     : null;
-  let state = "";
-  if (!inv) state = "This invite link is not valid.";
-  else if (inv.revoked_at) state = "This invite was cancelled.";
-  else if (inv.used_at) state = "This invite has already been used.";
-  else if (inv.expires_at <= now.toISOString()) state = "This invite has expired.";
+  let state: Key | "" = "";
+  if (!inv) state = "inv.invalid";
+  else if (inv.revoked_at) state = "inv.cancelled";
+  else if (inv.used_at) state = "inv.used";
+  else if (inv.expires_at <= now.toISOString()) state = "inv.expired";
   if (state) {
     return page(
-      layout("Invite", null, html`<div class="center-card"><span class="mark lg">${MARK}</span><p class="eyebrow">bordercheck invite</p><h1>This link can't be used</h1>
-<p class="lead">${state} Ask your IT team for a new one.</p></div>`),
+      layout(L, L.s("inv.badTitle"), null, html`<div class="center-card"><span class="mark lg">${MARK}</span><p class="eyebrow">${L.t("inv.badEyebrow")}</p><h1>${L.t("inv.badH1")}</h1>
+<p class="lead">${L.t("inv.badLead", { state: L.t(state) })}</p></div>`, undefined, SELF),
       404,
       CAPABILITY_HEADERS,
     );
@@ -255,19 +265,18 @@ export async function invitePage(req: Request, env: Env, code: string, now = new
   const c = installCommands(env, new URL(req.url).origin, code);
   const p = platformOf(req.headers.get("user-agent") ?? "");
   const windowsFirst = p === "windows";
-  const here = p === "mac" ? "On this Mac" : p === "windows" ? "On this Windows PC" : p === "linux" ? "On this Linux computer" : "On your work computer";
-  const body = html`<span class="mark lg">${MARK}</span><p class="eyebrow">An invitation from your IT team</p><h1>Install bordercheck</h1>
-<p class="lead">bordercheck looks at this computer's security settings, like the firewall, disk encryption and updates,
-and tells you and IT if something needs fixing. Setting it up is one command.</p>
-<div class="chips"><span class="chip"><b>Single use</b> · one computer</span><span class="chip">Expires <b>${inv!.expires_at.slice(0, 10)}</b></span></div>
-<h2>${here}</h2>
-${p === "" ? html`<p class="dim">Run <b>one</b> of these on the computer you use for work.</p>` : inviteSteps(p)}
-${windowsFirst ? ps1Block(c, true) : shBlock(c, true)}
+  const here = p === "mac" ? "inv.hereMac" : p === "windows" ? "inv.hereWindows" : p === "linux" ? "inv.hereLinux" : "inv.hereAny";
+  const body = html`<span class="mark lg">${MARK}</span><p class="eyebrow">${L.t("inv.eyebrow")}</p><h1>${L.t("inv.title")}</h1>
+<p class="lead">${L.t("inv.lead")}</p>
+<div class="chips"><span class="chip">${L.t("inv.single")}</span><span class="chip">${L.t("inv.expires", { date: L.day(inv!.expires_at.slice(0, 10)) })}</span></div>
+<h2>${L.t(here)}</h2>
+${p === "" ? html`<p class="dim">${L.t("inv.runOne")}</p>` : inviteSteps(L, p)}
+${windowsFirst ? ps1Block(L, c, true, "cmd-ps1") : shBlock(L, c, true, "cmd-sh")}
 ${p === ""
-    ? (windowsFirst ? shBlock(c, true) : ps1Block(c, true))
-    : html`<details class="alt"><summary>${windowsFirst ? "On a Mac or Linux instead?" : "On Windows instead?"}</summary><div>${
-        windowsFirst ? html`${inviteSteps("mac")}${shBlock(c)}` : html`${inviteSteps("windows")}${ps1Block(c)}`
+    ? (windowsFirst ? shBlock(L, c, true, "cmd-sh") : ps1Block(L, c, true, "cmd-ps1"))
+    : html`<details class="alt"><summary>${windowsFirst ? L.t("inv.otherMac") : L.t("inv.otherWindows")}</summary><div>${
+        windowsFirst ? html`${inviteSteps(L, "mac")}${shBlock(L, c, false, "cmd-sh-alt")}` : html`${inviteSteps(L, "windows")}${ps1Block(L, c, false, "cmd-ps1-alt")}`
       }</div></details>`}
-<p class="foot">Keep this link to yourself: until it is used, anyone with it can enroll a computer in your name.</p>`;
-  return page(layout("Install bordercheck", null, body), 200, CAPABILITY_HEADERS);
+<p class="foot">${L.t("inv.foot")}</p>`;
+  return page(layout(L, L.s("inv.title"), null, body, undefined, { ...SELF, copy: true }), 200, { ...CAPABILITY_HEADERS, ...COPY_HEADERS });
 }

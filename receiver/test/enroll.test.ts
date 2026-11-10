@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { COPY_SCRIPT } from "../src/html";
 import { composePolicy, goDuration, validateRolePolicy } from "../src/roles";
 import { ADMIN_TOKEN, adminGet, BASE, call, env, post, report } from "./helpers";
 import { adminPost, DEV_POLICY, enroll, enrolled, getPolicy, HOST, makeInvites, makeRole } from "./portal";
@@ -130,7 +131,7 @@ describe("invites and enrollment", () => {
     expect(body).toContain(`curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- ${BASE}/i/${code}`);
     expect(body).toContain(`&amp; ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) ${BASE}/i/${code}`);
     expect(body).not.toContain("an@acme.com");
-    expect(body).not.toContain("<script");
+    expect(body.replace(`<script>${COPY_SCRIPT}</script>`, "")).not.toContain("<script"); // only the hashed Copy script
     expect((await enroll({ code, host: HOST })).status).toBe(200);
     const after = await call(new Request(`${BASE}/i/${code}`));
     expect(after.status).toBe(404);
@@ -151,7 +152,7 @@ describe("invites and enrollment", () => {
     for (const body of [win, mac, await open(`<script>alert(1)</script>`)]) {
       expect(body).toContain("install.sh | sh -s -- ");
       expect(body).toContain("install.ps1)))");
-      expect(body).not.toContain("<script");
+      expect(body.replace(`<script>${COPY_SCRIPT}</script>`, "")).not.toContain("<script");
     }
   });
 

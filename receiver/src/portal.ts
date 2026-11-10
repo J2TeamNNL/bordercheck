@@ -2,12 +2,16 @@
 // the enrollment part of a machine's page (role, source invite,
 // revoke/restore, waivers, report link). Auth and same-origin checks are done
 // by the /admin router in index.ts before anything here runs.
+//
+// The shared write operations return their errors as messages (Msg), so the
+// dashboard shows them in the admin's language and the MCP server in English.
 
 import samplePolicy from "./sample-policy.json";
 import { audit, auditStmt, auditStmtIf, MCP_ACTOR, MCP_READ_ACTOR } from "./audit";
 import { commandBlock, installCommands, publicOrigin } from "./enroll";
 import { config, DAY, type Env } from "./env";
-import { ago, html, type Html, layout, note, page, pill, when } from "./html";
+import { COPY_HEADERS, copyButton, html, type Html, layout, note, page, pill } from "./html";
+import { type I18n, type Key, type Msg, msg } from "./i18n";
 import { CHECK_ID_RE, POLICY_CHECKS, today, validateRolePolicy, waiverDateError } from "./roles";
 import { newCode, sha256hex } from "./tokens";
 
@@ -49,58 +53,54 @@ export async function roleRows(env: Env) {
   return rows.results;
 }
 
-export async function rolesPage(env: Env, who: string, message: string | Html = "", draft?: { name: string; policy: string }, status = 200) {
+export async function rolesPage(env: Env, who: string, L: I18n, message: string | Html = "", draft?: { name: string; policy: string }, status = 200) {
   const rows = await roleRows(env);
-  const body = html`<div class="hero"><p class="eyebrow">Enrollment</p><h1>Roles</h1>
-<p class="lead">A role is a policy (the same JSON as bordercheck's policies.json) that enrolled machines get from <code>/policy</code>.
-When served, <code>report.url</code> and <code>update.policy_url</code> point at this receiver, <code>report.headers</code>
-never carry a token (each machine sends its own), and the machine's waivers are added.</p></div>
+  const body = html`<div class="hero"><p class="eyebrow">${L.t("enrollment.eyebrow")}</p><h1>${L.t("nav.roles")}</h1>
+<p class="lead">${L.t("roles.lead")}</p></div>
 ${note(message, tone(status))}
 ${rows.length
     ? html`<div class="shelf-row">${rows.map(
-        (r) => html`<a class="card" href="/admin/roles/${r.id}"><span class="t">${r.name}</span><span class="muted small">updated ${r.updated_at.slice(0, 10)}</span>
-<span class="meta"><span class="big plain">${r.machines}</span>machine${r.machines === 1 ? "" : "s"}${r.pending ? html` · ${r.pending} pending invite${r.pending === 1 ? "" : "s"}` : ""}</span></a>`,
+        (r) => html`<a class="card" href="/admin/roles/${r.id}"><span class="t">${r.name}</span><span class="muted small">${L.t("roles.updated", { date: L.day(r.updated_at.slice(0, 10)) })}</span>
+<span class="meta"><span class="big plain">${L.num(r.machines)}</span>${L.t("roles.machines", { n: r.machines })}${r.pending ? L.t("roles.pending", { n: r.pending }) : ""}</span></a>`,
       )}</div>`
-    : html`<div class="panel"><p class="muted">No roles yet. Create one to start inviting people.</p></div>`}
-<h2 id="new-role">New role</h2>
-${roleForm("/admin/roles", draft?.name ?? "", draft?.policy ?? SAMPLE_POLICY, "Create role",
-    html`The box starts with a sample policy that spells out every check; edit it, then create the role.`)}`;
-  return page(layout("Roles", who, body, "Roles"), status);
+    : html`<div class="panel"><p class="muted">${L.t("roles.empty")}</p></div>`}
+<h2 id="new-role">${L.t("roles.new")}</h2>
+${roleForm(L, "/admin/roles", draft?.name ?? "", draft?.policy ?? SAMPLE_POLICY, L.t("roles.create"), L.t("roles.intro"))}`;
+  return page(layout(L, L.s("nav.roles"), who, body, "Roles"), status);
 }
 
 // Messages after a form: an error when the response is one, else a confirmation.
 const tone = (status: number) => (status >= 400 ? "s-fail" : "s-pass");
 
-function roleForm(action: string, name: string, policy: string, label: string, intro: Html | string = ""): Html {
+function roleForm(L: I18n, action: string, name: string, policy: string, label: Html, intro: Html | string = ""): Html {
   return html`<form method="post" action="${action}"><div class="cols"><div class="panel">
-<div class="field"><label for="role-name">Name</label><input id="role-name" name="name" value="${name}" maxlength="64" required class="w-name"></div>
-<label for="role-policy">Policy</label><textarea id="role-policy" class="code" name="policy" spellcheck="false">${policy}</textarea>
+<div class="field"><label for="role-name">${L.t("roles.name")}</label><input id="role-name" name="name" value="${name}" maxlength="64" required class="w-name"></div>
+<label for="role-policy">${L.t("roles.policy")}</label><textarea id="role-policy" class="code" name="policy" spellcheck="false">${policy}</textarea>
 <div class="actions"><button class="primary">${label}</button></div></div>
-<aside class="panel">${intro ? html`<p>${intro}</p>` : ""}<h3>Checked here</h3>
-<p class="muted small">It is a JSON object; only fields bordercheck knows at the top level and in report, update,
-notify and waivers; check names; types of enabled and on_problem; durations; waiver fields; no report token in headers.</p>
-<h3>Not checked here</h3>
-<p class="muted small">The settings inside each check (globs, regexes, versions, lists). bordercheck validates the whole
-file and keeps its last good policy if one is invalid, so try it locally first:</p>
+<aside class="panel">${intro ? html`<p>${intro}</p>` : ""}<h3>${L.t("roles.checkedHere")}</h3>
+<p class="muted small">${L.t("roles.checkedText")}</p>
+<h3>${L.t("roles.notChecked")}</h3>
+<p class="muted small">${L.t("roles.notCheckedText")}</p>
 <div class="cmd"><code>bordercheck -policy role.json -print-policy</code></div></aside></div></form>`;
 }
 
-async function checkRole(env: Env, name: string, policyText: string, now: Date): Promise<{ errs: string[]; policy?: string }> {
-  const errs: string[] = [];
-  if (!name) errs.push("The role needs a name.");
-  if (policyText.length > MAX_ROLE_POLICY) return { errs: [...errs, "The policy is too large."] };
+async function checkRole(env: Env, name: string, policyText: string, now: Date): Promise<{ errs: Msg[]; policy?: string }> {
+  const errs: Msg[] = [];
+  if (!name) errs.push(msg("err.roleName"));
+  if (policyText.length > MAX_ROLE_POLICY) return { errs: [...errs, msg("err.policyTooLarge")] };
   let p: unknown;
   try {
     p = JSON.parse(policyText);
   } catch (e) {
-    return { errs: [...errs, `Not valid JSON: ${(e as Error).message}`] };
+    // The parser's own message (English, from the runtime) is a parameter.
+    return { errs: [...errs, msg("err.badJson", { detail: (e as Error).message })] };
   }
   errs.push(...validateRolePolicy(p, now));
   return { errs, policy: JSON.stringify(p, null, 2) };
 }
 
-function errorList(errs: string[]): Html {
-  return html`Not saved:<ul>${errs.slice(0, 50).map((e) => html`<li>${e}</li>`)}</ul>`;
+function errorList(L: I18n, head: Key, errs: Msg[]): Html {
+  return html`${L.t(head)}<ul>${errs.slice(0, 50).map((e) => html`<li>${L.m(e)}</li>`)}</ul>`;
 }
 
 // ---- Shared write operations ----
@@ -111,7 +111,7 @@ function errorList(errs: string[]): Html {
 // server records the tool name and its arguments there).
 
 export type AuditExtra = Record<string, unknown>;
-export type OpResult<T> = ({ ok: true } & T) | { ok: false; status: number; errors: string[] };
+export type OpResult<T> = ({ ok: true } & T) | { ok: false; status: number; errors: Msg[] };
 
 // saveRole creates a role (no id) or updates one (id): same checks either way.
 export async function saveRole(
@@ -125,13 +125,13 @@ export async function saveRole(
   const old = input.id === undefined
     ? null
     : await env.DB.prepare("SELECT name, policy FROM roles WHERE id = ?").bind(input.id).first<{ name: string; policy: string }>();
-  if (input.id !== undefined && !old) return { ok: false, status: 404, errors: ["No such role."] };
+  if (input.id !== undefined && !old) return { ok: false, status: 404, errors: [msg("err.noSuchRole")] };
   const { errs, policy } = await checkRole(env, name, input.policyText, now);
   if (errs.length) return { ok: false, status: 400, errors: errs };
   const ts = now.toISOString();
   if (input.id === undefined) {
     const exists = await env.DB.prepare("SELECT id FROM roles WHERE name = ?").bind(name).first();
-    if (exists) return { ok: false, status: 400, errors: ["A role with that name exists."] };
+    if (exists) return { ok: false, status: 400, errors: [msg("err.roleExists")] };
     const id = await env.DB.prepare("INSERT INTO roles (name, policy, created_at, updated_at) VALUES (?, ?, ?, ?) RETURNING id")
       .bind(name, policy, ts, ts)
       .first<number>("id");
@@ -140,7 +140,7 @@ export async function saveRole(
   }
   const id = input.id;
   const clash = await env.DB.prepare("SELECT id FROM roles WHERE name = ? AND id != ?").bind(name, id).first();
-  if (clash) return { ok: false, status: 400, errors: ["Another role has that name."] };
+  if (clash) return { ok: false, status: 400, errors: [msg("err.roleClash")] };
   const policyChanged = old!.policy !== policy;
   await env.DB.batch([
     env.DB.prepare("UPDATE roles SET name = ?, policy = ?, updated_at = ? WHERE id = ?").bind(name, policy, ts, id),
@@ -154,64 +154,69 @@ export async function saveRole(
   return { ok: true, id, name, policyChanged };
 }
 
-export async function createRole(env: Env, who: string, form: FormData): Promise<Response> {
+export async function createRole(env: Env, who: string, form: FormData, L: I18n): Promise<Response> {
   const name = String(form.get("name") ?? "");
   const text = String(form.get("policy") ?? "");
   const r = await saveRole(env, who, { name, policyText: text });
   if (!r.ok) {
-    const msg = r.errors.length === 1 && r.errors[0] === "A role with that name exists." ? r.errors[0] : errorList(r.errors);
-    return rolesPage(env, who, msg, { name: cleanLine(name, 64), policy: text }, 400);
+    const msgHtml = r.errors.length === 1 && r.errors[0].key === "err.roleExists" ? L.m(r.errors[0]) : errorList(L, "roles.notSaved", r.errors);
+    return rolesPage(env, who, L, msgHtml, { name: cleanLine(name, 64), policy: text }, 400);
   }
-  return rolesPage(env, who, html`Role <b>${r.name}</b> created.`);
+  return rolesPage(env, who, L, L.t("roles.created", { name: r.name }));
 }
 
-export async function rolePage(env: Env, id: number, who: string, message: string | Html = "", draft?: { name: string; policy: string }, status = 200) {
+export async function rolePage(env: Env, id: number, who: string, L: I18n, message: string | Html = "", draft?: { name: string; policy: string }, status = 200) {
   const r = await env.DB.prepare("SELECT * FROM roles WHERE id = ?").bind(id).first<RoleRow>();
-  if (!r) return page(layout("Not found", who, html`<h1>No such role</h1>`), 404);
+  if (!r) return noSuchRole(L, who);
   const machines = await env.DB.prepare(
     `SELECT e.install_id, e.email, e.hostname, e.revoked_at FROM enrollments e WHERE e.role_id = ? ORDER BY e.email LIMIT 500`,
   )
     .bind(id)
     .all<{ install_id: string; email: string; hostname: string; revoked_at: string | null }>();
-  const body = html`<div class="hero"><p class="eyebrow"><a href="/admin/roles">Roles</a> · role</p><h1>${r.name}</h1>
-<p class="lead">${machines.results.length} machine${machines.results.length === 1 ? "" : "s"} · updated ${when(r.updated_at)}</p></div>
+  const n = machines.results.length;
+  const body = html`<div class="hero"><p class="eyebrow"><a href="/admin/roles">${L.t("nav.roles")}</a> · ${L.t("role.crumb")}</p><h1>${r.name}</h1>
+<p class="lead">${L.t("role.lead", { n, when: L.when(r.updated_at) })}</p></div>
 ${note(message, tone(status))}
-${roleForm(`/admin/roles/${r.id}`, draft?.name ?? r.name, draft?.policy ?? r.policy, "Save", html`Saved changes reach machines at their next policy refresh (hourly).`)}
-<h2>Machines in this role (${machines.results.length})</h2>
-${machines.results.length
-    ? html`<div class="panel flush"><div class="scroll"><table><thead><tr><th>Person · machine</th><th>State</th></tr></thead><tbody>${machines.results.map(
-        (m) => html`<tr${m.revoked_at ? html` class="off"` : ""}><td class="who-cell"><a href="${machineLink(m.install_id)}">${m.email}</a><span class="sub">${m.hostname}</span></td><td>${m.revoked_at ? pill("s-fail", "revoked") : pill("s-pass", "active")}</td></tr>`,
+${roleForm(L, `/admin/roles/${r.id}`, draft?.name ?? r.name, draft?.policy ?? r.policy, L.t("role.save"), L.t("role.intro"))}
+<h2>${L.t("role.machines", { n })}</h2>
+${n
+    ? html`<div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("common.personMachine")}</th><th>${L.t("common.status")}</th></tr></thead><tbody>${machines.results.map(
+        (m) => html`<tr${m.revoked_at ? html` class="off"` : ""}><td class="who-cell"><a href="${machineLink(m.install_id)}">${m.email}</a><span class="sub">${m.hostname}</span></td><td>${m.revoked_at ? pill("s-fail", L.t("state.revoked")) : pill("s-pass", L.t("state.active"))}</td></tr>`,
       )}</tbody></table></div></div>`
-    : html`<div class="panel"><p class="muted">None yet.</p></div>`}
-<h2>Delete</h2>
-<div class="panel danger-zone"><p class="muted">Only a role no machine or pending invite uses can be deleted.</p>
-<form method="post" action="/admin/roles/${r.id}/delete"><button class="danger">Delete role</button></form></div>`;
-  return page(layout(r.name, who, body, "Roles"), status);
+    : html`<div class="panel"><p class="muted">${L.t("common.noneYet")}</p></div>`}
+<h2>${L.t("role.delete")}</h2>
+<div class="panel danger-zone"><p class="muted">${L.t("role.deleteText")}</p>
+<form method="post" action="/admin/roles/${r.id}/delete"><button class="danger">${L.t("role.deleteButton")}</button></form></div>`;
+  return page(layout(L, r.name, who, body, "Roles"), status);
 }
 
-export async function updateRole(env: Env, id: number, who: string, form: FormData): Promise<Response> {
+function noSuchRole(L: I18n, who: string): Response {
+  return page(layout(L, L.s("common.notFound"), who, html`<h1>${L.t("role.noSuch")}</h1>`, "Roles"), 404);
+}
+
+export async function updateRole(env: Env, id: number, who: string, form: FormData, L: I18n): Promise<Response> {
   const name = String(form.get("name") ?? "");
   const text = String(form.get("policy") ?? "");
   const r = await saveRole(env, who, { id, name, policyText: text });
   if (!r.ok) {
-    if (r.status === 404) return page(layout("Not found", who, html`<h1>No such role</h1>`), 404);
-    const msg = r.errors.length === 1 && r.errors[0] === "Another role has that name." ? r.errors[0] : errorList(r.errors);
-    return rolePage(env, id, who, msg, { name: cleanLine(name, 64), policy: text }, 400);
+    if (r.status === 404) return noSuchRole(L, who);
+    const msgHtml = r.errors.length === 1 && r.errors[0].key === "err.roleClash" ? L.m(r.errors[0]) : errorList(L, "roles.notSaved", r.errors);
+    return rolePage(env, id, who, L, msgHtml, { name: cleanLine(name, 64), policy: text }, 400);
   }
-  return rolePage(env, id, who, "Saved. Machines pick it up at their next policy refresh (hourly).");
+  return rolePage(env, id, who, L, L.t("role.saved"));
 }
 
-export async function deleteRole(env: Env, id: number, who: string): Promise<Response> {
+export async function deleteRole(env: Env, id: number, who: string, L: I18n): Promise<Response> {
   const r = await env.DB.prepare("SELECT name FROM roles WHERE id = ?").bind(id).first<{ name: string }>();
-  if (!r) return page(layout("Not found", who, html`<h1>No such role</h1>`), 404);
+  if (!r) return noSuchRole(L, who);
   const used = await env.DB.prepare(
     `SELECT (SELECT COUNT(*) FROM enrollments WHERE role_id = ?1) + (SELECT COUNT(*) FROM invites WHERE role_id = ?1) AS n`,
   )
     .bind(id)
     .first<number>("n");
-  if (used) return rolePage(env, id, who, "This role is used by machines or invites (including past ones), so it can't be deleted. Move them to another role first, or keep it.", undefined, 409);
+  if (used) return rolePage(env, id, who, L, L.t("role.inUse"), undefined, 409);
   await env.DB.batch([env.DB.prepare("DELETE FROM roles WHERE id = ?").bind(id), auditStmt(env, who, "role.delete", `role ${r.name}`, { role_id: id })]);
-  return rolesPage(env, who, html`Role <b>${r.name}</b> deleted.`);
+  return rolesPage(env, who, L, L.t("roles.deleted", { name: r.name }));
 }
 
 // ---- Invites ----
@@ -219,6 +224,9 @@ export async function deleteRole(env: Env, id: number, who: string): Promise<Res
 const STATUS_SQL = `CASE WHEN i.revoked_at IS NOT NULL THEN 'revoked' WHEN i.used_at IS NOT NULL THEN 'used'
   WHEN i.expires_at <= ?1 THEN 'expired' ELSE 'pending' END`;
 const INVITE_FILTERS = ["pending", "used", "expired", "revoked", "all"] as const;
+const INVITE_KEY: Record<string, Key> = {
+  pending: "invite.pending", used: "invite.used", expired: "invite.expired", revoked: "invite.revoked", all: "invites.all",
+};
 
 export interface InviteRow {
   id: number;
@@ -264,7 +272,7 @@ export async function inviteRows(env: Env, filter: InviteFilter, limit: number):
   return { rows: rows.results, counts: c };
 }
 
-export async function invitesPage(env: Env, url: URL, who: string, message: string | Html = "", status = 200): Promise<Response> {
+export async function invitesPage(env: Env, url: URL, who: string, L: I18n, message: string | Html = "", status = 200): Promise<Response> {
   const f = url.searchParams.get("status") ?? "pending";
   const filter = isInviteFilter(f) ? f : "pending";
   const { rows: inviteList, counts } = await inviteRows(env, filter, 1000);
@@ -272,42 +280,37 @@ export async function invitesPage(env: Env, url: URL, who: string, message: stri
   const count = (s: string) => counts[s] ?? 0;
   const options = await roleOptions(env);
   const cfg = config(env);
+  const inviteWord = (s: string) => (INVITE_KEY[s] ? L.t(INVITE_KEY[s]) : s);
 
   const now = Date.now();
-  const body = html`<div class="hero"><p class="eyebrow">Enrollment</p><h1>Invites</h1>
-<p class="lead">An invite lets one person enroll one machine. Its code is shown once, when it is made; to get a
-new command for someone, re-issue their invite (the old code stops working).</p></div>
+  const body = html`<div class="hero"><p class="eyebrow">${L.t("enrollment.eyebrow")}</p><h1>${L.t("nav.invites")}</h1>
+<p class="lead">${L.t("invites.lead")}</p></div>
 ${note(message, tone(status))}
-<h2 id="new">Invite people</h2>
+<h2 id="new">${L.t("invites.new")}</h2>
 ${options.value ? html`<form method="post" action="/admin/invites"><div class="panel"><div class="cols">
-<div class="field"><label for="inv-emails">Emails, one per line (or separated by commas)</label><textarea id="inv-emails" class="emails" name="emails" rows="6" spellcheck="false" required placeholder="an@acme.com&#10;bo@acme.com"></textarea></div>
-<div><div class="field"><label for="inv-role">Role</label><select id="inv-role" name="role_id" class="full">${options}</select></div>
-<div class="field"><label for="inv-days">Expires after (days)</label><input id="inv-days" name="days" type="number" min="1" max="90" value="${cfg.inviteDays}"></div>
-<div class="field"><label for="inv-note">Note (optional, for you)</label><input id="inv-note" name="note" maxlength="200" class="full"></div></div></div>
-<div class="actions"><button class="primary">Create invites</button><span class="muted small">At most ${MAX_BULK} at once. Each person gets their own link and command, shown once.</span></div></div></form>`
-    : html`<div class="panel"><p><a href="/admin/roles">Create a role</a> first.</p></div>`}
-<div class="shelf"><h2>Sent</h2></div>
-<div class="toolbar"><nav class="seg" aria-label="Status">${INVITE_FILTERS.map(
-    (s) => html`<a class="${s === filter ? "on" : ""}" href="/admin/invites?status=${s}">${s}${s !== "all" ? html`<span class="c">${count(s)}</span>` : ""}</a>`,
+<div class="field"><label for="inv-emails">${L.t("invites.emails")}</label><textarea id="inv-emails" class="emails" name="emails" rows="6" spellcheck="false" required placeholder="an@acme.com&#10;bo@acme.com"></textarea></div>
+<div><div class="field"><label for="inv-role">${L.t("common.role")}</label><select id="inv-role" name="role_id" class="full">${options}</select></div>
+<div class="field"><label for="inv-days">${L.t("invites.expires")}</label><input id="inv-days" name="days" type="number" min="1" max="90" value="${cfg.inviteDays}"></div>
+<div class="field"><label for="inv-note">${L.t("invites.note")}</label><input id="inv-note" name="note" maxlength="200" class="full"></div></div></div>
+<div class="actions"><button class="primary">${L.t("invites.create")}</button><span class="muted small">${L.t("invites.atMost", { n: MAX_BULK })}</span></div></div></form>`
+    : html`<div class="panel"><p>${L.t("invites.needRole", { link: html`<a href="/admin/roles">${L.t("invites.createRole")}</a>` })}</p></div>`}
+<div class="shelf"><h2>${L.t("invites.sent")}</h2></div>
+<div class="toolbar"><nav class="seg" aria-label="${L.s("common.status")}">${INVITE_FILTERS.map(
+    (s) => html`<a class="${s === filter ? "on" : ""}" href="/admin/invites?status=${s}">${inviteWord(s)}${s !== "all" ? html`<span class="c">${L.num(count(s))}</span>` : ""}</a>`,
   )}</nav></div>
-<div class="panel flush"><div class="scroll"><table><thead><tr><th class="n">#</th><th>Person</th><th>Role</th><th>Status</th><th>Created</th><th>Expires</th><th></th></tr></thead><tbody>
+<div class="panel flush"><div class="scroll"><table><thead><tr><th class="n">#</th><th>${L.t("invites.thPerson")}</th><th>${L.t("common.role")}</th><th>${L.t("common.status")}</th><th>${L.t("invites.thCreated")}</th><th>${L.t("invites.thExpires")}</th><th></th></tr></thead><tbody>
 ${rows.results.map(
     (i) => html`<tr${i.status === "revoked" || i.status === "expired" ? html` class="off"` : ""}><td class="n muted">${i.id}</td><td class="who-cell"><b>${i.email}</b>${i.note ? html`<span class="sub">${i.note}</span>` : ""}</td><td>${i.role}</td>
-<td class="nowrap">${pill(INVITE_TONE[i.status] ?? "s-other", i.status)}${i.used_install_id ? html`<span class="sub"><a class="u" href="${machineLink(i.used_install_id)}">machine</a></span>` : ""}${i.reissued_as ? html`<span class="sub">re-issued as #${i.reissued_as}</span>` : ""}</td>
-<td class="nowrap">${when(i.created_at)}<span class="sub">${i.created_by}</span></td><td class="nowrap">${when(i.expires_at)}${i.status === "pending" ? html`<span class="sub">${inDays(i.expires_at, now)}</span>` : ""}</td>
-<td class="nowrap">${i.status === "pending" ? html`<form class="inline" method="post" action="/admin/invites/${i.id}/revoke"><button class="sm">Revoke</button></form> ` : ""}${
-      i.status !== "used" && !i.reissued_as ? html`<form class="inline" method="post" action="/admin/invites/${i.id}/reissue"><button class="sm">Re-issue</button></form>` : ""
+<td class="nowrap">${pill(INVITE_TONE[i.status] ?? "s-other", inviteWord(i.status))}${i.used_install_id ? html`<span class="sub"><a class="u" href="${machineLink(i.used_install_id)}">${L.t("invites.machine")}</a></span>` : ""}${i.reissued_as ? html`<span class="sub">${L.t("invites.reissuedAs", { id: i.reissued_as })}</span>` : ""}</td>
+<td class="nowrap">${L.when(i.created_at)}<span class="sub">${i.created_by}</span></td><td class="nowrap">${L.when(i.expires_at)}${i.status === "pending" ? html`<span class="sub">${L.inDays(i.expires_at, now)}</span>` : ""}</td>
+<td class="nowrap">${i.status === "pending" ? html`<form class="inline" method="post" action="/admin/invites/${i.id}/revoke"><button class="sm">${L.t("invites.revoke")}</button></form> ` : ""}${
+      i.status !== "used" && !i.reissued_as ? html`<form class="inline" method="post" action="/admin/invites/${i.id}/reissue"><button class="sm">${L.t("invites.reissue")}</button></form>` : ""
     }</td></tr>`,
-  )}</tbody></table></div>${rows.results.length === 0 ? html`<p class="empty">None.</p>` : ""}</div>`;
-  return page(layout("Invites", who, body, "Invites"), status);
+  )}</tbody></table></div>${rows.results.length === 0 ? html`<p class="empty">${L.t("common.none")}</p>` : ""}</div>`;
+  return page(layout(L, L.s("nav.invites"), who, body, "Invites"), status);
 }
 
 const INVITE_TONE: Record<string, string> = { pending: "s-waived", used: "s-pass", expired: "s-skip", revoked: "s-fail" };
-
-function inDays(iso: string, now: number): string {
-  const d = Math.ceil((Date.parse(iso) - now) / DAY);
-  return Number.isNaN(d) ? "" : d <= 0 ? "today" : `in ${d} d`;
-}
 
 export function parseEmails(text: string): { ok: string[]; bad: string[] } {
   const ok: string[] = [];
@@ -325,6 +328,7 @@ export interface Issued {
   id: number;
   email: string;
   code: string;
+  expires: string; // ISO time
 }
 
 async function issueInvites(env: Env, who: string, emails: string[], roleId: number, days: number, note: string, now: Date): Promise<Issued[]> {
@@ -345,24 +349,33 @@ async function issueInvites(env: Env, who: string, emails: string[], roleId: num
     );
   }
   const res = await env.DB.batch<{ id: number }>(stmts);
-  res.forEach((r, i) => out.push({ id: r.results[0].id, email: pending[i].email, code: pending[i].code }));
+  res.forEach((r, i) => out.push({ id: r.results[0].id, email: pending[i].email, code: pending[i].code, expires }));
   return out;
 }
 
-function issuedPage(env: Env, req: Request, who: string, issued: Issued[], heading: string, extra: Html | string = ""): Response {
+// The page with freshly made codes. It has no language switcher: it exists
+// only as the answer to a POST, and switching would reload the invite list
+// and lose the codes.
+function issuedPage(env: Env, req: Request, who: string, L: I18n, issued: Issued[], title: string, extra: Html | string = ""): Response {
+  const heading = title;
   const origin = publicOrigin(env, req);
-  const body = html`<div class="hero"><p class="eyebrow"><a href="/admin/invites">Invites</a></p><h1>${heading}</h1></div>
-${note(html`<b>Copy these now.</b> The codes are not stored and can't be shown again; if one is lost, re-issue that invite.
-Each works once, for one machine, until it expires. Send each person only their own. Click a command once to select all of it.`, "s-warn")}
+  const body = html`<div class="hero"><p class="eyebrow"><a href="/admin/invites">${L.t("nav.invites")}</a></p><h1>${heading}</h1></div>
+${note(L.t("issued.copy"), "s-warn")}
 ${extra}
 ${issued.map((i) => {
     const c = installCommands(env, origin, i.code);
+    // Ids come from the invite's number only, never from its text.
+    const id = `inv-${i.id}`;
+    // The message is plain text in the admin's language, escaped like any other value.
+    const message = L.s("issued.messageText", { link: c.link, date: L.day(i.expires.slice(0, 10)) });
     return html`<h2>${i.email} <span class="muted">#${i.id}</span></h2>
-<div class="panel"><div class="cmd"><div class="cmd-h"><b>Invite link</b><span>opens a page with these instructions</span></div><code>${c.link}</code></div>
-${commandBlock(c)}</div>`;
+<div class="panel"><div class="cmd"><div class="cmd-h"><b>${L.t("issued.link")}</b><span>${L.t("issued.linkSub")}</span>${copyButton(L, `${id}-link`, "copy.link")}</div><code tabindex="0" id="${id}-link">${c.link}</code></div>
+${commandBlock(L, c, id)}
+<div class="cmd"><div class="cmd-h"><b>${L.t("issued.message")}</b><span>${L.t("issued.messageSub")}</span>${copyButton(L, `${id}-msg`, "copy.message")}</div><code tabindex="0" class="msg" id="${id}-msg">${message}</code></div></div>`;
   })}
-<div class="actions"><a class="btn" href="/admin/invites">Back to invites</a></div>`;
-  return page(layout(heading, who, body, "Invites"));
+<div class="actions"><a class="btn" href="/admin/invites">${L.t("issued.back")}</a></div>`;
+  // The one admin page with a script (COPY_SCRIPT): its CSP allows exactly that script.
+  return page(layout(L, title, who, body, "Invites", { switcher: false, copy: true }), 200, COPY_HEADERS);
 }
 
 // createInviteBatch validates and issues invites for the given emails (text:
@@ -382,15 +395,15 @@ export async function createInviteBatch(
   const days = input.days;
   const noteText = cleanLine(input.note, 200);
   const role = Number.isInteger(roleId) ? await env.DB.prepare("SELECT id, name FROM roles WHERE id = ?").bind(roleId).first<{ id: number; name: string }>() : null;
-  const problems: string[] = [];
-  if (!role) problems.push("Pick a role.");
-  if (bad.length) problems.push(`Not email addresses: ${bad.slice(0, 20).join(", ")}${bad.length > 20 ? "…" : ""}`);
-  if (!ok.length && !bad.length) problems.push("Enter at least one email.");
-  if (ok.length > maxBulk) problems.push(`At most ${maxBulk} invites at once.`);
-  if (!Number.isInteger(days) || days < 1 || days > 90) problems.push("Expiry must be 1 to 90 days.");
+  const problems: Msg[] = [];
+  if (!role) problems.push(msg("err.pickRole"));
+  if (bad.length) problems.push(msg("err.notEmails", { list: `${bad.slice(0, 20).join(", ")}${bad.length > 20 ? "…" : ""}` }));
+  if (!ok.length && !bad.length) problems.push(msg("err.noEmails"));
+  if (ok.length > maxBulk) problems.push(msg("err.tooMany", { n: maxBulk }));
+  if (!Number.isInteger(days) || days < 1 || days > 90) problems.push(msg("err.expiry"));
   if (cfg.emailDomains.length) {
     const outside = ok.filter((e) => !cfg.emailDomains.includes(e.split("@")[1]));
-    if (outside.length) problems.push(`Outside ALLOWED_EMAIL_DOMAINS: ${outside.slice(0, 20).join(", ")}`);
+    if (outside.length) problems.push(msg("err.outsideDomains", { list: outside.slice(0, 20).join(", ") }));
   }
   if (problems.length) return { ok: false, status: 400, errors: problems };
 
@@ -404,7 +417,7 @@ export async function createInviteBatch(
   return { ok: true, issued, role: role!.name, days };
 }
 
-export async function createInvites(env: Env, req: Request, url: URL, who: string, form: FormData): Promise<Response> {
+export async function createInvites(env: Env, req: Request, url: URL, who: string, form: FormData, L: I18n): Promise<Response> {
   const cfg = config(env);
   const daysIn = Number(form.get("days") || cfg.inviteDays);
   const days = Number.isFinite(daysIn) && daysIn >= 1 && daysIn <= 90 ? Math.floor(daysIn) : cfg.inviteDays;
@@ -414,36 +427,37 @@ export async function createInvites(env: Env, req: Request, url: URL, who: strin
     days,
     note: String(form.get("note") ?? ""),
   });
-  if (!r.ok) return invitesPage(env, url, who, html`Nothing created:<ul>${r.errors.map((p) => html`<li>${p}</li>`)}</ul>`, 400);
-  return issuedPage(env, req, who, r.issued, r.issued.length === 1 ? "Invite created" : `${r.issued.length} invites created`);
+  if (!r.ok) return invitesPage(env, url, who, L, errorList(L, "invites.nothingCreated", r.errors), 400);
+  const n = r.issued.length;
+  return issuedPage(env, req, who, L, r.issued, n === 1 ? L.s("issued.one") : L.s("issued.many", { n }));
 }
 
 export async function revokeInviteOp(env: Env, who: string, id: number, extra: AuditExtra = {}): Promise<OpResult<{ email: string }>> {
   const ts = new Date().toISOString();
   const inv = await env.DB.prepare("SELECT email FROM invites WHERE id = ?").bind(id).first<{ email: string }>();
-  if (!inv) return { ok: false, status: 404, errors: ["No such invite."] };
+  if (!inv) return { ok: false, status: 404, errors: [msg("err.noSuchInvite")] };
   // The audit row is written only if this request's UPDATE revoked it.
   const res = await env.DB.batch([
     env.DB.prepare("UPDATE invites SET revoked_at = ?, revoked_by = ? WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL").bind(ts, who, id),
     auditStmtIf(env, { sql: "SELECT 1 FROM invites WHERE id = ? AND revoked_at = ? AND revoked_by = ? AND reissued_as IS NULL", binds: [id, ts, who] },
       who, "invite.revoke", `invite #${id}`, { email: inv.email, ...extra }),
   ]);
-  if (res[0].meta.changes !== 1) return { ok: false, status: 409, errors: [`Invite #${id} was already used or revoked.`] };
+  if (res[0].meta.changes !== 1) return { ok: false, status: 409, errors: [msg("err.inviteUsedOrRevoked", { id })] };
   return { ok: true, email: inv.email };
 }
 
-export async function revokeInvite(env: Env, url: URL, who: string, id: number): Promise<Response> {
+export async function revokeInvite(env: Env, url: URL, who: string, id: number, L: I18n): Promise<Response> {
   const r = await revokeInviteOp(env, who, id);
-  if (!r.ok) return invitesPage(env, url, who, r.errors[0], r.status);
-  return invitesPage(env, url, who, `Invite #${id} revoked.`);
+  if (!r.ok) return invitesPage(env, url, who, L, L.m(r.errors[0]), r.status);
+  return invitesPage(env, url, who, L, L.t("invites.revoked", { id }));
 }
 
 export async function reissueInviteOp(env: Env, who: string, id: number, extra: AuditExtra = {}): Promise<OpResult<{ issued: Issued }>> {
   const inv = await env.DB.prepare("SELECT id, email, role_id, note, used_at, reissued_as FROM invites WHERE id = ?")
     .bind(id)
     .first<{ id: number; email: string; role_id: number; note: string; used_at: string | null; reissued_as: number | null }>();
-  if (!inv) return { ok: false, status: 404, errors: ["No such invite."] };
-  if (inv.used_at || inv.reissued_as) return { ok: false, status: 409, errors: [`Invite #${id} was used or already re-issued; create a new invite instead.`] };
+  if (!inv) return { ok: false, status: 404, errors: [msg("err.noSuchInvite")] };
+  if (inv.used_at || inv.reissued_as) return { ok: false, status: 409, errors: [msg("err.inviteNotReissuable", { id })] };
   const now = new Date();
   const ts = now.toISOString();
   // Revoke the old one first; only the request that does so issues the new one.
@@ -452,7 +466,7 @@ export async function reissueInviteOp(env: Env, who: string, id: number, extra: 
   )
     .bind(ts, who, id)
     .run();
-  if (claim.meta.changes !== 1) return { ok: false, status: 409, errors: [`Invite #${id} was used or already re-issued.`] };
+  if (claim.meta.changes !== 1) return { ok: false, status: 409, errors: [msg("err.inviteRaced", { id })] };
   const [n] = await issueInvites(env, who, [inv.email], inv.role_id, config(env).inviteDays, inv.note, now);
   await env.DB.batch([
     env.DB.prepare("UPDATE invites SET reissued_as = ? WHERE id = ?").bind(n.id, id),
@@ -461,10 +475,10 @@ export async function reissueInviteOp(env: Env, who: string, id: number, extra: 
   return { ok: true, issued: n };
 }
 
-export async function reissueInvite(env: Env, req: Request, url: URL, who: string, id: number): Promise<Response> {
+export async function reissueInvite(env: Env, req: Request, url: URL, who: string, id: number, L: I18n): Promise<Response> {
   const r = await reissueInviteOp(env, who, id);
-  if (!r.ok) return invitesPage(env, url, who, r.errors[0], r.status);
-  return issuedPage(env, req, who, [r.issued], "Invite re-issued", html`<p class="muted">Invite #${id} no longer works.</p>`);
+  if (!r.ok) return invitesPage(env, url, who, L, L.m(r.errors[0]), r.status);
+  return issuedPage(env, req, who, L, [r.issued], L.s("issued.reissued"), html`<p class="muted">${L.t("issued.oldGone", { id })}</p>`);
 }
 
 // ---- Machines: enrollment, role, revoke, waivers, report link ----
@@ -497,12 +511,11 @@ export async function enrollmentOf(env: Env, id: string): Promise<EnrollmentRow 
     .first<EnrollmentRow>();
 }
 
-export async function enrollmentSection(env: Env, id: string, e: EnrollmentRow | null, now: Date): Promise<Html> {
-  const linkForm = html`<h2>Report link</h2>
-<div class="panel"><p class="muted">Each accepted report gets a login-free link to that machine's own latest results, which bordercheck can open for
-the person at the machine. Reset to make every link issued so far stop working.</p>
-<form method="post" action="${machineLink(id)}/reset-link"><button>Reset report links</button></form></div>`;
-  if (!e) return html`<h2>Enrollment</h2><div class="panel"><p class="muted">No enrollment record for this machine.</p></div>${linkForm}`;
+export async function enrollmentSection(L: I18n, env: Env, id: string, e: EnrollmentRow | null, now: Date): Promise<Html> {
+  const linkForm = html`<h2>${L.t("enr.linkTitle")}</h2>
+<div class="panel"><p class="muted">${L.t("enr.linkText")}</p>
+<form method="post" action="${machineLink(id)}/reset-link"><button>${L.t("enr.linkReset")}</button></form></div>`;
+  if (!e) return html`<h2>${L.t("enr.title")}</h2><div class="panel"><p class="muted">${L.t("enr.none")}</p></div>${linkForm}`;
   const [waivers, options] = await Promise.all([
     env.DB.prepare("SELECT * FROM machine_waivers WHERE install_id = ? ORDER BY removed_at IS NOT NULL, until DESC LIMIT 200")
       .bind(id)
@@ -511,33 +524,33 @@ the person at the machine. Reset to make every link issued so far stop working.<
   ]);
   const t = today(now);
   const active = waivers.results.filter((w) => !w.removed_at && w.until >= t).length;
-  return html`<h2>Enrollment</h2>
+  return html`<h2>${L.t("enr.title")}</h2>
 <div class="cols"><div class="panel"><dl class="facts">
-<div><dt>Status</dt><dd>${e.revoked_at ? html`${pill("s-fail", "revoked")}<br><span class="muted small">${when(e.revoked_at)} by ${e.revoked_by}</span>` : pill("s-pass", "active")}</dd></div>
-<div><dt>Role</dt><dd>${e.role}</dd></div>
-<div><dt>Email</dt><dd>${e.email}<br><span class="muted small">from the invite; reports can't change it</span></dd></div>
-<div><dt>Invite</dt><dd>${e.invite_id ? html`#${e.invite_id} by ${e.invite_by}${e.invite_note ? html`<br><span class="muted small">${e.invite_note}</span>` : ""}` : "?"}</dd></div>
-<div><dt>Enrolled</dt><dd>${when(e.enrolled_at)}<br><span class="muted small">as ${e.hostname || "?"} (${e.os}/${e.arch}, ${e.version || "?"})</span></dd></div>
-<div><dt>Last policy fetch</dt><dd>${when(e.last_policy_at) || "never"}${e.last_policy_at ? html`<br><span class="muted small">${ago(e.last_policy_at, now.getTime())}</span>` : ""}</dd></div></dl></div>
-<div class="panel"><form method="post" action="${machineLink(id)}/role"><label for="m-role">Role</label><div class="row"><div class="grow"><select id="m-role" name="role_id">${options}</select></div><button>Change role</button></div></form>
+<div><dt>${L.t("common.status")}</dt><dd>${e.revoked_at ? html`${pill("s-fail", L.t("state.revoked"))}<br><span class="muted small">${L.t("enr.revokedBy", { when: L.when(e.revoked_at), who: e.revoked_by })}</span>` : pill("s-pass", L.t("state.active"))}</dd></div>
+<div><dt>${L.t("common.role")}</dt><dd>${e.role}</dd></div>
+<div><dt>${L.t("enr.email")}</dt><dd>${e.email}<br><span class="muted small">${L.t("enr.emailSub")}</span></dd></div>
+<div><dt>${L.t("enr.invite")}</dt><dd>${e.invite_id ? html`${L.t("enr.inviteBy", { id: e.invite_id, who: e.invite_by })}${e.invite_note ? html`<br><span class="muted small">${e.invite_note}</span>` : ""}` : "?"}</dd></div>
+<div><dt>${L.t("enr.enrolled")}</dt><dd>${L.when(e.enrolled_at)}<br><span class="muted small">${L.t("enr.as", { host: e.hostname || "?", platform: `${e.os}/${e.arch}`, version: e.version || "?" })}</span></dd></div>
+<div><dt>${L.t("enr.lastPolicy")}</dt><dd>${L.when(e.last_policy_at) || L.s("time.never")}${e.last_policy_at ? html`<br><span class="muted small">${L.ago(e.last_policy_at, now.getTime())}</span>` : ""}</dd></div></dl></div>
+<div class="panel"><form method="post" action="${machineLink(id)}/role"><label for="m-role">${L.t("common.role")}</label><div class="row"><div class="grow"><select id="m-role" name="role_id">${options}</select></div><button>${L.t("enr.changeRole")}</button></div></form>
 <div class="actions">${e.revoked_at
-    ? html`<form method="post" action="${machineLink(id)}/restore"><button>Restore</button></form><span class="muted small">Its token works again.</span>`
-    : html`<form method="post" action="${machineLink(id)}/revoke"><button class="danger">Revoke</button></form><span class="muted small">Its token stops working at once; its history stays.</span>`}</div></div></div>
-<h2>Waivers${active ? html` <span class="muted">(${active} active)</span>` : ""}</h2>
-<p class="muted">Delivered to this machine through <code>/policy</code>, keyed by its install ID, at its next hourly refresh.</p>
+    ? html`<form method="post" action="${machineLink(id)}/restore"><button>${L.t("enr.restore")}</button></form><span class="muted small">${L.t("enr.restoreSub")}</span>`
+    : html`<form method="post" action="${machineLink(id)}/revoke"><button class="danger">${L.t("enr.revoke")}</button></form><span class="muted small">${L.t("enr.revokeSub")}</span>`}</div></div></div>
+<h2>${L.t("enr.waivers")}${active ? html` <span class="muted">${L.t("enr.active", { n: active })}</span>` : ""}</h2>
+<p class="muted">${L.t("enr.waiversText")}</p>
 ${waivers.results.length
-    ? html`<div class="panel flush"><div class="scroll"><table><thead><tr><th>Check</th><th>Until</th><th>Reason</th><th>Added</th><th></th></tr></thead><tbody>
+    ? html`<div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("common.check")}</th><th>${L.t("enr.thUntil")}</th><th>${L.t("enr.thReason")}</th><th>${L.t("enr.thAdded")}</th><th></th></tr></thead><tbody>
 ${waivers.results.map(
-        (w) => html`<tr${w.removed_at || w.until < t ? html` class="off"` : ""}><td><code>${w.check_id}</code></td><td class="nowrap">${w.until}${w.until < t ? html`<span class="sub">ended</span>` : ""}${w.removed_at ? html`<span class="sub">removed</span>` : ""}</td><td class="wrap">${w.reason}</td>
-<td class="nowrap">${when(w.created_at)}<span class="sub">by ${w.created_by}${w.removed_at ? html` · removed ${when(w.removed_at)} by ${w.removed_by}` : ""}</span></td>
-<td>${w.removed_at ? "" : html`<form method="post" action="${machineLink(id)}/waivers/${w.id}/remove"><button class="sm">Remove</button></form>`}</td></tr>`,
+        (w) => html`<tr${w.removed_at || w.until < t ? html` class="off"` : ""}><td><code>${w.check_id}</code></td><td class="nowrap">${L.day(w.until)}${w.until < t ? html`<span class="sub">${L.t("enr.ended")}</span>` : ""}${w.removed_at ? html`<span class="sub">${L.t("enr.removed")}</span>` : ""}</td><td class="wrap">${w.reason}</td>
+<td class="nowrap">${L.when(w.created_at)}<span class="sub">${L.t("common.byWho", { who: w.created_by })}${w.removed_at ? L.t("enr.removedBy", { when: L.when(w.removed_at), who: w.removed_by }) : ""}</span></td>
+<td>${w.removed_at ? "" : html`<form method="post" action="${machineLink(id)}/waivers/${w.id}/remove"><button class="sm">${L.t("enr.remove")}</button></form>`}</td></tr>`,
       )}</tbody></table></div></div>`
     : ""}
-<form method="post" action="${machineLink(id)}/waivers"><div class="panel"><h3>Add a waiver</h3><div class="row">
-<div class="field"><label for="w-check">Check</label><select id="w-check" name="check">${POLICY_CHECKS.map((c) => html`<option>${c}</option>`)}</select></div>
-<div class="field"><label for="w-until">Until</label><input id="w-until" type="date" name="until" required min="${t}"></div>
-<div class="field grow"><label for="w-reason">Reason</label><input id="w-reason" name="reason" maxlength="300" required placeholder="Why, and who agreed"></div>
-<button>Add waiver</button></div></div></form>
+<form method="post" action="${machineLink(id)}/waivers"><div class="panel"><h3>${L.t("enr.add")}</h3><div class="row">
+<div class="field"><label for="w-check">${L.t("common.check")}</label><select id="w-check" name="check">${POLICY_CHECKS.map((c) => html`<option>${c}</option>`)}</select></div>
+<div class="field"><label for="w-until">${L.t("enr.thUntil")}</label><input id="w-until" type="date" name="until" required min="${t}"></div>
+<div class="field grow"><label for="w-reason">${L.t("enr.thReason")}</label><input id="w-reason" name="reason" maxlength="300" required placeholder="${L.s("enr.reasonPlaceholder")}"></div>
+<button>${L.t("enr.addButton")}</button></div></div></form>
 ${linkForm}`;
 }
 
@@ -566,8 +579,8 @@ export function machineParams(form: FormData, waiverId = 0): MachineParams {
 }
 
 // machineAction runs a write on one machine (from its dashboard page or an MCP
-// tool) and returns an error message for the admin, or "" on success. `extra`
-// is merged into the audit row's detail.
+// tool) and returns an error message for the admin, or none on success.
+// `extra` is merged into the audit row's detail.
 export async function machineAction(
   env: Env,
   who: string,
@@ -575,17 +588,17 @@ export async function machineAction(
   action: MachineAction,
   params: MachineParams,
   extra: AuditExtra = {},
-): Promise<{ status: number; error: string; detail?: Record<string, unknown> }> {
+): Promise<{ status: number; error?: Msg; detail?: Record<string, unknown> }> {
   const now = new Date();
   const ts = now.toISOString();
   const db = env.DB;
   const e = await db.prepare("SELECT install_id, role_id, revoked_at FROM enrollments WHERE install_id = ?").bind(id).first<{ install_id: string; role_id: number; revoked_at: string | null }>();
   if (action === "reset-link") {
-    if (!(await machineExists(env, id))) return { status: 404, error: "No such machine." };
+    if (!(await machineExists(env, id))) return { status: 404, error: msg("err.noSuchMachine") };
     await db.batch([db.prepare("DELETE FROM report_links WHERE install_id = ?").bind(id), auditStmt(env, who, "machine.reset_link", id, { ...extra })]);
-    return { status: 200, error: "" };
+    return { status: 200 };
   }
-  if (!e) return { status: 409, error: "This machine is not enrolled." };
+  if (!e) return { status: 409, error: msg("err.notEnrolled") };
   switch (action) {
     case "revoke":
     case "restore": {
@@ -598,35 +611,35 @@ export async function machineAction(
         db.prepare("DELETE FROM report_links WHERE install_id = ?").bind(id),
         auditStmt(env, who, revoking ? "machine.revoke" : "machine.restore", id, { ...extra }),
       ]);
-      return { status: 200, error: "" };
+      return { status: 200 };
     }
     case "role": {
       const roleId = Number(params.role_id);
       const role = Number.isInteger(roleId) ? await db.prepare("SELECT id, name FROM roles WHERE id = ?").bind(roleId).first<{ id: number; name: string }>() : null;
-      if (!role) return { status: 400, error: "No such role." };
+      if (!role) return { status: 400, error: msg("err.noSuchRole") };
       const old = await db.prepare("SELECT name FROM roles WHERE id = ?").bind(e.role_id).first<string>("name");
       await db.batch([
         db.prepare("UPDATE enrollments SET role_id = ? WHERE install_id = ?").bind(role.id, id),
         auditStmt(env, who, "machine.change_role", id, { from: old, to: role.name, ...extra }),
       ]);
-      return { status: 200, error: "", detail: { from: old, to: role.name } };
+      return { status: 200, detail: { from: old, to: role.name } };
     }
     case "waivers": {
       const check = cleanLine(String(params.check ?? ""), 64);
       const until = cleanLine(String(params.until ?? ""), 16);
       const reason = cleanLine(String(params.reason ?? ""), 300);
       if (!CHECK_ID_RE.test(check) || !POLICY_CHECKS.includes(check)) {
-        return { status: 400, error: `Check must be one of the checks bordercheck's policy knows: ${POLICY_CHECKS.join(", ")}.` };
+        return { status: 400, error: msg("err.waiverCheck", { list: POLICY_CHECKS.join(", ") }) };
       }
       const dateErr = waiverDateError(until, now);
-      if (dateErr) return { status: 400, error: `Waiver not added: ${dateErr}.` };
-      if (!reason) return { status: 400, error: "Waiver not added: a reason is required." };
+      if (dateErr) return { status: 400, error: msg("err.waiverNotAdded", { problem: dateErr }) };
+      if (!reason) return { status: 400, error: msg("err.waiverReason") };
       const res = await db.batch([
         db.prepare("INSERT INTO machine_waivers (install_id, check_id, until, reason, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?) RETURNING id").bind(id, check, until, reason, ts, who),
         auditStmt(env, who, "waiver.add", id, { check, until, reason, ...extra }),
       ]);
       const waiverId = (res[0].results[0] as { id: number } | undefined)?.id;
-      return { status: 200, error: "", detail: { waiver_id: waiverId, check, until, reason } };
+      return { status: 200, detail: { waiver_id: waiverId, check, until, reason } };
     }
     case "remove-waiver": {
       const waiverId = Number(params.waiver_id ?? 0);
@@ -635,10 +648,10 @@ export async function machineAction(
         auditStmtIf(env, { sql: "SELECT 1 FROM machine_waivers WHERE id = ? AND install_id = ? AND removed_at = ? AND removed_by = ?", binds: [waiverId, id, ts, who] },
           who, "waiver.remove", id, { waiver: waiverId, ...extra }),
       ]);
-      return res[0].meta.changes === 1 ? { status: 200, error: "" } : { status: 404, error: "No such waiver." };
+      return res[0].meta.changes === 1 ? { status: 200 } : { status: 404, error: msg("err.noSuchWaiver") };
     }
   }
-  return { status: 400, error: "Unknown action." };
+  return { status: 400, error: msg("err.unknownAction") };
 }
 
 // ---- Audit ----
@@ -661,18 +674,17 @@ export async function auditRows(env: Env, limit: number, mcpOnly = false): Promi
   return rows.results;
 }
 
-export async function auditPage(env: Env, url: URL, who: string): Promise<Response> {
+export async function auditPage(env: Env, url: URL, who: string, L: I18n): Promise<Response> {
   const mcpOnly = url.searchParams.get("who") === "mcp";
   const rows = { results: await auditRows(env, 500, mcpOnly) };
-  const body = html`<div class="hero"><p class="eyebrow">Accountability</p><h1>Audit trail</h1>
-<p class="lead">Every change made in the dashboard, by the admin token or through the MCP server, and every enrollment. Newest first, last 500.
-MCP rows record the tool and its arguments: review what a model did here.</p></div>
-<div class="toolbar"><nav class="seg" aria-label="Who"><a class="${mcpOnly ? "" : "on"}" href="/admin/audit">all</a><a class="${mcpOnly ? "on" : ""}" href="/admin/audit?who=mcp">MCP only</a></nav></div>
-<div class="panel flush"><div class="scroll"><table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Detail</th></tr></thead><tbody>
+  const body = html`<div class="hero"><p class="eyebrow">${L.t("audit.eyebrow")}</p><h1>${L.t("audit.title")}</h1>
+<p class="lead">${L.t("audit.lead")}</p></div>
+<div class="toolbar"><nav class="seg" aria-label="${L.s("audit.thWho")}"><a class="${mcpOnly ? "" : "on"}" href="/admin/audit">${L.t("audit.all")}</a><a class="${mcpOnly ? "on" : ""}" href="/admin/audit?who=mcp">${L.t("audit.mcpOnly")}</a></nav></div>
+<div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("audit.thWhen")}</th><th>${L.t("audit.thWho")}</th><th>${L.t("audit.thAction")}</th><th>${L.t("audit.thTarget")}</th><th>${L.t("audit.thDetail")}</th></tr></thead><tbody>
 ${rows.results.map(
-    (a) => html`<tr><td class="nowrap">${when(a.at)}</td><td class="wrap">${a.who.startsWith("mcp") ? pill("s-error", a.who) : a.who}</td><td class="nowrap"><code>${a.action}</code></td><td class="wrap">${
+    (a) => html`<tr><td class="nowrap">${L.when(a.at)}</td><td class="wrap">${a.who.startsWith("mcp") ? pill("s-error", a.who) : a.who}</td><td class="nowrap"><code>${a.action}</code></td><td class="wrap">${
       /^[0-9a-f]{32}$/.test(a.target) ? html`<a class="u mono" href="${machineLink(a.target)}">${a.target}</a>` : a.target
     }</td><td class="ev wrap">${a.detail === "{}" ? "" : a.detail}</td></tr>`,
-  )}</tbody></table></div>${rows.results.length === 0 ? html`<p class="empty">Nothing yet.</p>` : ""}</div>`;
-  return page(layout("Audit", who, body, "Audit"));
+  )}</tbody></table></div>${rows.results.length === 0 ? html`<p class="empty">${L.t("audit.empty")}</p>` : ""}</div>`;
+  return page(layout(L, L.s("audit.title"), who, body, "Audit"));
 }

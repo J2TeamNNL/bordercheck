@@ -51,7 +51,8 @@ describe("login-free report links", () => {
     expect(body).not.toContain("secret-path"); // no evidence
     expect(body).not.toContain("5432");
     expect(body).not.toContain("/admin"); // no admin nav or controls
-    expect(body).not.toContain("<form");
+    // The only form is the language switcher, which posts to the page itself.
+    expect(body.match(/<form[^>]*>/g)).toEqual([`<form class="langs" method="post" role="group" aria-label="Language">`]);
   });
 
   it("cannot reach another machine, and unknown ids get one uniform 404", async () => {

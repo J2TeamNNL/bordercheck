@@ -148,6 +148,9 @@ invalid entries are dropped, at most 32 kept) and `location` (`{"lat", "lon", "a
 - **A leaked machine token** lets its holder send reports as that one machine and read its policy (which holds
   no secrets but shows that machine's waivers). Revoke the machine; reinstall with a new invite.
 - **Read access to the database** shows reports, emails, IPs and locations, but no usable code, token or link.
+- The issued-invites page and `/i/<code>` are the only pages with a script: one hash-pinned inline script for
+  Copy buttons, which never sends what it copies anywhere ([Dashboard access](#dashboard-access)). Every other
+  page runs no script at all.
 - A machine token can only write that machine's own record: the install_id and email of a report come from the
   token's enrollment, never from the body.
 - Reports are still self-reported: they tell you who needs help, not proof of compliance. Further limits on a
@@ -192,6 +195,54 @@ can send `Authorization: Bearer <ADMIN_TOKEN>`. If you use only Access, don't se
 
 Pages carry a CSP with no scripts at all, and every value from a report (hostname, email, title, summary,
 evidence) is escaped: a report is attacker-controllable input. Forms only accept same-origin posts.
+
+**The one script: Copy buttons.** Two pages carry one small inline script, for Copy buttons: the admin page
+that shows freshly issued invites (after creating or re-issuing them: copy the link, either install command,
+or a ready-to-send message in the admin's language), and the invite page `/i/<code>` (copy the command). The
+script (`COPY_SCRIPT` in `src/html.ts`) only copies the `textContent` of an element the server rendered, with
+`navigator.clipboard` or by selecting it; it builds no HTML, loads nothing and sends nothing, so copied invite
+codes are never logged, audited or transmitted. It is allowed by its SHA-256 hash (`script-src
+'sha256-…'`), on those two responses only; a test recomputes the hash from the page as served. Every other page
+keeps the script-free CSP, unchanged. The buttons are rendered `hidden` and shown by the script, so with
+scripts off they don't appear and the click-to-select command blocks work as before. There is deliberately no
+"copy all links" button: one paste into the wrong channel would leak every code.
+
+## Languages
+
+Every page, admin and public, is in **English, Simplified Chinese or Vietnamese**.
+
+How the language is chosen, per request:
+
+1. The `bc_lang` cookie, set by the switcher in each page's header (`EN · 中文 · VI`). It is a plain POST form
+   (no script): on admin and sign-in pages it posts to `/lang` with the current path, and `/lang` redirects
+   back only to a same-origin path; on `/i/<code>` and `/r/<id>` it posts to the page's own URL, which sets the
+   cookie and redirects to that same path, so the code is not copied anywhere and the invite is not touched.
+   The cookie holds only the language code (validated on read), `Path=/; Max-Age=1 year; Secure; HttpOnly;
+   SameSite=Lax`. The page showing freshly issued codes has no switcher (switching would reload the list and
+   lose them).
+2. Otherwise `Accept-Language`, by q-value. Every Chinese tag maps to Simplified Chinese, including `zh-TW`,
+   `zh-HK` and `zh-Hant` (Simplified reads better for them than English); `vi*` to Vietnamese.
+3. Otherwise English.
+
+Pages set `<html lang>` (`en`, `zh-Hans`, `vi`) and `Vary: Accept-Language, Cookie`, and stay `no-store`.
+Dates are UTC: ISO `2026-11-01 10:05 UTC` in English, the local numeric order in Chinese and Vietnamese;
+numbers, plurals and relative times ("3m ago", "3分钟前", "3 phút trước") come from `Intl`.
+
+**Deliberately not translated**: anything a machine sends (check titles, summaries, fix text, evidence,
+unknown statuses), check IDs, policy JSON and the field names and JSON paths quoted in validation messages,
+audit action codes, emails and hostnames, the MCP server (a machine interface: tools, descriptions, results
+and errors stay English), the JSON of `/enroll`, `/policy` and `/report`, and webhook alerts (English; there
+is no per-deployment language setting). Known statuses and severities (`fail`, `high`…) are shown translated
+in pages; anything else as received.
+
+**Adding a language**: copy `src/i18n/vi.ts` to `src/i18n/<code>.ts` and translate it (it is typed
+`Record<Key, Entry>`, so a missing or extra key fails `npm run typecheck`), add the code to `LANGS`, `CATALOGS`,
+`HTML_LANG`, `LOCALE`, `LANG_SHORT` and `LANG_NAME` in `src/i18n/index.ts` and to `langOfTag`, and run the
+tests (`test/i18n.test.ts` checks each translation keeps English's `{parameters}` and balanced markup, and
+renders every page in every language). In a translation, `{name}` is a parameter (always escaped) and
+`[b]…[/b]`, `[code]…[/code]`, `[kbd]…[/kbd]` are the only markup; any other `<`, `>` or `&` is shown as text.
+Operations shared with the MCP server return messages (`Msg`, a key and parameters) rather than text, so the
+dashboard shows them in the admin's language and MCP in English.
 
 ## MCP server: ask Claude about the fleet
 
