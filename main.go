@@ -35,6 +35,8 @@ const usage = `Usage:
   bordercheck send [-force]                          what the service runs; -force sends a report now
   bordercheck update                                 refresh the policy and install a newer signed release now
   bordercheck uninstall
+  bordercheck verify SHA256SUMS SHA256SUMS.sig [file...]
+                                                     check downloaded release files against the signed checksums
   bordercheck -list | -print-policy | -version
 
 The policy is read from -policy, then $BORDERCHECK_POLICY, then policies.json beside the binary,
@@ -48,6 +50,8 @@ func run(args []string) int {
 		switch args[0] {
 		case "install", "uninstall", "status", "send", "update":
 			return runAgent(args[0], args[1:])
+		case "verify":
+			return runVerify(args[1:])
 		}
 	}
 	return runCheck(args)

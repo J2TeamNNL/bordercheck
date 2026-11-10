@@ -3,23 +3,180 @@ on:
   push:
     tags: ["v*"]
 
+# Order matters: build → code-sign and notarize the macOS binaries → only then
+# compute and sign SHA256SUMS (a code signature changes the file) → publish.
+#
+# Repo secrets:
+#   BORDERCHECK_SIGNING_KEY       required. ed25519 key from `go run ./scripts/sign -keygen`; signs SHA256SUMS.
+#   MACOS_CERTIFICATE_P12         optional. base64 of a .p12 holding the "Developer ID Application" certificate and its key.
+#   MACOS_CERTIFICATE_PASSWORD    the .p12's password.
+#   MACOS_SIGNING_IDENTITY        optional. e.g. "Developer ID Application: Acme Ltd (ABCDE12345)"; found in the .p12 when empty.
+#   APPLE_NOTARY_KEY_P8           optional. Contents of an App Store Connect API key (AuthKey_XXXXXXXXXX.p8) for notarytool.
+#   APPLE_NOTARY_KEY_ID           its key ID.
+#   APPLE_NOTARY_ISSUER_ID        its issuer ID.
+# Without the MACOS_* secrets the release still goes out, with unsigned macOS
+# binaries and a warning on the run. This macOS signing has not been run for
+# real yet: check the first signed release by hand (see README, Releasing).
+
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go test ./...
-      - run: test -n "$BORDERCHECK_SIGNING_KEY" && scripts/build-all.sh "$GITHUB_REF_NAME" && test -s dist/SHA256SUMS.sig
+      - run: go vet ./... && go test ./...
+      - run: scripts/build-all.sh "$GITHUB_REF_NAME" --no-sums
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: dist/
+          if-no-files-found: error
+
+  macos:
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: dist/
+      - name: Which signing secrets are set
+        id: cfg
+        env:
+          P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          sign=no notarize=no
+          [ -n "$P12" ] && sign=yes
+          [ "$sign" = yes ] && [ -n "$NOTARY_KEY" ] && [ -n "$NOTARY_KEY_ID" ] && [ -n "$NOTARY_ISSUER" ] && notarize=yes
+          echo "sign=$sign" >>"$GITHUB_OUTPUT"
+          echo "notarize=$notarize" >>"$GITHUB_OUTPUT"
+          if [ "$sign" = no ]; then
+            msg="MACOS_CERTIFICATE_P12 is not set: the macOS binaries are NOT code-signed or notarized. Gatekeeper blocks them when downloaded with a browser (install.sh and Homebrew are unaffected)."
+            echo "::warning title=macOS binaries are NOT signed::$msg"
+            printf '## :warning: macOS binaries are NOT signed\n\n%s\n' "$msg" >>"$GITHUB_STEP_SUMMARY"
+          elif [ "$notarize" = no ]; then
+            msg="The APPLE_NOTARY_* secrets are not all set: the macOS binaries are signed but NOT notarized, so Gatekeeper still blocks them when downloaded with a browser."
+            echo "::warning title=macOS binaries are NOT notarized::$msg"
+            printf '## :warning: macOS binaries are NOT notarized\n\n%s\n' "$msg" >>"$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Import the Developer ID certificate into a throwaway keychain
+        if: steps.cfg.outputs.sign == 'yes'
+        env:
+          P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          set -eu
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_pw=$(openssl rand -base64 24)
+          printf '%s' "$P12" | base64 --decode >"$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$keychain_pw" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_pw" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -f pkcs12 -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_pw" "$keychain" >/dev/null
+          # Search it, plus the keychains already there (for Apple's intermediate certificates).
+          eval "set -- $(security list-keychains -d user | tr '\n' ' ')"
+          security list-keychains -d user -s "$keychain" "$@"
+          echo "KEYCHAIN=$keychain" >>"$GITHUB_ENV"
+
+      - name: Code-sign the macOS binaries (hardened runtime, secure timestamp)
+        if: steps.cfg.outputs.sign == 'yes'
+        env:
+          IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          set -eu
+          if [ -z "$IDENTITY" ]; then
+            IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | awk -F'"' '/Developer ID Application/ { print $2; exit }')
+          fi
+          [ -n "$IDENTITY" ] || { echo "::error::No Developer ID Application identity in MACOS_CERTIFICATE_P12"; exit 1; }
+          for f in dist/bordercheck-*-darwin-*; do
+            codesign --force --sign "$IDENTITY" --keychain "$KEYCHAIN" --options runtime --timestamp \
+              --identifier io.github.ptrinh.bordercheck "$f"
+            codesign --verify --strict --verbose=2 "$f"
+            codesign --display --verbose=2 "$f" 2>&1 | grep -E '^(Authority|TeamIdentifier|Timestamp|Runtime)'
+          done
+          # The runner is Apple silicon: the arm64 binary must still run once signed.
+          chmod +x dist/bordercheck-*-darwin-*
+          "dist/bordercheck-$GITHUB_REF_NAME-darwin-arm64" -version
+
+      - name: Notarize the macOS binaries
+        if: steps.cfg.outputs.notarize == 'yes'
+        env:
+          NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -eu
+          key="$RUNNER_TEMP/notary.p8"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$NOTARY_KEY" >"$key"
+          # A bare executable cannot be stapled; Gatekeeper looks the ticket up online.
+          for f in dist/bordercheck-*-darwin-*; do
+            zip="$RUNNER_TEMP/$(basename "$f").zip"
+            ditto -c -k --keepParent "$f" "$zip"
+            out=$(xcrun notarytool submit "$zip" --key "$key" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER" \
+              --wait --timeout 30m --output-format json)
+            echo "$out"
+            id=$(printf '%s' "$out" | jq -r .id)
+            status=$(printf '%s' "$out" | jq -r .status)
+            if [ "$status" != Accepted ]; then
+              xcrun notarytool log "$id" --key "$key" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER" || true
+              echo "::error::Notarization of $(basename "$f") ended as $status"
+              exit 1
+            fi
+          done
+
+      - name: Remove the keychain
+        if: always() && steps.cfg.outputs.sign == 'yes'
+        run: security delete-keychain "$KEYCHAIN" || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darwin
+          path: dist/bordercheck-*-darwin-*
+          if-no-files-found: error
+
+  release:
+    needs: macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: dist/
+      - uses: actions/download-artifact@v4
+        with:
+          name: darwin
+          path: darwin/
+      - name: Take the macOS binaries from the signing job
+        run: cp -f darwin/bordercheck-*-darwin-* dist/ && rm -rf darwin
+      # SHA256SUMS.sig is what installed copies and the install scripts trust.
+      - name: Write and sign SHA256SUMS
+        run: test -n "$BORDERCHECK_SIGNING_KEY" && scripts/sums.sh && test -s dist/SHA256SUMS.sig
         env:
           BORDERCHECK_SIGNING_KEY: ${{ secrets.BORDERCHECK_SIGNING_KEY }}
-      # SHA256SUMS.sig is what installed copies trust for self-update.
-      # TODO: also code-sign (Developer ID + notarize for macOS, Authenticode for Windows).
-      - run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
+      # Fails if the secret is not the key behind update.OfficialKey: such a
+      # release would be refused by every installed copy and installer.
+      - name: Check the release against the key built into bordercheck
+        run: go run . verify dist/SHA256SUMS dist/SHA256SUMS.sig dist/bordercheck-*
+      - name: Render the Homebrew formula
+        run: scripts/homebrew-formula.sh "$GITHUB_REF_NAME" dist/SHA256SUMS "$GITHUB_REPOSITORY" >bordercheck.rb
+      - run: gh release create "$GITHUB_REF_NAME" dist/* bordercheck.rb --title "$GITHUB_REF_NAME" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,14 +1,23 @@
 #!/bin/sh
-# Cross-compiles release binaries and SHA256SUMS into dist/, and signs
-# SHA256SUMS when $BORDERCHECK_SIGNING_KEY is set (required for releases:
-# installed copies only update to signed releases).
-# Usage: scripts/build-all.sh [version]
+# Cross-compiles release binaries into dist/, then writes and signs
+# SHA256SUMS (scripts/sums.sh) unless --no-sums is given. The release workflow
+# uses --no-sums so the macOS binaries can be code-signed first: a signature
+# changes the file, so the checksums must come after it.
+# Usage: scripts/build-all.sh [version] [--no-sums]
 set -eu
 cd "$(dirname "$0")/.."
-version=${1:-dev}
+version=dev
+sums=yes
+for arg in "$@"; do
+	case $arg in
+	--no-sums) sums=no ;;
+	-*) echo "unknown option $arg" >&2; exit 2 ;;
+	*) version=$arg ;;
+	esac
+done
 rm -rf dist
 mkdir -p dist
-for target in darwin/arm64 darwin/amd64 windows/amd64 windows/arm64; do
+for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
 	os=${target%/*}
 	arch=${target#*/}
 	ext=""
@@ -16,9 +25,5 @@ for target in darwin/arm64 darwin/amd64 windows/amd64 windows/arm64; do
 	CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$version" \
 		-o "dist/bordercheck-$version-$os-$arch$ext" .
 done
-cd dist
-if command -v sha256sum >/dev/null; then sha256sum -- * >../SHA256SUMS; else shasum -a 256 -- * >../SHA256SUMS; fi
-mv ../SHA256SUMS .
-cd ..
-if [ -n "${BORDERCHECK_SIGNING_KEY:-}" ]; then go run ./scripts/sign dist/SHA256SUMS; fi
+if [ "$sums" = yes ]; then scripts/sums.sh; fi
 ls -l dist

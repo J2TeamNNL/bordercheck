@@ -49,8 +49,7 @@ func Run(ctx context.Context, client *http.Client, src Source, current, bin stri
 	if _, _, ok := parseVersion(current); !ok {
 		return res, fmt.Errorf("this is a %q build, not a release; it does not update itself", current)
 	}
-	key, err := publicKey(src.PublicKey)
-	if err != nil {
+	if _, err := publicKey(src.PublicKey); err != nil {
 		return res, err
 	}
 	latest := src.GitHub + "/" + src.Repo + "/releases/latest/download/"
@@ -62,8 +61,7 @@ func Run(ctx context.Context, client *http.Client, src Source, current, bin stri
 	if err != nil {
 		return res, err
 	}
-	rawSig, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(sig)))
-	if err != nil || !ed25519.Verify(key, sums, rawSig) {
+	if err := VerifySums(sums, sig, src.PublicKey); err != nil {
 		return res, errors.New("SHA256SUMS of the latest release is not signed by the trusted key; not updating")
 	}
 	name, version, want, err := findAsset(sums)
@@ -86,6 +84,35 @@ func Run(ctx context.Context, client *http.Client, src Source, current, bin stri
 	}
 	res.Updated = true
 	return res, nil
+}
+
+// VerifySums checks that sig (base64, as in SHA256SUMS.sig) is an ed25519
+// signature of sums by the base64 key pubKey ("" = OfficialKey).
+func VerifySums(sums, sig []byte, pubKey string) error {
+	key, err := publicKey(pubKey)
+	if err != nil {
+		return err
+	}
+	rawSig, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(sig)))
+	if err != nil || !ed25519.Verify(key, sums, rawSig) {
+		return errors.New("SHA256SUMS is not signed by the trusted key")
+	}
+	return nil
+}
+
+// SumFor returns the SHA-256 that sums ("<hex>  <name>" lines) lists for name.
+func SumFor(sums []byte, name string) ([]byte, error) {
+	for _, line := range strings.Split(string(sums), "\n") {
+		f := strings.Fields(line)
+		if len(f) == 2 && strings.TrimPrefix(f[1], "*") == name {
+			h, err := hex.DecodeString(f[0])
+			if err != nil || len(h) != sha256.Size {
+				return nil, fmt.Errorf("bad SHA256SUMS line for %s", name)
+			}
+			return h, nil
+		}
+	}
+	return nil, fmt.Errorf("%s is not listed in SHA256SUMS", name)
 }
 
 func publicKey(b64 string) (ed25519.PublicKey, error) {

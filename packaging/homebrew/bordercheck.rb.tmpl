@@ -1,0 +1,48 @@
+# Rendered by scripts/homebrew-formula.sh from packaging/homebrew/bordercheck.rb.tmpl
+# for release @TAG@. Edit the template, not the rendered file.
+class Bordercheck < Formula
+  desc "Checks a work laptop for open doors and reports to IT"
+  homepage "https://github.com/@REPO@"
+  version "@VERSION@"
+  license "MIT"
+
+  on_macos do
+    on_arm do
+      url "https://github.com/@REPO@/releases/download/@TAG@/bordercheck-@TAG@-darwin-arm64"
+      sha256 "@SHA_DARWIN_ARM64@"
+    end
+    on_intel do
+      url "https://github.com/@REPO@/releases/download/@TAG@/bordercheck-@TAG@-darwin-amd64"
+      sha256 "@SHA_DARWIN_AMD64@"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "https://github.com/@REPO@/releases/download/@TAG@/bordercheck-@TAG@-linux-arm64"
+      sha256 "@SHA_LINUX_ARM64@"
+    end
+    on_intel do
+      url "https://github.com/@REPO@/releases/download/@TAG@/bordercheck-@TAG@-linux-amd64"
+      sha256 "@SHA_LINUX_AMD64@"
+    end
+  end
+
+  def install
+    bin.install Dir["bordercheck-*"].first => "bordercheck"
+  end
+
+  def caveats
+    <<~EOS
+      To report to your organisation every hour, run:
+        bordercheck install https://<your IT team's host>/policies.json
+      That copies bordercheck into its own folder and updates that copy itself;
+      `brew upgrade` updates only this one.
+    EOS
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/bordercheck -version")
+    system bin/"bordercheck", "-list"
+  end
+end

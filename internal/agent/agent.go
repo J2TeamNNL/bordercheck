@@ -48,10 +48,22 @@ type Env struct {
 }
 
 // Dir is the install folder: ~/Library/Application Support/bordercheck on macOS,
-// %LOCALAPPDATA%\bordercheck on Windows.
+// %LOCALAPPDATA%\bordercheck on Windows, $XDG_DATA_HOME/bordercheck (by default
+// ~/.local/share/bordercheck) on Linux: it holds a program and its state, not
+// just settings, so it belongs in the data folder rather than ~/.config.
 func Dir() (string, error) {
 	if runtime.GOOS == "windows" && os.Getenv("LOCALAPPDATA") != "" {
 		return filepath.Join(os.Getenv("LOCALAPPDATA"), "bordercheck"), nil
+	}
+	if runtime.GOOS == "linux" {
+		if d := os.Getenv("XDG_DATA_HOME"); filepath.IsAbs(d) {
+			return filepath.Join(d, "bordercheck"), nil
+		}
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, ".local", "share", "bordercheck"), nil
 	}
 	base, err := os.UserConfigDir()
 	if err != nil {

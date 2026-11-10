@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"runtime"
+	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
 	"github.com/ptrinh/bordercheck/internal/sysx"
@@ -17,12 +18,18 @@ func tailscale(ctx context.Context) check.Result {
 		fallbacks = []string{"/Applications/Tailscale.app/Contents/MacOS/Tailscale"}
 	case "windows":
 		fallbacks = []string{`C:\Program Files\Tailscale\tailscale.exe`}
+	case "linux": // the service's PATH may lack sbin or snap
+		fallbacks = []string{"/usr/bin/tailscale", "/usr/sbin/tailscale", "/usr/local/bin/tailscale", "/snap/bin/tailscale"}
 	}
 	bin, ok := sysx.Find("tailscale", fallbacks...)
 	if !ok {
 		return check.Skipped("Tailscale is not installed.")
 	}
 	out, err := sysx.Run(ctx, bin, "debug", "prefs")
+	if err != nil && runtime.GOOS == "linux" && strings.Contains(strings.ToLower(err.Error()), "denied") {
+		return check.Skipped("Only root or the Tailscale operator may read Tailscale's settings here. Run " +
+			"sudo tailscale set --operator=$USER once, or sudo bordercheck -only tailscale. (" + err.Error() + ")")
+	}
 	if err != nil {
 		return check.Skipped("Could not read Tailscale settings; is Tailscale running? (" + err.Error() + ")")
 	}
