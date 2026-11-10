@@ -46,7 +46,7 @@ describe("login-free report links", () => {
     expect(body).toContain("an@acme.com");
     expect(body).toContain("an-mbp");
     expect(body).toContain("Turn it on.");
-    expect(body).toContain("[high]");
+    expect(body).toContain(`<span class="sev sev-high">high</span>`);
     expect(body).toContain("Until 2026-12-01");
     expect(body).not.toContain("secret-path"); // no evidence
     expect(body).not.toContain("5432");

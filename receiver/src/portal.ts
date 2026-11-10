@@ -7,7 +7,7 @@ import samplePolicy from "./sample-policy.json";
 import { audit, auditStmt, auditStmtIf, MCP_ACTOR, MCP_READ_ACTOR } from "./audit";
 import { commandBlock, installCommands, publicOrigin } from "./enroll";
 import { config, DAY, type Env } from "./env";
-import { html, type Html, layout, page, when } from "./html";
+import { ago, html, type Html, layout, note, page, pill, when } from "./html";
 import { CHECK_ID_RE, POLICY_CHECKS, today, validateRolePolicy, waiverDateError } from "./roles";
 import { newCode, sha256hex } from "./tokens";
 
@@ -16,7 +16,6 @@ const MAX_BULK = 500;
 const EMAIL_RE = /^[^\s@<>"'(),;:\\]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
 
 const machineLink = (id: string) => `/admin/machine/${encodeURIComponent(id)}`;
-const note = (m: string | Html) => (m ? html`<div class="note">${m}</div>` : "");
 
 function cleanLine(s: string, max: number): string {
   return s.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
@@ -51,31 +50,39 @@ export async function roleRows(env: Env) {
 }
 
 export async function rolesPage(env: Env, who: string, message: string | Html = "", draft?: { name: string; policy: string }, status = 200) {
-  const rows = { results: await roleRows(env) };
-  const body = html`<h1>Roles</h1>
-<p class="muted">A role is a policy (the same JSON as bordercheck's policies.json) that enrolled machines get from <code>/policy</code>.
-When served, <code>report.url</code> and <code>update.policy_url</code> are set to this receiver, <code>report.headers</code>
-never carry a token (each machine sends its own), and the machine's waivers are added.</p>
-${note(message)}
-<div class="scroll"><table><thead><tr><th>Role</th><th>Machines</th><th>Pending invites</th><th>Updated</th></tr></thead><tbody>
-${rows.results.map(
-    (r) => html`<tr><td><a href="/admin/roles/${r.id}">${r.name}</a></td><td class="n">${r.machines}</td><td class="n">${r.pending}</td><td>${when(r.updated_at)}</td></tr>`,
-  )}</tbody></table></div>
-${rows.results.length === 0 ? html`<p class="muted">No roles yet. Create one to start inviting people.</p>` : ""}
+  const rows = await roleRows(env);
+  const body = html`<div class="hero"><p class="eyebrow">Enrollment</p><h1>Roles</h1>
+<p class="lead">A role is a policy (the same JSON as bordercheck's policies.json) that enrolled machines get from <code>/policy</code>.
+When served, <code>report.url</code> and <code>update.policy_url</code> point at this receiver, <code>report.headers</code>
+never carry a token (each machine sends its own), and the machine's waivers are added.</p></div>
+${note(message, tone(status))}
+${rows.length
+    ? html`<div class="shelf-row">${rows.map(
+        (r) => html`<a class="card" href="/admin/roles/${r.id}"><span class="t">${r.name}</span><span class="muted small">updated ${r.updated_at.slice(0, 10)}</span>
+<span class="meta"><span class="big plain">${r.machines}</span>machine${r.machines === 1 ? "" : "s"}${r.pending ? html` · ${r.pending} pending invite${r.pending === 1 ? "" : "s"}` : ""}</span></a>`,
+      )}</div>`
+    : html`<div class="panel"><p class="muted">No roles yet. Create one to start inviting people.</p></div>`}
 <h2 id="new-role">New role</h2>
-<p class="muted">The box starts with a sample policy that spells out every check; edit it, then create the role.</p>
-${roleForm("/admin/roles", draft?.name ?? "", draft?.policy ?? SAMPLE_POLICY, "Create role")}`;
-  return page(layout("Roles", who, body), status);
+${roleForm("/admin/roles", draft?.name ?? "", draft?.policy ?? SAMPLE_POLICY, "Create role",
+    html`The box starts with a sample policy that spells out every check; edit it, then create the role.`)}`;
+  return page(layout("Roles", who, body, "Roles"), status);
 }
 
-function roleForm(action: string, name: string, policy: string, label: string): Html {
-  return html`<form method="post" action="${action}"><p><label>Name <input name="name" value="${name}" maxlength="64" required></label></p>
-<textarea name="policy" spellcheck="false">${policy}</textarea>
-<p class="muted">Checked here: it is a JSON object; only fields bordercheck knows at the top level and in report, update,
-notify and waivers; check names; types of enabled and on_problem; durations; waiver fields; no report token in headers.
-Not checked here: the settings inside each check (globs, regexes, versions, lists). bordercheck validates the whole
-file and keeps its last good policy if one is invalid, so try it locally first: <code>bordercheck -policy role.json -print-policy</code>.</p>
-<p><button>${label}</button></p></form>`;
+// Messages after a form: an error when the response is one, else a confirmation.
+const tone = (status: number) => (status >= 400 ? "s-fail" : "s-pass");
+
+function roleForm(action: string, name: string, policy: string, label: string, intro: Html | string = ""): Html {
+  return html`<form method="post" action="${action}"><div class="cols"><div class="panel">
+<div class="field"><label for="role-name">Name</label><input id="role-name" name="name" value="${name}" maxlength="64" required class="w-name"></div>
+<label for="role-policy">Policy</label><textarea id="role-policy" class="code" name="policy" spellcheck="false">${policy}</textarea>
+<div class="actions"><button class="primary">${label}</button></div></div>
+<aside class="panel">${intro ? html`<p>${intro}</p>` : ""}<h3>Checked here</h3>
+<p class="muted small">It is a JSON object; only fields bordercheck knows at the top level and in report, update,
+notify and waivers; check names; types of enabled and on_problem; durations; waiver fields; no report token in headers.</p>
+<h3>Not checked here</h3>
+<p class="muted small">The settings inside each check (globs, regexes, versions, lists). bordercheck validates the whole
+file and keeps its last good policy if one is invalid, so try it locally first:</p>
+<div class="cmd"><code>bordercheck -policy role.json -print-policy</code></div></aside></div></form>`;
 }
 
 async function checkRole(env: Env, name: string, policyText: string, now: Date): Promise<{ errs: string[]; policy?: string }> {
@@ -166,17 +173,20 @@ export async function rolePage(env: Env, id: number, who: string, message: strin
   )
     .bind(id)
     .all<{ install_id: string; email: string; hostname: string; revoked_at: string | null }>();
-  const body = html`<h1>Role: ${r.name}</h1>
-${note(message)}
-${roleForm(`/admin/roles/${r.id}`, draft?.name ?? r.name, draft?.policy ?? r.policy, "Save")}
+  const body = html`<div class="hero"><p class="eyebrow"><a href="/admin/roles">Roles</a> · role</p><h1>${r.name}</h1>
+<p class="lead">${machines.results.length} machine${machines.results.length === 1 ? "" : "s"} · updated ${when(r.updated_at)}</p></div>
+${note(message, tone(status))}
+${roleForm(`/admin/roles/${r.id}`, draft?.name ?? r.name, draft?.policy ?? r.policy, "Save", html`Saved changes reach machines at their next policy refresh (hourly).`)}
 <h2>Machines in this role (${machines.results.length})</h2>
-<ul>${machines.results.map(
-    (m) => html`<li><a href="${machineLink(m.install_id)}">${m.email}</a> ${m.hostname}${m.revoked_at ? html` <span class="badge s-fail">revoked</span>` : ""}</li>`,
-  )}</ul>
+${machines.results.length
+    ? html`<div class="panel flush"><div class="scroll"><table><thead><tr><th>Person · machine</th><th>State</th></tr></thead><tbody>${machines.results.map(
+        (m) => html`<tr${m.revoked_at ? html` class="off"` : ""}><td class="who-cell"><a href="${machineLink(m.install_id)}">${m.email}</a><span class="sub">${m.hostname}</span></td><td>${m.revoked_at ? pill("s-fail", "revoked") : pill("s-pass", "active")}</td></tr>`,
+      )}</tbody></table></div></div>`
+    : html`<div class="panel"><p class="muted">None yet.</p></div>`}
 <h2>Delete</h2>
-<p class="muted">Only a role no machine or pending invite uses can be deleted.</p>
-<form method="post" action="/admin/roles/${r.id}/delete"><button class="danger">Delete role</button></form>`;
-  return page(layout(r.name, who, body), status);
+<div class="panel danger-zone"><p class="muted">Only a role no machine or pending invite uses can be deleted.</p>
+<form method="post" action="/admin/roles/${r.id}/delete"><button class="danger">Delete role</button></form></div>`;
+  return page(layout(r.name, who, body, "Roles"), status);
 }
 
 export async function updateRole(env: Env, id: number, who: string, form: FormData): Promise<Response> {
@@ -263,31 +273,40 @@ export async function invitesPage(env: Env, url: URL, who: string, message: stri
   const options = await roleOptions(env);
   const cfg = config(env);
 
-  const body = html`<h1>Invites</h1>
-<p class="muted">An invite lets one person enroll one machine. Its code is shown once, when it is made; to get a
-new command for someone, re-issue their invite (the old code stops working).</p>
-${note(message)}
-<div class="filters">${INVITE_FILTERS.map(
-    (s) => html`<a class="${s === filter ? "on" : ""}" href="/admin/invites?status=${s}">${s}${s !== "all" ? html` (${count(s)})` : ""}</a>`,
-  )}</div>
-<div class="scroll"><table><thead><tr><th>#</th><th>Email</th><th>Role</th><th>Note</th><th>Status</th><th>Created</th><th>Expires</th><th></th></tr></thead><tbody>
+  const now = Date.now();
+  const body = html`<div class="hero"><p class="eyebrow">Enrollment</p><h1>Invites</h1>
+<p class="lead">An invite lets one person enroll one machine. Its code is shown once, when it is made; to get a
+new command for someone, re-issue their invite (the old code stops working).</p></div>
+${note(message, tone(status))}
+<h2 id="new">Invite people</h2>
+${options.value ? html`<form method="post" action="/admin/invites"><div class="panel"><div class="cols">
+<div class="field"><label for="inv-emails">Emails, one per line (or separated by commas)</label><textarea id="inv-emails" class="emails" name="emails" rows="6" spellcheck="false" required placeholder="an@acme.com&#10;bo@acme.com"></textarea></div>
+<div><div class="field"><label for="inv-role">Role</label><select id="inv-role" name="role_id" class="full">${options}</select></div>
+<div class="field"><label for="inv-days">Expires after (days)</label><input id="inv-days" name="days" type="number" min="1" max="90" value="${cfg.inviteDays}"></div>
+<div class="field"><label for="inv-note">Note (optional, for you)</label><input id="inv-note" name="note" maxlength="200" class="full"></div></div></div>
+<div class="actions"><button class="primary">Create invites</button><span class="muted small">At most ${MAX_BULK} at once. Each person gets their own link and command, shown once.</span></div></div></form>`
+    : html`<div class="panel"><p><a href="/admin/roles">Create a role</a> first.</p></div>`}
+<div class="shelf"><h2>Sent</h2></div>
+<div class="toolbar"><nav class="seg" aria-label="Status">${INVITE_FILTERS.map(
+    (s) => html`<a class="${s === filter ? "on" : ""}" href="/admin/invites?status=${s}">${s}${s !== "all" ? html`<span class="c">${count(s)}</span>` : ""}</a>`,
+  )}</nav></div>
+<div class="panel flush"><div class="scroll"><table><thead><tr><th class="n">#</th><th>Person</th><th>Role</th><th>Status</th><th>Created</th><th>Expires</th><th></th></tr></thead><tbody>
 ${rows.results.map(
-    (i) => html`<tr><td class="n">${i.id}</td><td>${i.email}</td><td>${i.role}</td><td>${i.note}</td>
-<td>${i.status}${i.used_install_id ? html` · <a href="${machineLink(i.used_install_id)}">machine</a>` : ""}${i.reissued_as ? html` · re-issued as #${i.reissued_as}` : ""}</td>
-<td>${when(i.created_at)}<br><span class="muted">${i.created_by}</span></td><td>${when(i.expires_at)}</td>
-<td>${i.status === "pending" ? html`<form method="post" action="/admin/invites/${i.id}/revoke" style="display:inline"><button>Revoke</button></form> ` : ""}${
-      i.status !== "used" && !i.reissued_as ? html`<form method="post" action="/admin/invites/${i.id}/reissue" style="display:inline"><button>Re-issue</button></form>` : ""
+    (i) => html`<tr${i.status === "revoked" || i.status === "expired" ? html` class="off"` : ""}><td class="n muted">${i.id}</td><td class="who-cell"><b>${i.email}</b>${i.note ? html`<span class="sub">${i.note}</span>` : ""}</td><td>${i.role}</td>
+<td class="nowrap">${pill(INVITE_TONE[i.status] ?? "s-other", i.status)}${i.used_install_id ? html`<span class="sub"><a class="u" href="${machineLink(i.used_install_id)}">machine</a></span>` : ""}${i.reissued_as ? html`<span class="sub">re-issued as #${i.reissued_as}</span>` : ""}</td>
+<td class="nowrap">${when(i.created_at)}<span class="sub">${i.created_by}</span></td><td class="nowrap">${when(i.expires_at)}${i.status === "pending" ? html`<span class="sub">${inDays(i.expires_at, now)}</span>` : ""}</td>
+<td class="nowrap">${i.status === "pending" ? html`<form class="inline" method="post" action="/admin/invites/${i.id}/revoke"><button class="sm">Revoke</button></form> ` : ""}${
+      i.status !== "used" && !i.reissued_as ? html`<form class="inline" method="post" action="/admin/invites/${i.id}/reissue"><button class="sm">Re-issue</button></form>` : ""
     }</td></tr>`,
-  )}</tbody></table></div>
-${rows.results.length === 0 ? html`<p class="muted">None.</p>` : ""}
-<h2>Invite people</h2>
-${options.value ? html`<form method="post" action="/admin/invites">
-<p><label>Emails, one per line (or separated by commas)<br><textarea name="emails" rows="6" style="min-height:0" spellcheck="false" required></textarea></label></p>
-<p><label>Role <select name="role_id">${options}</select></label>
-<label>Expires after <input name="days" type="number" min="1" max="90" value="${cfg.inviteDays}" style="width:5em"> days</label></p>
-<p><label>Note (optional, for you) <input name="note" maxlength="200" size="50"></label></p>
-<p><button>Create invites</button> <span class="muted">At most ${MAX_BULK} at once.</span></p></form>` : html`<p><a href="/admin/roles">Create a role</a> first.</p>`}`;
-  return page(layout("Invites", who, body), status);
+  )}</tbody></table></div>${rows.results.length === 0 ? html`<p class="empty">None.</p>` : ""}</div>`;
+  return page(layout("Invites", who, body, "Invites"), status);
+}
+
+const INVITE_TONE: Record<string, string> = { pending: "s-waived", used: "s-pass", expired: "s-skip", revoked: "s-fail" };
+
+function inDays(iso: string, now: number): string {
+  const d = Math.ceil((Date.parse(iso) - now) / DAY);
+  return Number.isNaN(d) ? "" : d <= 0 ? "today" : `in ${d} d`;
 }
 
 export function parseEmails(text: string): { ok: string[]; bad: string[] } {
@@ -332,19 +351,18 @@ async function issueInvites(env: Env, who: string, emails: string[], roleId: num
 
 function issuedPage(env: Env, req: Request, who: string, issued: Issued[], heading: string, extra: Html | string = ""): Response {
   const origin = publicOrigin(env, req);
-  const body = html`<h1>${heading}</h1>
-<div class="note"><b>Copy these now.</b> The codes are not stored and can't be shown again; if one is lost, re-issue that invite.
-Each works once, for one machine, until it expires. Send each person only their own.</div>
+  const body = html`<div class="hero"><p class="eyebrow"><a href="/admin/invites">Invites</a></p><h1>${heading}</h1></div>
+${note(html`<b>Copy these now.</b> The codes are not stored and can't be shown again; if one is lost, re-issue that invite.
+Each works once, for one machine, until it expires. Send each person only their own. Click a command once to select all of it.`, "s-warn")}
 ${extra}
 ${issued.map((i) => {
     const c = installCommands(env, origin, i.code);
-    return html`<h2>#${i.id} · ${i.email}</h2>
-<p>Invite link (opens a page with these instructions):</p>
-<textarea class="cmd" readonly rows="2" spellcheck="false">${c.link}</textarea>
-${commandBlock(c)}`;
+    return html`<h2>${i.email} <span class="muted">#${i.id}</span></h2>
+<div class="panel"><div class="cmd"><div class="cmd-h"><b>Invite link</b><span>opens a page with these instructions</span></div><code>${c.link}</code></div>
+${commandBlock(c)}</div>`;
   })}
-<p><a href="/admin/invites">Back to invites</a></p>`;
-  return page(layout(heading, who, body));
+<div class="actions"><a class="btn" href="/admin/invites">Back to invites</a></div>`;
+  return page(layout(heading, who, body, "Invites"));
 }
 
 // createInviteBatch validates and issues invites for the given emails (text:
@@ -481,10 +499,10 @@ export async function enrollmentOf(env: Env, id: string): Promise<EnrollmentRow 
 
 export async function enrollmentSection(env: Env, id: string, e: EnrollmentRow | null, now: Date): Promise<Html> {
   const linkForm = html`<h2>Report link</h2>
-<p class="muted">Each accepted report gets a login-free link to that machine's own latest results, which bordercheck can open for
+<div class="panel"><p class="muted">Each accepted report gets a login-free link to that machine's own latest results, which bordercheck can open for
 the person at the machine. Reset to make every link issued so far stop working.</p>
-<form method="post" action="${machineLink(id)}/reset-link"><button>Reset report links</button></form>`;
-  if (!e) return html`<h2>Enrollment</h2><p class="muted">No enrollment record for this machine.</p>${linkForm}`;
+<form method="post" action="${machineLink(id)}/reset-link"><button>Reset report links</button></form></div>`;
+  if (!e) return html`<h2>Enrollment</h2><div class="panel"><p class="muted">No enrollment record for this machine.</p></div>${linkForm}`;
   const [waivers, options] = await Promise.all([
     env.DB.prepare("SELECT * FROM machine_waivers WHERE install_id = ? ORDER BY removed_at IS NOT NULL, until DESC LIMIT 200")
       .bind(id)
@@ -492,28 +510,34 @@ the person at the machine. Reset to make every link issued so far stop working.<
     roleOptions(env, e.role_id),
   ]);
   const t = today(now);
+  const active = waivers.results.filter((w) => !w.removed_at && w.until >= t).length;
   return html`<h2>Enrollment</h2>
-<dl><dt>Status</dt><dd>${e.revoked_at ? html`<span class="badge s-fail">revoked</span> ${when(e.revoked_at)} by ${e.revoked_by}` : html`<span class="badge s-pass">active</span>`}</dd>
-<dt>Role</dt><dd>${e.role}</dd><dt>Email</dt><dd>${e.email} <span class="muted">(from the invite; reports can't change it)</span></dd>
-<dt>Invite</dt><dd>${e.invite_id ? html`#${e.invite_id} by ${e.invite_by}${e.invite_note ? html` · ${e.invite_note}` : ""}` : "?"}</dd>
-<dt>Enrolled</dt><dd>${when(e.enrolled_at)} as ${e.hostname || "?"} (${e.os}/${e.arch}, ${e.version || "?"})</dd>
-<dt>Last policy fetch</dt><dd>${when(e.last_policy_at) || "never"}</dd></dl>
-<p><form method="post" action="${machineLink(id)}/role" style="display:inline"><label>Role <select name="role_id">${options}</select></label> <button>Change role</button></form></p>
-${e.revoked_at
-    ? html`<form method="post" action="${machineLink(id)}/restore"><button>Restore</button> <span class="muted">Its token works again.</span></form>`
-    : html`<form method="post" action="${machineLink(id)}/revoke"><button class="danger">Revoke</button> <span class="muted">Its token stops working at once; its history stays.</span></form>`}
-<h2>Waivers</h2>
+<div class="cols"><div class="panel"><dl class="facts">
+<div><dt>Status</dt><dd>${e.revoked_at ? html`${pill("s-fail", "revoked")}<br><span class="muted small">${when(e.revoked_at)} by ${e.revoked_by}</span>` : pill("s-pass", "active")}</dd></div>
+<div><dt>Role</dt><dd>${e.role}</dd></div>
+<div><dt>Email</dt><dd>${e.email}<br><span class="muted small">from the invite; reports can't change it</span></dd></div>
+<div><dt>Invite</dt><dd>${e.invite_id ? html`#${e.invite_id} by ${e.invite_by}${e.invite_note ? html`<br><span class="muted small">${e.invite_note}</span>` : ""}` : "?"}</dd></div>
+<div><dt>Enrolled</dt><dd>${when(e.enrolled_at)}<br><span class="muted small">as ${e.hostname || "?"} (${e.os}/${e.arch}, ${e.version || "?"})</span></dd></div>
+<div><dt>Last policy fetch</dt><dd>${when(e.last_policy_at) || "never"}${e.last_policy_at ? html`<br><span class="muted small">${ago(e.last_policy_at, now.getTime())}</span>` : ""}</dd></div></dl></div>
+<div class="panel"><form method="post" action="${machineLink(id)}/role"><label for="m-role">Role</label><div class="row"><div class="grow"><select id="m-role" name="role_id">${options}</select></div><button>Change role</button></div></form>
+<div class="actions">${e.revoked_at
+    ? html`<form method="post" action="${machineLink(id)}/restore"><button>Restore</button></form><span class="muted small">Its token works again.</span>`
+    : html`<form method="post" action="${machineLink(id)}/revoke"><button class="danger">Revoke</button></form><span class="muted small">Its token stops working at once; its history stays.</span>`}</div></div></div>
+<h2>Waivers${active ? html` <span class="muted">(${active} active)</span>` : ""}</h2>
 <p class="muted">Delivered to this machine through <code>/policy</code>, keyed by its install ID, at its next hourly refresh.</p>
-<div class="scroll"><table><thead><tr><th>Check</th><th>Until</th><th>Reason</th><th>Added</th><th></th></tr></thead><tbody>
+${waivers.results.length
+    ? html`<div class="panel flush"><div class="scroll"><table><thead><tr><th>Check</th><th>Until</th><th>Reason</th><th>Added</th><th></th></tr></thead><tbody>
 ${waivers.results.map(
-    (w) => html`<tr class="${w.removed_at || w.until < t ? "muted" : ""}"><td><code>${w.check_id}</code></td><td>${w.until}${w.until < t ? " (ended)" : ""}</td><td>${w.reason}</td>
-<td>${when(w.created_at)} by ${w.created_by}${w.removed_at ? html`<br>removed ${when(w.removed_at)} by ${w.removed_by}` : ""}</td>
-<td>${w.removed_at ? "" : html`<form method="post" action="${machineLink(id)}/waivers/${w.id}/remove"><button>Remove</button></form>`}</td></tr>`,
-  )}</tbody></table></div>
-<form method="post" action="${machineLink(id)}/waivers"><p>
-<label>Check <select name="check">${POLICY_CHECKS.map((c) => html`<option>${c}</option>`)}</select></label>
-<label>Until <input type="date" name="until" required min="${t}"></label>
-<label>Reason <input name="reason" maxlength="300" size="40" required></label> <button>Add waiver</button></p></form>
+        (w) => html`<tr${w.removed_at || w.until < t ? html` class="off"` : ""}><td><code>${w.check_id}</code></td><td class="nowrap">${w.until}${w.until < t ? html`<span class="sub">ended</span>` : ""}${w.removed_at ? html`<span class="sub">removed</span>` : ""}</td><td class="wrap">${w.reason}</td>
+<td class="nowrap">${when(w.created_at)}<span class="sub">by ${w.created_by}${w.removed_at ? html` · removed ${when(w.removed_at)} by ${w.removed_by}` : ""}</span></td>
+<td>${w.removed_at ? "" : html`<form method="post" action="${machineLink(id)}/waivers/${w.id}/remove"><button class="sm">Remove</button></form>`}</td></tr>`,
+      )}</tbody></table></div></div>`
+    : ""}
+<form method="post" action="${machineLink(id)}/waivers"><div class="panel"><h3>Add a waiver</h3><div class="row">
+<div class="field"><label for="w-check">Check</label><select id="w-check" name="check">${POLICY_CHECKS.map((c) => html`<option>${c}</option>`)}</select></div>
+<div class="field"><label for="w-until">Until</label><input id="w-until" type="date" name="until" required min="${t}"></div>
+<div class="field grow"><label for="w-reason">Reason</label><input id="w-reason" name="reason" maxlength="300" required placeholder="Why, and who agreed"></div>
+<button>Add waiver</button></div></div></form>
 ${linkForm}`;
 }
 
@@ -640,15 +664,15 @@ export async function auditRows(env: Env, limit: number, mcpOnly = false): Promi
 export async function auditPage(env: Env, url: URL, who: string): Promise<Response> {
   const mcpOnly = url.searchParams.get("who") === "mcp";
   const rows = { results: await auditRows(env, 500, mcpOnly) };
-  const body = html`<h1>Audit trail</h1>
-<p class="muted">Every change made in the dashboard, by the admin token or through the MCP server, and every enrollment. Newest first, last 500.
-MCP rows record the tool and its arguments: review what a model did here.</p>
-<div class="filters"><a class="${mcpOnly ? "" : "on"}" href="/admin/audit">all</a><a class="${mcpOnly ? "on" : ""}" href="/admin/audit?who=mcp">MCP only</a></div>
-<div class="scroll"><table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Detail</th></tr></thead><tbody>
+  const body = html`<div class="hero"><p class="eyebrow">Accountability</p><h1>Audit trail</h1>
+<p class="lead">Every change made in the dashboard, by the admin token or through the MCP server, and every enrollment. Newest first, last 500.
+MCP rows record the tool and its arguments: review what a model did here.</p></div>
+<div class="toolbar"><nav class="seg" aria-label="Who"><a class="${mcpOnly ? "" : "on"}" href="/admin/audit">all</a><a class="${mcpOnly ? "on" : ""}" href="/admin/audit?who=mcp">MCP only</a></nav></div>
+<div class="panel flush"><div class="scroll"><table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Detail</th></tr></thead><tbody>
 ${rows.results.map(
-    (a) => html`<tr><td>${when(a.at)}</td><td>${a.who}</td><td>${a.action}</td><td>${
-      /^[0-9a-f]{32}$/.test(a.target) ? html`<a href="${machineLink(a.target)}">${a.target}</a>` : a.target
-    }</td><td class="ev">${a.detail === "{}" ? "" : a.detail}</td></tr>`,
-  )}</tbody></table></div>`;
-  return page(layout("Audit", who, body));
+    (a) => html`<tr><td class="nowrap">${when(a.at)}</td><td class="wrap">${a.who.startsWith("mcp") ? pill("s-error", a.who) : a.who}</td><td class="nowrap"><code>${a.action}</code></td><td class="wrap">${
+      /^[0-9a-f]{32}$/.test(a.target) ? html`<a class="u mono" href="${machineLink(a.target)}">${a.target}</a>` : a.target
+    }</td><td class="ev wrap">${a.detail === "{}" ? "" : a.detail}</td></tr>`,
+  )}</tbody></table></div>${rows.results.length === 0 ? html`<p class="empty">Nothing yet.</p>` : ""}</div>`;
+  return page(layout("Audit", who, body, "Audit"));
 }

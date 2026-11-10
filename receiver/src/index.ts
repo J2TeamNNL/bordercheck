@@ -10,7 +10,7 @@ import {
 } from "./auth";
 import { alertsPage, checkPage, checksPage, forgetMachine, machinePage, machinesPage } from "./dashboard";
 import type { Env } from "./env";
-import { html, layout, page } from "./html";
+import { html, layout, MARK, note, page } from "./html";
 import { handleReport, json } from "./ingest";
 import { audit } from "./audit";
 import { handleEnroll, invitePage, serveMachinePolicy } from "./enroll";
@@ -44,10 +44,11 @@ async function formOf(req: Request): Promise<FormData> {
 }
 
 function loginPage(message = "", status = 200): Response {
-  const body = html`<h1>Sign in</h1>
-${message ? html`<div class="note">${message}</div>` : ""}
-<form method="post" action="/admin/login"><p><input type="password" name="token" placeholder="Admin token" autocomplete="current-password" size="40" autofocus>
-<button>Sign in</button></p></form>`;
+  const body = html`<div class="center-card"><span class="mark lg">${MARK}</span><p class="eyebrow">IT portal</p><h1>Sign in</h1>
+<p class="lead">The fleet's security posture, roles, invites and waivers.</p>
+${note(message, status >= 400 ? "s-fail" : "")}
+<form method="post" action="/admin/login"><div class="panel"><label for="token">Admin token</label><input id="token" class="full" type="password" name="token" placeholder="Paste the admin token" autocomplete="current-password" autofocus>
+<div class="actions"><button class="primary">Sign in</button></div></div></form></div>`;
   return page(layout("Sign in", null, body), status);
 }
 
@@ -59,7 +60,7 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
   const now = Date.now();
   if (!dashboardConfigured(env)) {
     return page(
-      layout("Dashboard off", null, html`<h1>Dashboard is off</h1><p>Set Cloudflare Access (ACCESS_TEAM_DOMAIN and ACCESS_AUD) or an ADMIN_TOKEN secret of at least 16 characters.</p>`),
+      layout("Dashboard off", null, html`<div class="center-card"><span class="mark lg">${MARK}</span><h1>Dashboard is off</h1><p class="lead">Set Cloudflare Access (ACCESS_TEAM_DOMAIN and ACCESS_AUD) or an ADMIN_TOKEN secret of at least 16 characters.</p></div>`),
       503,
     );
   }
@@ -79,7 +80,7 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
   if (!v) {
     if (req.method === "GET" && !req.headers.get("authorization")) {
       if (usableToken(env.ADMIN_TOKEN)) return redirect("/admin/login");
-      return page(layout("Sign in", null, html`<h1>Sign in through Cloudflare Access</h1><p>This request did not carry a valid Access token.</p>`), 401);
+      return page(layout("Sign in", null, html`<div class="center-card"><span class="mark lg">${MARK}</span><h1>Sign in through Cloudflare Access</h1><p class="lead">This request did not carry a valid Access token.</p></div>`), 401);
     }
     return json({ error: "unauthorized" }, 401);
   }
@@ -110,7 +111,7 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
     const action = (m[3] ? "remove-waiver" : m[2]) as MachineAction;
     const form = await formOf(req);
     const r = await machineAction(env, v.who, m[1], action, machineParams(form, Number(m[3] ?? 0)));
-    if (r.error) return page(layout("Not done", v.who, html`<h1>Not done</h1><div class="note">${r.error}</div><p><a href="/admin/machine/${m[1]}">Back</a></p>`), r.status);
+    if (r.error) return page(layout("Not done", v.who, html`<p class="eyebrow">Machines</p><h1>Not done</h1>${note(r.error, "s-fail")}<div class="actions"><a class="btn" href="/admin/machine/${m[1]}">Back to the machine</a></div>`), r.status);
     return redirect(`/admin/machine/${m[1]}`);
   }
 
@@ -129,7 +130,7 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
     return m[2] === "revoke" ? revokeInvite(env, url, v.who, Number(m[1])) : reissueInvite(env, req, url, v.who, Number(m[1]));
   }
   if (path === "/admin/audit" && req.method === "GET") return auditPage(env, url, v.who);
-  return page(layout("Not found", v.who, html`<h1>Not found</h1>`), 404);
+  return page(layout("Not found", v.who, html`<h1>Not found</h1><p class="lead">There is no page here.</p><div class="actions"><a class="btn" href="/admin">Machines</a></div>`), 404);
 }
 
 export default {

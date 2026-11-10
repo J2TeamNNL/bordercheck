@@ -5,7 +5,7 @@
 
 import { bearer } from "./auth";
 import { config, type Env } from "./env";
-import { html, layout, page } from "./html";
+import { html, layout, MARK, page } from "./html";
 import { json } from "./ingest";
 import { hit } from "./ratelimit";
 import { str } from "./report";
@@ -180,11 +180,45 @@ export function installCommands(env: Env, origin: string, code: string): Install
 
 export const CAPABILITY_HEADERS = { "x-robots-tag": "noindex, nofollow", "referrer-policy": "no-referrer", "cache-control": "no-store" };
 
+// The two install commands as copyable blocks: one click selects a whole
+// command (CSS user-select: all; there is no script to copy with).
+export function shBlock(c: InstallCommands, big = false) {
+  return html`<div class="cmd${big ? " big" : ""}"><div class="cmd-h"><b>macOS or Linux</b><span>Terminal</span></div><code tabindex="0">${c.sh}</code></div>`;
+}
+
+export function ps1Block(c: InstallCommands, big = false) {
+  return html`<div class="cmd${big ? " big" : ""}"><div class="cmd-h"><b>Windows</b><span>PowerShell</span></div><code tabindex="0">${c.ps1}</code></div>`;
+}
+
 export function commandBlock(c: InstallCommands) {
-  return html`<p><b>macOS or Linux</b>, in Terminal:</p>
-<textarea class="cmd" readonly rows="3" spellcheck="false">${c.sh}</textarea>
-<p><b>Windows</b>, in PowerShell:</p>
-<textarea class="cmd" readonly rows="3" spellcheck="false">${c.ps1}</textarea>`;
+  return html`${shBlock(c)}${ps1Block(c)}`;
+}
+
+type Platform = "mac" | "windows" | "linux" | "";
+
+// platformOf guesses the visitor's OS from the User-Agent, only to put their
+// command first. Phones and anything unknown get the default order.
+function platformOf(ua: string): Platform {
+  if (/iPhone|iPad|iPod|Android/i.test(ua)) return "";
+  if (/Windows/i.test(ua)) return "windows";
+  if (/Macintosh|Mac OS X/i.test(ua)) return "mac";
+  if (/Linux|X11|CrOS/i.test(ua)) return "linux";
+  return "";
+}
+
+function inviteSteps(p: Platform) {
+  if (p === "windows") {
+    return html`<ol class="steps"><li><span>Open <b>PowerShell</b>: press <kbd>Start</kbd>, type <b>PowerShell</b> and press <kbd>Enter</kbd>.</span></li>
+<li><span>Click the command below once to select it, copy it (<kbd>Ctrl</kbd> <kbd>C</kbd>), paste it into PowerShell and press <kbd>Enter</kbd>.</span></li>
+<li><span>Follow what it prints. When it's done, bordercheck checks this computer in the background.</span></li></ol>`;
+  }
+  const open = p === "mac"
+    ? html`Open <b>Terminal</b>: press <kbd>⌘</kbd> <kbd>Space</kbd>, type <b>Terminal</b> and press <kbd>Return</kbd>.`
+    : html`Open a <b>terminal</b> window.`;
+  const copy = p === "mac" ? html`<kbd>⌘</kbd> <kbd>C</kbd>` : html`<kbd>Ctrl</kbd> <kbd>C</kbd>`;
+  return html`<ol class="steps"><li><span>${open}</span></li>
+<li><span>Click the command below once to select it, copy it (${copy}), paste it into the terminal and press <kbd>${p === "mac" ? "Return" : "Enter"}</kbd>.</span></li>
+<li><span>Follow what it prints. When it's done, bordercheck checks this computer in the background.</span></li></ol>`;
 }
 
 // GET /i/<code>: a page for the person who got the invite. It reads the
@@ -212,17 +246,28 @@ export async function invitePage(req: Request, env: Env, code: string, now = new
   else if (inv.expires_at <= now.toISOString()) state = "This invite has expired.";
   if (state) {
     return page(
-      layout("Invite", null, html`<h1>bordercheck invite</h1><p>${state} Ask your IT team for a new one.</p>`),
+      layout("Invite", null, html`<div class="center-card"><span class="mark lg">${MARK}</span><p class="eyebrow">bordercheck invite</p><h1>This link can't be used</h1>
+<p class="lead">${state} Ask your IT team for a new one.</p></div>`),
       404,
       CAPABILITY_HEADERS,
     );
   }
   const c = installCommands(env, new URL(req.url).origin, code);
-  const body = html`<h1>Install bordercheck</h1>
-<p>Your IT team invited you to install bordercheck, which checks this computer's security settings and reports
-them to IT. Run <b>one</b> of these on the computer you use for work. It works once and expires on
-${inv!.expires_at.slice(0, 10)}.</p>
-${commandBlock(c)}
-<p class="muted">Don't share this page or its link: anyone with it can enroll a machine in your name until it is used.</p>`;
+  const p = platformOf(req.headers.get("user-agent") ?? "");
+  const windowsFirst = p === "windows";
+  const here = p === "mac" ? "On this Mac" : p === "windows" ? "On this Windows PC" : p === "linux" ? "On this Linux computer" : "On your work computer";
+  const body = html`<span class="mark lg">${MARK}</span><p class="eyebrow">An invitation from your IT team</p><h1>Install bordercheck</h1>
+<p class="lead">bordercheck looks at this computer's security settings, like the firewall, disk encryption and updates,
+and tells you and IT if something needs fixing. Setting it up is one command.</p>
+<div class="chips"><span class="chip"><b>Single use</b> · one computer</span><span class="chip">Expires <b>${inv!.expires_at.slice(0, 10)}</b></span></div>
+<h2>${here}</h2>
+${p === "" ? html`<p class="dim">Run <b>one</b> of these on the computer you use for work.</p>` : inviteSteps(p)}
+${windowsFirst ? ps1Block(c, true) : shBlock(c, true)}
+${p === ""
+    ? (windowsFirst ? shBlock(c, true) : ps1Block(c, true))
+    : html`<details class="alt"><summary>${windowsFirst ? "On a Mac or Linux instead?" : "On Windows instead?"}</summary><div>${
+        windowsFirst ? html`${inviteSteps("mac")}${shBlock(c)}` : html`${inviteSteps("windows")}${ps1Block(c)}`
+      }</div></details>`}
+<p class="foot">Keep this link to yourself: until it is used, anyone with it can enroll a computer in your name.</p>`;
   return page(layout("Install bordercheck", null, body), 200, CAPABILITY_HEADERS);
 }

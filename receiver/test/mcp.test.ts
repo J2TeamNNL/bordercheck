@@ -499,9 +499,9 @@ describe("MCP write tools", () => {
     await tool("create_role", { name: "Sales", policy: {} });
     const all = await (await adminGet("/admin/audit")).text();
     expect(all).toContain("role.create");
-    expect(all.match(/<td>role\.create<\/td>/g)).toHaveLength(2);
+    expect(all.match(/<code>role\.create<\/code>/g)).toHaveLength(2);
     const mcp = await (await adminGet("/admin/audit?who=mcp")).text();
-    expect(mcp.match(/<td>role\.create<\/td>/g)).toHaveLength(1);
+    expect(mcp.match(/<code>role\.create<\/code>/g)).toHaveLength(1);
     expect(mcp).toContain("create_role");
     expect(mcp).toContain("MCP only");
   });

@@ -138,6 +138,23 @@ describe("invites and enrollment", () => {
     expect((await call(new Request(`${BASE}/i/nope`))).status).toBe(404);
   });
 
+  it("puts the visitor's own command first, judging only by the User-Agent", async () => {
+    const [code] = await makeInvites(["an@acme.com"], await makeRole("Dev"));
+    const open = async (ua: string) => (await call(new Request(`${BASE}/i/${code}`, { headers: { "user-agent": ua } }))).text();
+    const win = await open("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0 Safari/537.36");
+    expect(win.indexOf("install.ps1")).toBeLessThan(win.indexOf("install.sh"));
+    expect(win).toContain("On this Windows PC");
+    const mac = await open("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15");
+    expect(mac.indexOf("install.sh")).toBeLessThan(mac.indexOf("install.ps1"));
+    expect(mac).toContain("On this Mac");
+    // Both commands are always on the page, whatever the User-Agent says.
+    for (const body of [win, mac, await open(`<script>alert(1)</script>`)]) {
+      expect(body).toContain("install.sh | sh -s -- ");
+      expect(body).toContain("install.ps1)))");
+      expect(body).not.toContain("<script");
+    }
+  });
+
   it("uses INSTALL_SH_URL / INSTALL_PS1_URL, ignoring values that are unsafe in a shell", async () => {
     const roleId = await makeRole("Dev");
     const res = await adminPost("/admin/invites", { emails: "a@acme.com", role_id: String(roleId) }, {
