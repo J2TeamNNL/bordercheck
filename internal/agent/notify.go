@@ -29,13 +29,15 @@ var showNotification = notify.Show
 //
 // When the receiver gave this machine a report page (st.ReportPage, on the host
 // reports go to, reportURL) and an announced problem is high severity, the page
-// opens in the browser too, unless the policy turns notify.open_report off;
+// opens in the browser too, the first time that problem is announced (not
+// with its reminders), unless the policy turns notify.open_report off;
 // when it is off or the page cannot be opened, the notification only adds a
 // hint to run bordercheck status for the link. A forced send prints the link
 // on the terminal (env.Term), never in the log. The link is a secret: it is
 // never written to env.Out.
 func notifyUser(ctx context.Context, env Env, n policy.Notify, results []check.Result, st *State, now time.Time, force bool, reportURL string) {
-	due, next := notify.Plan(results, n, st.Notified, now)
+	seen := st.Notified
+	due, next := notify.Plan(results, n, seen, now)
 	st.Notified = next
 	if len(due) == 0 {
 		return
@@ -50,8 +52,15 @@ func notifyUser(ctx context.Context, env Env, n policy.Notify, results []check.R
 		}
 		return
 	}
+	// The page opens by itself only for a high-severity problem that was not
+	// there before. A reminder of one already announced just notifies: a
+	// browser tab every day would teach people to ignore it.
+	newHigh := high && slices.ContainsFunc(due, func(r check.Result) bool {
+		_, announced := seen[notify.Key(r)]
+		return r.Severity == check.High && !announced
+	})
 	opened := false
-	if high && n.OpenReport {
+	if newHigh && n.OpenReport {
 		if err := openURL(ctx, link); err == nil {
 			opened = true
 			fmt.Fprintf(env.Out, "%s opened the report page\n", now.Format(time.RFC3339))

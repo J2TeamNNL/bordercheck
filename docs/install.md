@@ -175,11 +175,11 @@ notifies.
 **Report page.** A receiver may answer a report with `{"report_url": "https://<host>/r/<id>"}`, a link to that
 machine's own report that needs no login. bordercheck keeps it (in `state.json`, never in the log) only if it is
 https on exactly the host reports go to, and shows it in `bordercheck status`. When a notification announces a
-**high-severity** problem (new, or due its `remind_every` reminder, not every hour), the page also opens in the
-default browser: `open` on macOS, `rundll32 url.dll,FileProtocolHandler` on Windows, `xdg-open` on Linux, the
+**high-severity** problem for the first time, the page also opens in the default browser (a `remind_every`
+reminder of the same problem only notifies; it does not open the page again): `open` on macOS, `rundll32 url.dll,FileProtocolHandler` on Windows, `xdg-open` on Linux, the
 link passed as one argument, never through a shell. Linux skips it quietly without a graphical session (a
 systemd user timer often has no `DISPLAY`). With `notify.open_report` off, or when the browser can't be opened,
-the notification only adds "Run bordercheck status for the link to your report page." `bordercheck send -force`
+or on a reminder, the notification adds "Run bordercheck status for the link to your report page." `bordercheck send -force`
 prints the link on the terminal instead. A receiver that sends no link changes nothing. Anyone who has the link
 can see that machine's failing checks, so treat it like a password.
 

@@ -735,9 +735,17 @@ func TestNotifyOpensReportPageForNewHighProblems(t *testing.T) {
 	if len(opened) != 1 {
 		t.Error("opened again before the reminder was due")
 	}
+	// The reminder a day later notifies again, with a hint for the link, but
+	// does not open the page a second time.
 	notifyUser(t.Context(), env, n, high, &st, t0.Add(25*time.Hour), false, reportURL)
+	if len(opened) != 1 || len(shown) != 2 || !strings.Contains(shown[1].Body, "Run bordercheck status for the link") {
+		t.Errorf("reminder: opened %d, shown %d %q", len(opened), len(shown), shown[len(shown)-1].Body)
+	}
+	// A second high problem appearing later is new: the page opens for it.
+	both := append([]check.Result{{ID: "secrets", Status: check.Fail, Severity: check.High, Summary: "found"}}, high...)
+	notifyUser(t.Context(), env, n, both, &st, t0.Add(26*time.Hour), false, reportURL)
 	if len(opened) != 2 {
-		t.Error("not opened with the reminder")
+		t.Errorf("a new high problem beside an old one: opened %d", len(opened))
 	}
 
 	st = State{ReportPage: link}
