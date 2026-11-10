@@ -74,7 +74,7 @@ func TestSendPostsJSONAndRespectsInterval(t *testing.T) {
 	if err := Send(t.Context(), env, true); err != nil || len(got) != 2 {
 		t.Fatalf("forced send: err %v, %d reports", err, len(got))
 	}
-	if !strings.Contains(out.String(), "next report due") {
+	if !strings.Contains(out.String(), "nothing due: next check") {
 		t.Errorf("log: %s", out)
 	}
 }

@@ -347,6 +347,10 @@ th:first-child,td:first-child{padding-left:16px}th:last-child,td:last-child{padd
 a.tile:hover,a.tile:focus-visible,a.card:hover,a.card:focus-visible,button:hover,button:focus-visible,.btn:hover,.btn:focus-visible{transform:none}}
 `;
 
+// The site icon: the mark on its gradient tile. Served at /favicon.svg (and
+// /favicon.ico, which browsers ask for unprompted); img-src 'self' allows it.
+export const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a7bff"/><stop offset=".55" stop-color="#7b4dff"/><stop offset="1" stop-color="#1fc8b0"/></linearGradient></defs><rect width="64" height="64" rx="15" fill="url(#g)"/><g transform="translate(13 13) scale(1.58)" fill="none"><path d="M12 2.8 4.5 5.6v5.7c0 4.6 3.1 8.6 7.5 9.9 4.4-1.3 7.5-5.3 7.5-9.9V5.6L12 2.8Z" fill="rgba(255,255,255,.18)" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.6 12.1 2.4 2.4 4.5-4.7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+
 // The bordercheck mark: a shield with a check, drawn inline (no request).
 export const MARK = new Html(
   `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.8 4.5 5.6v5.7c0 4.6 3.1 8.6 7.5 9.9 4.4-1.3 7.5-5.3 7.5-9.9V5.6L12 2.8Z" fill="rgba(255,255,255,.18)" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.6 12.1 2.4 2.4 4.5-4.7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
@@ -403,6 +407,7 @@ export function layout(L: I18n, title: string, who: string | null, body: Html, a
   const langs = opts.switcher === false ? "" : switcher(L, opts.switcher === "self" ? "self" : "lang");
   return html`<html lang="${L.htmlLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark"><meta name="theme-color" content="#000000">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="theme-color" content="#000000">
 <title>${title} · bordercheck</title><style>${new Html(STYLE)}</style></head><body class="${who ? "admin" : "public"}">
 <header class="top">${
     who

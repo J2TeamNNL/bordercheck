@@ -150,3 +150,15 @@ describe("dashboard pages", () => {
     expect((await call(new Request(`${BASE}/nothing`))).status).toBe(404);
   });
 });
+
+describe("site icon", () => {
+  it("is served without sign-in and linked from every page", async () => {
+    for (const p of ["/favicon.svg", "/favicon.ico"]) {
+      const res = await call(new Request(`${BASE}${p}`));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("image/svg+xml");
+      expect(await res.text()).toContain("<svg");
+    }
+    expect(await (await call(new Request(`${BASE}/admin/login`))).text()).toContain('rel="icon" type="image/svg+xml" href="/favicon.svg"');
+  });
+});

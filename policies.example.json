@@ -6,6 +6,7 @@
       "Authorization": "Bearer <report-submit-token>"
     },
     "interval": "24h",
+    "check_interval": "",
     "include_evidence": false,
     "email_domains": [
       "example.com"

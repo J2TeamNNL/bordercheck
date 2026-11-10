@@ -98,6 +98,7 @@ type Config struct {
 
 type State struct {
 	LastSent        time.Time `json:"last_sent,omitzero"`
+	LastCheck       time.Time `json:"last_check,omitzero"` // when the checks last ran, with or without a report
 	LastTry         time.Time `json:"last_try,omitzero"`
 	LastError       string    `json:"last_error,omitempty"`
 	LastUpdateCheck time.Time `json:"last_update_check,omitzero"`
@@ -222,8 +223,7 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 	if err := services.register(bin, env.Dir); err != nil {
 		return fmt.Errorf("registering the hourly service: %w", err)
 	}
-	fmt.Fprintf(env.Out, "Installed in %s for %s.\nChecking every hour; reporting every %s to %s.\n",
-		env.Dir, email, pol.Report.Interval, hostOf(pol.Report.URL))
+	fmt.Fprintf(env.Out, "Installed in %s for %s.\n%s\n", env.Dir, email, schedule(pol.Report))
 	if pol.Update.PolicyURL != "" {
 		fmt.Fprintf(env.Out, "Policy refreshed from %s.\n", pol.Update.PolicyURL)
 	} else if isURL(source) {
@@ -241,6 +241,18 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 	}
 	fmt.Fprintf(env.Out, "Done: bordercheck is installed and the first report is sent. Nothing else to do; it checks again on its own.\nTo see the details and how to fix anything it found, run: \"%s\"\n", filepath.Join(env.Dir, binName()))
 	return nil
+}
+
+// schedule says, at install, how often bordercheck does what. The service
+// wakes every hour, but only to see whether anything is due (and to refresh
+// the policy): the checks themselves run every CheckEvery.
+func schedule(r policy.Report) string {
+	every := func(d time.Duration) string { return strings.TrimSuffix(strings.TrimSuffix(d.String(), "0s"), "0m") }
+	s := fmt.Sprintf("Checks this computer every %s and reports every %s to %s.", every(r.CheckEvery()), every(r.Every()), hostOf(r.URL))
+	if r.CheckEvery() == r.Every() {
+		s = fmt.Sprintf("Checks this computer and reports every %s to %s.", every(r.Every()), hostOf(r.URL))
+	}
+	return s + " (It wakes hourly for a moment to see if either is due.)"
 }
 
 // printSends says, at install, when the report carries more than results.
@@ -314,14 +326,19 @@ func Send(ctx context.Context, env Env, force bool) error {
 	if pol.Report.URL == "" {
 		return errors.New("the policy has no report.url")
 	}
-	if force || now.Sub(st.LastSent) >= pol.Report.Every() {
+	switch {
+	case force || now.Sub(st.LastSent) >= pol.Report.Every():
 		err = sendReport(ctx, env, cfg, pol, &st, now, force, tok)
 		if errors.Is(err, ErrRevoked) {
 			revoked(ctx, env, &st, now, force)
 		}
-	} else {
-		fmt.Fprintf(env.Out, "%s next report due %s\n", now.Format(time.RFC3339),
-			st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339))
+	case now.Sub(st.LastCheck) >= pol.Report.CheckEvery():
+		// Between reports: check, and tell the person at the machine about
+		// anything new. Nothing is sent.
+		checkOnly(ctx, env, cfg, pol, &st, now)
+	default:
+		fmt.Fprintf(env.Out, "%s nothing due: next check %s, next report %s\n", now.Format(time.RFC3339),
+			st.LastCheck.Add(pol.Report.CheckEvery()).Format(time.RFC3339), st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339))
 	}
 	// After the report, so a broken update never costs a report. Its error is
 	// in state.json and the log; the report's error is what Send returns.
@@ -331,7 +348,19 @@ func Send(ctx context.Context, env Env, force bool) error {
 	return errors.Join(err, writeJSON(filepath.Join(env.Dir, "state.json"), st))
 }
 
+// checkOnly runs the checks without reporting: what the service does when
+// report.check_interval has passed but a report is not due yet.
+func checkOnly(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time) {
+	results := pol.Waive(check.RunAll(ctx, checks.All(pol)), identity(cfg), now)
+	st.LastCheck = now
+	c := report.New(env.Version, pol.Name, results).Counts
+	fmt.Fprintf(env.Out, "%s checked (no report due until %s): %d fail, %d warn, %d pass, %d waived\n", now.Format(time.RFC3339),
+		st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339), c.Fail, c.Warn, c.Pass, c.Waived)
+	notifyUser(ctx, env, pol.Notify, results, st, now, false, pol.Report.URL)
+}
+
 func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time, force bool, tok *bearer) error {
+	st.LastCheck = now
 	var progress check.Progress
 	if force && env.Term != nil { // someone is watching: show how far the checks are
 		progress = report.Progress(env.Term)
@@ -454,8 +483,8 @@ func Status(env Env) (string, error) {
 	if refreshedFrom != "" {
 		fmt.Fprintf(&b, " (refreshed from %s)", refreshedFrom)
 	}
-	fmt.Fprintf(&b, "\nReports:    every %s to %s\nSends:      results; %s\nService:    %s\n", pol.Report.Interval,
-		hostOf(pol.Report.URL), sends(pol.Report), services.status())
+	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results; %s\nService:    %s\n",
+		pol.Report.CheckEvery(), pol.Report.Interval, hostOf(pol.Report.URL), sends(pol.Report), services.status())
 	if !st.LastSent.IsZero() {
 		fmt.Fprintf(&b, "Last sent:  %s\n", st.LastSent.Format(time.RFC1123))
 	}

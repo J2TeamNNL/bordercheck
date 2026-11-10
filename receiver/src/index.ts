@@ -10,7 +10,7 @@ import {
 } from "./auth";
 import { alertsPage, checkPage, checksPage, forgetMachine, machinePage, machinesPage } from "./dashboard";
 import type { Env } from "./env";
-import { html, layout, MARK, note, page } from "./html";
+import { FAVICON, html, layout, MARK, note, page } from "./html";
 import { forRequest, type I18n, isLang, type Key, langCookie, safeNext } from "./i18n";
 import { handleReport, json } from "./ingest";
 import { audit } from "./audit";
@@ -181,6 +181,11 @@ export default {
     if (cap && req.method === "POST") return switchLanguage(req, url, path);
     if (path === "/mcp") return handleMcp(req, env);
     if (path === "/healthz") return new Response("ok\n", { headers: { "cache-control": "no-store" } });
+    if ((path === "/favicon.svg" || path === "/favicon.ico") && (req.method === "GET" || req.method === "HEAD")) {
+      return new Response(FAVICON, {
+        headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400", "x-content-type-options": "nosniff" },
+      });
+    }
     if (path === "/" || path === "") return redirect("/admin");
     if (path === "/admin" || path.startsWith("/admin/")) return admin(req, env, url, L);
     return json({ error: "not found" }, 404);

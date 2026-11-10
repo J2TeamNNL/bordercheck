@@ -52,11 +52,16 @@ func (u Update) Every() time.Duration {
 
 // Report says where an installed bordercheck sends its reports.
 type Report struct {
-	URL             string            `json:"url"`              // HTTPS endpoint that receives a POST of the JSON report
-	Headers         map[string]string `json:"headers"`          // e.g. a token that can only submit reports
-	Interval        string            `json:"interval"`         // Go duration between reports, e.g. "24h"
-	IncludeEvidence bool              `json:"include_evidence"` // send file paths, ports, etc., not just pass/fail
-	EmailDomains    []string          `json:"email_domains"`    // if set, the user's email must be in one of these
+	URL      string            `json:"url"`      // HTTPS endpoint that receives a POST of the JSON report
+	Headers  map[string]string `json:"headers"`  // e.g. a token that can only submit reports
+	Interval string            `json:"interval"` // Go duration between reports, e.g. "24h"
+	// CheckInterval makes the service check the machine more often than it
+	// reports, e.g. "24h" with a weekly report: the person at the machine hears
+	// about a new problem within a day, IT gets one report a week. "" = check
+	// only when a report is due.
+	CheckInterval   string   `json:"check_interval"`
+	IncludeEvidence bool     `json:"include_evidence"` // send file paths, ports, etc., not just pass/fail
+	EmailDomains    []string `json:"email_domains"`    // if set, the user's email must be in one of these
 	// IncludeIPs adds the machine's own interface addresses (host.ips) to the
 	// installed service's report; IncludeLocation adds a device position
 	// (location) where the OS can give one without a prompt. Both off by default.
@@ -68,6 +73,15 @@ type Report struct {
 func (r Report) Every() time.Duration {
 	d, _ := time.ParseDuration(r.Interval)
 	return d
+}
+
+// CheckEvery returns the interval between checks: CheckInterval, or the
+// report interval when it is not set.
+func (r Report) CheckEvery() time.Duration {
+	if d, err := time.ParseDuration(r.CheckInterval); err == nil && r.CheckInterval != "" {
+		return d
+	}
+	return r.Every()
 }
 
 type Checks struct {
@@ -358,6 +372,15 @@ func (p Policy) validate() error {
 	}
 	if d, err := time.ParseDuration(p.Report.Interval); err != nil || d < 15*time.Minute {
 		return fmt.Errorf("report.interval must be a duration of at least 15m, like \"24h\", not %q", p.Report.Interval)
+	}
+	if ci := p.Report.CheckInterval; ci != "" {
+		d, err := time.ParseDuration(ci)
+		if err != nil || d < 15*time.Minute {
+			return fmt.Errorf("report.check_interval must be a duration of at least 15m, like \"24h\", or \"\", not %q", ci)
+		}
+		if d > p.Report.Every() {
+			return fmt.Errorf("report.check_interval (%s) must not be longer than report.interval (%s)", ci, p.Report.Interval)
+		}
 	}
 	u := p.Update
 	if u.PolicyURL != "" && !strings.HasPrefix(u.PolicyURL, "https://") {

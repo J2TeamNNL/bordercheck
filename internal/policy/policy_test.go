@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func load(t *testing.T, body string) (Policy, error) {
@@ -91,6 +92,27 @@ func TestHardeningChecksPolicy(t *testing.T) {
 	} {
 		if _, err := load(t, body); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: got %v, want error containing %q", body, err, want)
+		}
+	}
+}
+
+func TestCheckInterval(t *testing.T) {
+	if p := Default(); p.Report.CheckEvery() != p.Report.Every() {
+		t.Error("without check_interval, checks run when a report is due")
+	}
+	for body, want := range map[string]string{
+		`{"report": {"interval": "168h", "check_interval": "24h"}}`: "",
+		`{"report": {"interval": "24h", "check_interval": "48h"}}`:  "must not be longer",
+		`{"report": {"check_interval": "5m"}}`:                      "at least 15m",
+		`{"report": {"check_interval": "daily"}}`:                   "at least 15m",
+	} {
+		p, err := Parse([]byte(body), "test")
+		if want == "" {
+			if err != nil || p.Report.CheckEvery() != 24*time.Hour {
+				t.Errorf("%s: %v %v", body, p.Report.CheckEvery(), err)
+			}
+		} else if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: want %q, got %v", body, want, err)
 		}
 	}
 }
