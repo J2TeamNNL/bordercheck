@@ -328,9 +328,16 @@ function statTile(L: I18n, n: number, label: Html, tone: string): Html {
 }
 
 export async function machinePage(env: Env, id: string, who: string, now: number, L: I18n): Promise<Response> {
-  const [mRow, enrollment] = await Promise.all([
+  // One round of queries for everything keyed by the install ID alone: the
+  // database can be far from where the request landed, so each extra round
+  // is a long wait.
+  const [mRow, enrollment, checks, hist] = await Promise.all([
     env.DB.prepare("SELECT * FROM machines WHERE install_id = ?").bind(id).first<MachineRow & { report: string; public_ip: string; geo: string; local_ips: string; device_location: string }>(),
     enrollmentOf(env, id),
+    env.DB.prepare("SELECT check_id, since FROM checks WHERE install_id = ?").bind(id).all<{ check_id: string; since: string }>(),
+    env.DB.prepare(
+      "SELECT received_at, version, fail, warn, error, waived, statuses, ip, geo, device_location FROM reports WHERE install_id = ? ORDER BY id DESC LIMIT 61",
+    ).bind(id).all<HistoryRow>(),
   ]);
   if (!mRow && !enrollment) {
     return page(layout(L, L.s("common.notFound"), who, html`<p class="eyebrow">${L.t("nav.machines")}</p><h1>${L.t("machine.noSuch")}</h1><p><a href="/admin">${L.t("machine.back")}</a></p>`, "Machines"), 404);
@@ -345,12 +352,6 @@ ${note(L.t("machine.noReportYet", { ago: L.ago(e.enrolled_at, now) }))}
     return page(layout(L, e.hostname || e.email, who, body, "Machines"));
   }
   const m = mRow;
-  const [checks, hist] = await Promise.all([
-    env.DB.prepare("SELECT check_id, since FROM checks WHERE install_id = ?").bind(id).all<{ check_id: string; since: string }>(),
-    env.DB.prepare(
-      "SELECT received_at, version, fail, warn, error, waived, statuses, ip, geo, device_location FROM reports WHERE install_id = ? ORDER BY id DESC LIMIT 61",
-    ).bind(id).all<HistoryRow>(),
-  ]);
   const since = new Map(checks.results.map((c) => [c.check_id, c.since]));
 
   let results: Result[] = [];
