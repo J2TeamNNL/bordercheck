@@ -3,7 +3,7 @@
 // in from the Worker secret when the file is served.
 
 import { safeEqual, usableToken } from "./auth";
-import type { Env } from "./env";
+import { config, type Env } from "./env";
 import { html, layout, page } from "./html";
 import { json } from "./ingest";
 
@@ -28,6 +28,9 @@ function mapHeaders(p: Obj, fn: (v: string) => string): Obj {
 }
 
 export async function servePolicy(req: Request, env: Env): Promise<Response> {
+  if (!config(env).legacy) {
+    return json({ error: "legacy_disabled", message: "This receiver only serves enrolled machines; install with an invite link." }, 410);
+  }
   if (env.POLICY_KEY) {
     const key = new URL(req.url).searchParams.get("key") ?? "";
     if (!(await safeEqual(key, env.POLICY_KEY))) return json({ error: "not found" }, 404);

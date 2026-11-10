@@ -5,6 +5,7 @@
 // rather than losing or repeating them.
 
 import { config, DAY, type Env } from "./env";
+import { pruneRateLimits } from "./ratelimit";
 
 export type Format = "discord" | "slack" | "json";
 
@@ -71,6 +72,10 @@ export function alertLine(env: Env, a: AlertRow): string {
     case "back":
       line = `🔔 ${who}: reporting again (was silent since ${d.last_seen?.slice(0, 10) ?? "?"})`;
       break;
+    case "new_country":
+      // Country codes only: no IP or coordinates in webhooks.
+      line = `🌍 ${who}: reporting from a new country ${lit(d.to, 8)}${d.from ? ` (was ${lit(d.from, 8)})` : ""}`;
+      break;
     default:
       line = `${lit(a.kind)} ${who}`;
   }
@@ -129,7 +134,9 @@ export async function raiseSilent(env: Env, now: Date): Promise<number> {
   const before = new Date(now.getTime() - config(env).silentDays * DAY).toISOString();
   const ts = now.toISOString();
   const rows = await env.DB.prepare(
-    "SELECT install_id, email, hostname, last_seen FROM machines WHERE last_seen < ? AND silent_alerted_at IS NULL LIMIT 500",
+    // A revoked machine is expected to go quiet.
+    `SELECT install_id, email, hostname, last_seen FROM machines m WHERE last_seen < ? AND silent_alerted_at IS NULL
+       AND NOT EXISTS (SELECT 1 FROM enrollments e WHERE e.install_id = m.install_id AND e.revoked_at IS NOT NULL) LIMIT 500`,
   )
     .bind(before)
     .all<{ install_id: string; email: string; hostname: string; last_seen: string }>();
@@ -241,7 +248,15 @@ export async function prune(env: Env, now: Date): Promise<void> {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM reports WHERE received_at < ?").bind(before),
     env.DB.prepare("DELETE FROM alerts WHERE created_at < ? AND sent_at IS NOT NULL").bind(before),
+    // A machine silent for longer than history is kept loses its IPs and locations too.
+    env.DB.prepare(
+      `UPDATE machines SET public_ip = '', geo = '', local_ips = '', device_location = '',
+         report = CASE WHEN json_valid(report) THEN json_remove(report, '$.host.ips', '$.location') ELSE report END
+       WHERE last_seen < ? AND (public_ip != '' OR geo != '' OR local_ips != '' OR device_location != '')`,
+    ).bind(before),
+    env.DB.prepare("DELETE FROM report_links WHERE expires_at < ?").bind(now.toISOString()),
   ]);
+  await pruneRateLimits(env, now.getTime());
 }
 
 export async function runCron(env: Env, now: Date, send: Send = postWebhook) {
