@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
@@ -148,7 +149,7 @@ func parseProcNetTCP(out string) []listener {
 	return ls
 }
 
-func evalListeners(ls []listener, note string, allow []policy.ListenerRule) check.Result {
+func evalListeners(ls []listener, note msg.Text, allow []policy.ListenerRule) check.Result {
 	var exposed []string
 	allowed := 0
 	for _, l := range ls {
@@ -174,18 +175,13 @@ func evalListeners(ls []listener, note string, allow []policy.ListenerRule) chec
 	}
 	exposed = uniqSorted(exposed) // IPv4 and IPv6 sockets of one server collapse
 	if allowed > 0 {
-		note = strings.TrimSpace(fmt.Sprintf("%d more allowed by policy. %s", allowed, note))
-	}
-	if note != "" {
-		note = " " + note
+		note = append(msg.Of("check.moreAllowed", "n", allowed), note...)
 	}
 	if len(exposed) == 0 {
-		return check.Result{Status: check.Pass,
-			Summary: fmt.Sprintf("%d listening socket(s), all on localhost.%s", len(ls), note)}
+		return check.Result{Status: check.Pass}.
+			WithSummary(append(msg.Of("listeners.pass", "n", len(ls)), note...))
 	}
-	return check.Result{Status: check.Warn, Severity: check.Medium,
-		Summary:  fmt.Sprintf("%d port(s) can be reached from other machines (LAN, Wi-Fi, Tailscale).%s", len(exposed), note),
-		Evidence: exposed,
-		Fix: "Bind dev servers to 127.0.0.1 (Vite: drop --host; Docker: -p 127.0.0.1:PORT:PORT) and quit what you " +
-			"don't need. To share something, use a Cloudflare Tunnel instead of an open port."}
+	return check.Result{Status: check.Warn, Severity: check.Medium, Evidence: exposed}.
+		WithSummary(append(msg.Of("listeners.exposed", "n", len(exposed)), note...)).
+		WithFix(msg.Of("listeners.fix"))
 }

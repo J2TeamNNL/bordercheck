@@ -30,7 +30,7 @@ LISTEN 0      4096   100.101.102.103:41641     0.0.0.0:*    users:(("tailscaled"
 	if !slices.Equal(ls, want) {
 		t.Fatalf("parseSS:\n got %+v\nwant %+v", ls, want)
 	}
-	r := evalListeners(ls, "", nil)
+	r := evalListeners(ls, nil, nil)
 	wantEv := []string{
 		"node: port 3000 on all interfaces",
 		"tailscaled: port 41641 on 100.101.102.103",

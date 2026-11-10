@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
 
@@ -28,10 +29,10 @@ func diskEncryption(ctx context.Context) check.Result {
 	return evalFileVault(out)
 }
 
-func listListeners(ctx context.Context) ([]listener, string, error) {
-	note := ""
+func listListeners(ctx context.Context) ([]listener, msg.Text, error) {
+	var note msg.Text
 	if os.Geteuid() != 0 {
-		note = "Only your own processes are visible; run with sudo to include system services."
+		note = msg.Of("listeners.note.mac")
 	}
 	out, err := sysx.Run(ctx, "/usr/sbin/lsof", "+c", "0", "-nP", "-iTCP", "-sTCP:LISTEN")
 	if err != nil && strings.TrimSpace(out) == "" {

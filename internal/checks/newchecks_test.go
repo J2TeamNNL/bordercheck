@@ -191,7 +191,7 @@ func TestGatherAndEvalSSH(t *testing.T) {
 			t.Errorf("world-readable unencrypted key should fail first: %s %q", r.Status, r.Evidence)
 		}
 	}
-	if !strings.Contains(r.Summary, "4 private key(s) without a passphrase") || !strings.Contains(r.Summary, "2 key(s) in authorized_keys") {
+	if !strings.Contains(r.Summary, "4 private keys have no passphrase") || !strings.Contains(r.Summary, "2 keys in authorized_keys") {
 		t.Errorf("summary: %q", r.Summary)
 	}
 
@@ -321,27 +321,27 @@ func TestEvalTunnels(t *testing.T) {
 	p := policy.Default().Checks.Tunnels
 	named := exposure{tool: "cloudflared", what: "Cloudflare named tunnel", sev: check.High}
 	quick := exposure{tool: "cloudflared", what: "quick", port: "8080", sev: check.High, public: true}
-	if r := evalTunnels([]exposure{named}, p, ""); r.Status != check.Warn || r.Severity != check.Low {
+	if r := evalTunnels([]exposure{named}, p, nil); r.Status != check.Warn || r.Severity != check.Low {
 		t.Errorf("named cloudflared: %s %s", r.Status, r.Severity)
 	}
-	if r := evalTunnels([]exposure{named, quick}, p, ""); r.Status != check.Warn || r.Severity != check.Medium {
+	if r := evalTunnels([]exposure{named, quick}, p, nil); r.Status != check.Warn || r.Severity != check.Medium {
 		t.Errorf("quick cloudflared: %s %s", r.Status, r.Severity)
 	}
 	funnel := exposure{tool: "tailscale-funnel", what: "public", port: "3000", sev: check.High, public: true}
-	r := evalTunnels([]exposure{named, funnel}, p, "")
+	r := evalTunnels([]exposure{named, funnel}, p, nil)
 	if r.Status != check.Fail || r.Severity != check.High || !strings.HasPrefix(r.Evidence[0], "tailscale-funnel") {
 		t.Errorf("funnel: %s %s %q", r.Status, r.Severity, r.Evidence)
 	}
 	p.Allow = []string{"tailscale-funnel", "cloudflared"}
-	if r := evalTunnels([]exposure{named, funnel}, p, ""); r.Status != check.Pass || !strings.Contains(r.Summary, "2 more allowed") {
+	if r := evalTunnels([]exposure{named, funnel}, p, nil); r.Status != check.Pass || !strings.Contains(r.Summary, "2 more allowed") {
 		t.Errorf("allowed: %s %q", r.Status, r.Summary)
 	}
 	p = policy.Default().Checks.Tunnels
 	p.LowerSeverity = nil
-	if r := evalTunnels([]exposure{named}, p, ""); r.Status != check.Fail {
+	if r := evalTunnels([]exposure{named}, p, nil); r.Status != check.Fail {
 		t.Errorf("cloudflared without lower_severity: %s", r.Status)
 	}
-	if r := evalTunnels(nil, p, ""); r.Status != check.Pass {
+	if r := evalTunnels(nil, p, nil); r.Status != check.Pass {
 		t.Errorf("none: %s", r.Status)
 	}
 }

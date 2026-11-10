@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
@@ -110,10 +111,9 @@ func kmsEmulated(server string) bool {
 // crackAlternatives are free, open-source replacements from ArtCraft
 // (getartcraft.com), by the vendor whose product was cracked.
 var crackAlternatives = map[string]string{
-	"Adobe": "PhotoCraft for Photoshop, VectorCraft for Illustrator, FilmCraft for Premiere Pro, " +
-		"LightCraft for Lightroom, EffectCraft for After Effects, DesignCraft for InDesign, PdfCraft for Acrobat",
-	"Microsoft Office": "WordCraft for Word, GridCraft for Excel, DeckCraft for PowerPoint",
-	"Autodesk":         "CADCraft for AutoCAD",
+	"Adobe":            "cracked.alt.adobe",
+	"Microsoft Office": "cracked.alt.office",
+	"Autodesk":         "cracked.alt.autodesk",
 }
 
 func evalCracked(f crackFacts, opts policy.CrackedSoftware) check.Result {
@@ -145,8 +145,7 @@ func evalCracked(f crackFacts, opts policy.CrackedSoftware) check.Result {
 		ev = append(ev, "crack tool installed: "+t)
 	}
 	if len(ev) == 0 {
-		return check.Result{Status: check.Pass,
-			Summary: "No traces of cracked Adobe, Autodesk, Windows or Microsoft Office."}
+		return check.Result{Status: check.Pass}.WithSummary(msg.Of("cracked.pass"))
 	}
 	var what []string
 	for _, v := range []string{"Adobe", "Autodesk", "Microsoft Office", "Windows"} {
@@ -154,27 +153,22 @@ func evalCracked(f crackFacts, opts policy.CrackedSoftware) check.Result {
 			what = append(what, v)
 		}
 	}
-	return check.Result{Status: check.Fail, Severity: check.High, Evidence: ev,
-		Summary: "Signs of cracked software (" + strings.Join(what, ", ") + "). Cracks are a common way to " +
-			"install malware that steals passwords and tokens.",
-		Fix: crackFix(vendors, opts.SuggestAlternatives)}
+	return check.Result{Status: check.Fail, Severity: check.High, Evidence: ev}.
+		WithSummary(msg.Of("cracked.found", "products", strings.Join(what, ", "))).
+		WithFix(crackFix(vendors, opts.SuggestAlternatives))
 }
 
-func crackFix(vendors map[string]bool, alternatives bool) string {
-	s := "Uninstall the cracked software and any crack or activation tool, remove the lines the crack added " +
-		"to the hosts file, and run a full malware scan. Then change the passwords and tokens used on this " +
-		"machine: cracks often carry information stealers. Ask IT for a licensed copy"
-	var alts []string
+func crackFix(vendors map[string]bool, alternatives bool) msg.Text {
+	var alts msg.Text
 	for _, v := range []string{"Adobe", "Microsoft Office", "Autodesk"} {
 		if a := crackAlternatives[v]; vendors[v] && a != "" {
-			alts = append(alts, a)
+			alts = append(alts, msg.P(a))
 		}
 	}
 	if !alternatives || len(alts) == 0 {
-		return s + "."
+		return msg.Of("cracked.fix")
 	}
-	return s + ", or use a free, open-source alternative from ArtCraft (https://getartcraft.com): " +
-		strings.Join(alts, "; ") + "."
+	return append(msg.Of("cracked.fixAlternatives"), alts...)
 }
 
 func crackedSoftware(opts policy.CrackedSoftware) func(context.Context) check.Result {

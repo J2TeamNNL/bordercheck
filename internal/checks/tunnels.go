@@ -3,7 +3,6 @@ package checks
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net"
 	"net/url"
 	"path"
@@ -14,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
@@ -45,11 +45,11 @@ func (e exposure) String() string {
 func tunnels(p policy.Tunnels) func(context.Context) check.Result {
 	return func(ctx context.Context) check.Result {
 		var found []exposure
-		var notes []string
+		var notes msg.Text
 		if p.Processes {
 			ps, err := listProcs(ctx)
 			if err != nil {
-				notes = append(notes, "Could not list processes ("+err.Error()+").")
+				notes = append(notes, msg.P("tunnels.noProcs", "err", err.Error()))
 			}
 			for _, pr := range ps {
 				if e, ok := classifyProc(pr); ok {
@@ -61,7 +61,7 @@ func tunnels(p policy.Tunnels) func(context.Context) check.Result {
 			if out, ok := tailscaleServeStatus(ctx); ok {
 				es, err := parseServeStatus(out)
 				if err != nil {
-					notes = append(notes, "Could not read `tailscale serve status`.")
+					notes = append(notes, msg.P("tunnels.noServe"))
 				}
 				for _, e := range es {
 					if (e.tool == "tailscale-funnel" && p.TailscaleFunnel) || (e.tool == "tailscale-serve" && p.TailscaleServe) {
@@ -70,7 +70,7 @@ func tunnels(p policy.Tunnels) func(context.Context) check.Result {
 				}
 			}
 		}
-		return evalTunnels(found, p, strings.Join(notes, " "))
+		return evalTunnels(found, p, notes)
 	}
 }
 
@@ -447,7 +447,7 @@ func sshForwardPort(spec string) string {
 	return ""
 }
 
-func evalTunnels(found []exposure, p policy.Tunnels, note string) check.Result {
+func evalTunnels(found []exposure, p policy.Tunnels, note msg.Text) check.Result {
 	var shown []exposure
 	allowed := 0
 	for _, e := range found {
@@ -475,18 +475,13 @@ func evalTunnels(found []exposure, p policy.Tunnels, note string) check.Result {
 	}
 	ev = uniqKeepOrder(ev)
 	if allowed > 0 {
-		note = strings.TrimSpace(fmt.Sprintf("%d more allowed by policy. %s", allowed, note))
-	}
-	if note != "" {
-		note = " " + note
+		note = append(msg.Of("check.moreAllowed", "n", allowed), note...)
 	}
 	if len(ev) == 0 {
-		return check.Result{Status: check.Pass, Summary: "No tunnels publish this machine to the internet or the tailnet." + note}
+		return check.Result{Status: check.Pass}.WithSummary(append(msg.Of("tunnels.pass"), note...))
 	}
-	r := check.Result{Status: check.Warn, Severity: worst, Evidence: ev,
-		Summary: fmt.Sprintf("%d tunnel(s) publish this machine beyond the local network.%s", len(ev), note),
-		Fix: "Stop tunnels you aren't using (tailscale funnel reset, tailscale serve reset; quit ngrok, ssh -R…). " +
-			"If you must share something, use a named Cloudflare Tunnel behind Cloudflare Access, not a public URL."}
+	r := check.Result{Status: check.Warn, Severity: worst, Evidence: ev}.
+		WithSummary(append(msg.Of("tunnels.found", "n", len(ev)), note...)).WithFix(msg.Of("tunnels.fix"))
 	if worst == check.High {
 		r.Status = check.Fail
 	}

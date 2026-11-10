@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
@@ -405,41 +406,38 @@ func evalSSHKeys(keys []sshKey, auth []authorizedKey, p policy.SSHKeys) check.Re
 			medium = append(medium, fmt.Sprintf("%s:%d  can log in here: %s %s", a.path, a.line, key, comment))
 		}
 	}
-	note := ""
+	var note msg.Text
 	if hw > 0 {
-		note = fmt.Sprintf(" %d hardware-backed key(s) need their token and are fine.", hw)
+		note = msg.Of("sshkeys.hardware", "n", hw)
 	}
 	if len(high)+len(medium) == 0 {
-		return check.Result{Status: check.Pass,
-			Summary: fmt.Sprintf("%d private key(s) checked: all have a passphrase and private permissions; no authorized_keys.%s", len(keys), note)}
+		return check.Result{Status: check.Pass}.WithSummary(append(msg.Of("sshkeys.pass", "n", len(keys)), note...))
 	}
-	var parts []string
+	var parts msg.Text
 	if plain > 0 {
-		parts = append(parts, fmt.Sprintf("%d private key(s) without a passphrase", plain))
+		parts = append(parts, msg.P("sshkeys.noPassphrase", "n", plain))
 	}
 	if loose > 0 {
-		parts = append(parts, fmt.Sprintf("%d readable by other users", loose))
+		parts = append(parts, msg.P("sshkeys.readable", "n", loose))
 	}
 	if authN > 0 {
-		parts = append(parts, fmt.Sprintf("%d key(s) in authorized_keys can log in to this machine", authN))
+		parts = append(parts, msg.P("sshkeys.authorized", "n", authN))
 	}
-	r := check.Result{Status: check.Warn, Severity: check.Medium, Summary: strings.Join(parts, ", ") + "." + note,
-		Evidence: append(high, medium...), Fix: sshFix()}
+	r := check.Result{Status: check.Warn, Severity: check.Medium, Evidence: append(high, medium...)}.
+		WithSummary(append(parts, note...)).WithFix(sshFix())
 	if len(high) > 0 {
 		r.Status, r.Severity = check.Fail, check.High
 	}
 	return r
 }
 
-func sshFix() string {
-	s := "Add a passphrase: ssh-keygen -p -f <key> (the key stays the same, nothing to re-upload), or move to a " +
-		"hardware key (ssh-keygen -t ed25519-sk) or a password manager's SSH agent. "
+func sshFix() msg.Text {
+	t := msg.Of("sshkeys.fix.passphrase")
 	switch runtime.GOOS {
 	case "darwin":
-		s += "Let the Keychain remember the passphrase: ssh-add --apple-use-keychain <key>. "
+		t = append(t, msg.P("sshkeys.fix.mac"))
 	case "windows":
-		s += "Let the Windows ssh-agent service hold the unlocked key: ssh-add <key>. "
+		t = append(t, msg.P("sshkeys.fix.win"))
 	}
-	return s + "Make keys private: chmod 600 <key>. Remove authorized_keys lines you don't recognise, and turn off " +
-		"the SSH server (Remote Login) if you don't use it."
+	return append(t, msg.P("sshkeys.fix.rest"))
 }

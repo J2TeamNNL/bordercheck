@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
@@ -30,12 +32,12 @@ type pendingUpdate struct {
 }
 
 type updateFacts struct {
-	Family         string // "macos", "windows", "debian", "fedora", "arch" or "linux"; picks the fix text
-	Name           string // "macOS 27.2", for people
-	Key            string // key in min_os_versions
-	Version        string // compared with the minimum
-	AutoUpdate     *bool  // nil: could not tell
-	AutoUpdateOff  string // what is off, in the OS's own words
+	Family         string   // "macos", "windows", "debian", "fedora", "arch" or "linux"; picks the fix text
+	Name           string   // "macOS 27.2", for people
+	Key            string   // key in min_os_versions
+	Version        string   // compared with the minimum
+	AutoUpdate     *bool    // nil: could not tell
+	AutoUpdateOff  msg.Text // what is off, as the summary says it
 	PausedUntil    time.Time
 	LastCheck      time.Time // last successful check for updates; zero if unknown
 	PendingKnown   bool      // the OS keeps a list of updates it found
@@ -43,7 +45,7 @@ type updateFacts struct {
 	PendingCount   int       // updates found when only a count is known
 	LastInstall    time.Time // last OS update installed; zero if unknown
 	RebootRequired bool
-	Notes          []string // what could not be read
+	Notes          msg.Text // what could not be read
 }
 
 type browserInfo struct {
@@ -84,26 +86,30 @@ func agoText(days int) string {
 
 func evalOSUpdates(f updateFacts, bs []browserInfo, opts policy.OSUpdates, now time.Time) check.Result {
 	var p issueList
-	var notes []string
-	fix := func(kind string) string { return updateFix(kind, f.Family) }
+	var notes msg.Text
+	fix := func(kind string) msg.Part { return updateFix(kind, f.Family) }
 
 	if min := opts.MinOSVersions[f.Key]; min != "" && f.Version != "" && versionLess(f.Version, min) {
-		p.add(true, fmt.Sprintf("%s is older than the minimum version %s set by policy.", f.Name, minOSLabel(f.Key, min)), fix("upgrade"))
+		key := "updates.belowMin"
+		if f.Key == "windows" {
+			key = "updates.belowMinWin"
+		}
+		p.add(true, msg.Of(key, "os", f.Name, "min", min), fix("upgrade"))
 	}
 	if opts.RequireAutoUpdate == nil || *opts.RequireAutoUpdate {
 		switch {
 		case f.AutoUpdate == nil:
-			notes = append(notes, "Could not tell whether automatic updates are on.")
+			notes = append(notes, msg.P("updates.autoUnknown"))
 		case !*f.AutoUpdate:
-			p.add(false, "Automatic updates are off ("+f.AutoUpdateOff+").", fix("auto"))
+			p.add(false, f.AutoUpdateOff, fix("auto"))
 		}
 	}
 	if f.PausedUntil.After(now) {
-		p.add(false, "Updates are paused until "+f.PausedUntil.Format("2 Jan 2006")+".", fix("paused"))
+		p.add(false, msg.Of("updates.paused", "until", f.PausedUntil.Format("2006-01-02")), fix("paused"))
 	}
 	if max := opts.MaxCheckAgeDays; max > 0 && !f.LastCheck.IsZero() {
 		if d := daysAgo(f.LastCheck, now); d > max {
-			p.add(false, fmt.Sprintf("The OS last checked for updates %s (policy: every %d days).", agoText(d), max), fix("check"))
+			p.add(false, msg.Of("updates.checkStale", "ago", d, "max", max), fix("check"))
 		}
 	}
 	for _, u := range f.Pending {
@@ -112,12 +118,12 @@ func evalOSUpdates(f updateFacts, bs []browserInfo, opts policy.OSUpdates, now t
 			d = daysAgo(u.Since, now)
 		}
 		if max := opts.MaxPendingDays; max > 0 && d > max {
-			p.add(true, fmt.Sprintf("%s has been waiting to be installed for %d days (policy: %d).", u.Name, d, max), fix("pending"))
+			p.add(true, msg.Of("updates.waitingLong", "name", u.Name, "days", d, "max", max), fix("pending"))
 		} else {
 			if d >= 0 {
-				notes = append(notes, fmt.Sprintf("%s is ready to install (found %s).", u.Name, agoText(d)))
+				notes = append(notes, msg.P("updates.ready", "name", u.Name, "ago", d))
 			} else {
-				notes = append(notes, u.Name+" is ready to install.")
+				notes = append(notes, msg.P("updates.readyUndated", "name", u.Name))
 			}
 		}
 	}
@@ -128,26 +134,39 @@ func evalOSUpdates(f updateFacts, bs []browserInfo, opts policy.OSUpdates, now t
 			d = daysAgo(f.LastInstall, now)
 		}
 		if max := opts.MaxPendingDays; max > 0 && d > max {
-			p.add(true, fmt.Sprintf("%d update(s) are waiting and nothing has been installed for %d days (policy: %d).", f.PendingCount, d, max), fix("pending"))
+			p.add(true, msg.Of("updates.countWaitingLong", "n", f.PendingCount, "days", d, "max", max), fix("pending"))
 		} else {
-			notes = append(notes, fmt.Sprintf("%d update(s) are ready to install.", f.PendingCount))
+			notes = append(notes, msg.P("updates.countReady", "n", f.PendingCount))
 		}
 	}
 	if f.RebootRequired {
-		p.add(false, "Updates are installed but need a restart to take effect.", fix("reboot"))
+		p.add(false, msg.Of("updates.reboot"), fix("reboot"))
 	}
 	if max := opts.MaxDaysSinceUpdate; max > 0 && !f.LastInstall.IsZero() && !upToDate {
 		if d := daysAgo(f.LastInstall, now); d > max && f.PendingCount == 0 {
-			p.add(true, fmt.Sprintf("No OS update has been installed for %d days (policy: %d).", d, max), fix("pending"))
+			p.add(true, msg.Of("updates.noneInstalled", "days", d, "max", max), fix("pending"))
 		}
 	}
 
+	auto := f.AutoUpdate != nil && *f.AutoUpdate
 	state := f.Name
-	if f.AutoUpdate != nil && *f.AutoUpdate {
+	if auto {
 		state += ", automatic updates on"
 	}
-	if !f.LastCheck.IsZero() {
-		state += ", last checked for updates " + agoText(daysAgo(f.LastCheck, now))
+	var pass msg.Text
+	switch {
+	case !f.LastCheck.IsZero():
+		d := daysAgo(f.LastCheck, now)
+		state += ", last checked for updates " + agoText(d)
+		if auto {
+			pass = msg.Of("updates.stateAutoChecked", "os", f.Name, "ago", d)
+		} else {
+			pass = msg.Of("updates.stateChecked", "os", f.Name, "ago", d)
+		}
+	case auto:
+		pass = msg.Of("updates.stateAuto", "os", f.Name)
+	default:
+		pass = msg.Of("updates.state", "os", f.Name)
 	}
 	evidence := []string{state}
 	for _, b := range bs {
@@ -162,106 +181,90 @@ func evalOSUpdates(f updateFacts, bs []browserInfo, opts policy.OSUpdates, now t
 		}
 		evidence = append(evidence, line)
 		if max := opts.MaxBrowserAgeDays; max > 0 && age > max {
-			p.add(true, fmt.Sprintf("%s has not updated for %d days (policy: %d); browsers ship security fixes every few weeks.", strings.TrimSpace(b.Name+" "+b.Version), age, max), updateFix("browser", ""))
+			p.add(true, msg.Of("updates.browserStale", "browser", strings.TrimSpace(b.Name+" "+b.Version), "days", age, "max", max),
+				updateFix("browser", ""))
 		}
 		if min := opts.MinBrowserVersions[b.ID]; min != "" && b.Version != "" && versionLess(b.Version, min) {
-			p.add(true, fmt.Sprintf("%s %s is older than the minimum %s set by policy.", b.Name, b.Version, min), updateFix("browser", ""))
+			p.add(true, msg.Of("updates.browserBelowMin", "browser", b.Name, "version", b.Version, "min", min),
+				updateFix("browser", ""))
 		}
 	}
 
-	pass := state + "."
 	if upToDate {
-		pass += " No updates waiting."
+		pass = append(pass, msg.P("updates.noneWaiting"))
 	}
 	if len(bs) > 0 {
-		pass += fmt.Sprintf(" %d browser(s) recently updated.", len(bs))
+		pass = append(pass, msg.P("updates.browsersFresh", "n", len(bs)))
 	}
 	notes = append(notes, f.Notes...)
 	return p.result(pass, notes, evidence)
 }
 
-func minOSLabel(key, min string) string {
-	if key == "windows" {
-		return "build " + min
-	}
-	return min
-}
-
 // updateFix says how to fix one kind of update problem on one OS family.
-func updateFix(kind, family string) string {
-	switch kind {
-	case "browser":
-		return "Open each browser's About page (Chrome/Edge/Brave: Settings → About; Firefox: Help → About Firefox) " +
-			"to update it, then relaunch it; uninstall browsers you don't use."
+func updateFix(kind, family string) msg.Part {
+	if kind == "browser" {
+		return msg.P("updates.fix.browser")
 	}
 	fixes := map[string]map[string]string{
 		"macos": {
-			"upgrade": "System Settings → General → Software Update → upgrade to a supported macOS.",
-			"auto": "System Settings → General → Software Update → Automatic updates (i) → turn on Check for updates, " +
-				"Download new updates when available and Install Security Responses and system files.",
-			"pending": "System Settings → General → Software Update → Update Now.",
-			"check":   "Connect to the internet and open System Settings → General → Software Update so macOS checks again.",
+			"upgrade": "updates.fix.macos.upgrade",
+			"auto":    "updates.fix.macos.auto",
+			"pending": "updates.fix.macos.pending",
+			"check":   "updates.fix.macos.check",
 		},
 		"windows": {
-			"upgrade": "Settings → Windows Update → install the latest Windows 11 feature update.",
-			"auto": "Windows Update must run automatically: the Windows Update service (wuauserv) must not be Disabled " +
-				"and no policy may turn automatic updates off. If Settings → Windows Update says some settings are " +
-				"managed by your organisation, ask IT.",
-			"paused":  "Settings → Windows Update → Resume updates.",
-			"pending": "Settings → Windows Update → Check for updates, install everything, then restart.",
-			"check":   "Settings → Windows Update → Check for updates.",
-			"reboot":  "Restart the PC to finish installing updates.",
+			"upgrade": "updates.fix.windows.upgrade",
+			"auto":    "updates.fix.windows.auto",
+			"paused":  "updates.fix.windows.paused",
+			"pending": "updates.fix.windows.pending",
+			"check":   "updates.fix.windows.check",
+			"reboot":  "updates.fix.windows.reboot",
 		},
 		"debian": {
-			"upgrade": "Upgrade to a supported release (Ubuntu: sudo do-release-upgrade).",
-			"auto":    "sudo apt install unattended-upgrades && sudo dpkg-reconfigure -plow unattended-upgrades",
-			"pending": "sudo apt update && sudo apt full-upgrade",
-			"check":   "sudo apt update",
-			"reboot":  "Restart to finish installing updates (/var/run/reboot-required is set).",
+			"upgrade": "updates.fix.debian.upgrade",
+			"auto":    "updates.fix.debian.auto",
+			"pending": "updates.fix.debian.pending",
+			"check":   "updates.fix.debian.check",
+			"reboot":  "updates.fix.debian.reboot",
 		},
 		"fedora": {
-			"upgrade": "Upgrade to a supported release: sudo dnf system-upgrade (see the Fedora upgrade guide).",
-			"auto": "sudo dnf install dnf-automatic, set apply_updates = yes in /etc/dnf/automatic.conf, then " +
-				"sudo systemctl enable --now dnf-automatic.timer (dnf5-automatic.timer on dnf5).",
-			"pending": "sudo dnf upgrade --refresh",
-			"check":   "sudo dnf check-update --refresh",
+			"upgrade": "updates.fix.fedora.upgrade",
+			"auto":    "updates.fix.fedora.auto",
+			"pending": "updates.fix.fedora.pending",
+			"check":   "updates.fix.fedora.check",
 		},
 		"arch": {
-			"pending": "sudo pacman -Syu",
-			"check":   "sudo pacman -Syu",
+			"pending": "updates.fix.arch.pending",
+			"check":   "updates.fix.arch.pending",
 		},
 	}
-	if s := fixes[family][kind]; s != "" {
-		return s
+	if k := fixes[family][kind]; k != "" {
+		return msg.P(k)
 	}
-	return "Install the latest updates with your distribution's package manager, and restart."
+	return msg.P("updates.fix.generic")
 }
 
 // issueList collects what a check found and turns it into one result.
-type issueList struct{ high, medium, fixes []string }
+type issueList struct{ high, medium, fixes msg.Text }
 
-func (p *issueList) add(high bool, text, fix string) {
+// add records a problem; its fix, when it has one, is listed once.
+func (p *issueList) add(high bool, text msg.Text, fix msg.Part) {
 	if high {
-		p.high = append(p.high, text)
+		p.high = append(p.high, text...)
 	} else {
-		p.medium = append(p.medium, text)
+		p.medium = append(p.medium, text...)
 	}
-	if fix != "" && !slices.Contains(p.fixes, fix) {
+	if fix.Key != "" && !slices.ContainsFunc(p.fixes, func(f msg.Part) bool { return reflect.DeepEqual(f, fix) }) {
 		p.fixes = append(p.fixes, fix)
 	}
 }
 
-func (p issueList) result(pass string, notes, evidence []string) check.Result {
-	note := ""
-	if len(notes) > 0 {
-		note = " " + strings.Join(notes, " ")
-	}
+func (p issueList) result(pass, notes msg.Text, evidence []string) check.Result {
 	if len(p.high)+len(p.medium) == 0 {
-		return check.Result{Status: check.Pass, Summary: strings.TrimSpace(pass + note), Evidence: evidence}
+		return check.Result{Status: check.Pass, Evidence: evidence}.WithSummary(slices.Concat(pass, notes))
 	}
-	r := check.Result{Status: check.Warn, Severity: check.Medium,
-		Summary:  strings.Join(append(slices.Clone(p.high), p.medium...), " ") + note,
-		Evidence: evidence, Fix: strings.Join(p.fixes, " ")}
+	r := check.Result{Status: check.Warn, Severity: check.Medium, Evidence: evidence}.
+		WithSummary(slices.Concat(p.high, p.medium, notes)).WithFix(p.fixes)
 	if len(p.high) > 0 {
 		r.Status, r.Severity = check.Fail, check.High
 	}
@@ -331,7 +334,10 @@ func macUpdateFacts(productVersion, suPlist, managedPlist string) (updateFacts, 
 		}
 	}
 	on := len(off) == 0
-	f.AutoUpdate, f.AutoUpdateOff = &on, strings.Join(off, ", ")
+	f.AutoUpdate = &on
+	if !on {
+		f.AutoUpdateOff = msg.Of("updates.autoOff.mac", "settings", strings.Join(off, ", "))
+	}
 	for _, k := range []string{"LastSuccessfulDate", "LastFullSuccessfulDate"} {
 		if t, ok := su[k].(time.Time); ok && t.After(f.LastCheck) {
 			f.LastCheck = t
@@ -405,18 +411,21 @@ func winUpdateFacts(kv map[string]string) updateFacts {
 		f.Name += "." + ubr
 	}
 	f.Name += ")"
-	var off []string
+	var why msg.Text
 	if strings.EqualFold(kv["wuauserv_start"], "Disabled") {
-		off = append(off, "the Windows Update service is disabled")
+		why = append(why, msg.P("updates.autoOff.winService"))
 	}
 	if kv["no_auto_update"] == "1" {
-		off = append(off, "a policy turns automatic updates off")
+		why = append(why, msg.P("updates.autoOff.winPolicy"))
 	}
 	if o := kv["au_options"]; o == "1" || o == "2" {
-		off = append(off, "a policy only notifies about updates")
+		why = append(why, msg.P("updates.autoOff.winNotify"))
 	}
-	on := len(off) == 0
-	f.AutoUpdate, f.AutoUpdateOff = &on, strings.Join(off, "; ")
+	on := len(why) == 0
+	f.AutoUpdate = &on
+	if !on {
+		f.AutoUpdateOff = append(msg.Of("updates.autoOff.win"), why...)
+	}
 	if t, err := time.Parse(time.RFC3339, kv["pause_until"]); err == nil {
 		f.PausedUntil = t
 	}
@@ -426,7 +435,7 @@ func winUpdateFacts(kv map[string]string) updateFacts {
 	if t, err := time.Parse("2006-01-02", kv["last_hotfix"]); err == nil {
 		f.LastInstall = t
 	} else {
-		f.Notes = append(f.Notes, "Could not read when Windows last installed an update.")
+		f.Notes = append(f.Notes, msg.P("updates.note.winLastInstall"))
 	}
 	f.RebootRequired = strings.EqualFold(kv["reboot_required"], "True")
 	return f

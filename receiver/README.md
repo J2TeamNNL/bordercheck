@@ -230,8 +230,8 @@ Pages set `<html lang>` (`en`, `zh-Hans`, `vi`) and `Vary: Accept-Language, Cook
 Dates are UTC: ISO `2026-11-01 10:05 UTC` in English, the local numeric order in Chinese and Vietnamese;
 numbers, plurals and relative times ("3m ago", "3分钟前", "3 phút trước") come from `Intl`.
 
-**Deliberately not translated**: anything a machine sends (check titles, summaries, fix text, evidence,
-unknown statuses), check IDs, policy JSON and the field names and JSON paths quoted in validation messages,
+**Deliberately not translated**: what a machine sends as free text (evidence, unknown statuses, the titles of
+checks the portal does not know, and summaries or fixes without parts, see below), check IDs, policy JSON and the field names and JSON paths quoted in validation messages,
 audit action codes, emails and hostnames, the MCP server (a machine interface: tools, descriptions, results
 and errors stay English), the REST API (likewise), the JSON of `/enroll`, `/policy` and `/report`, and webhook alerts (English; there
 is no per-deployment language setting). Known statuses and severities (`fail`, `high`…) are shown translated
@@ -245,6 +245,46 @@ renders every page in every language). In a translation, `{name}` is a parameter
 `[b]…[/b]`, `[code]…[/code]`, `[kbd]…[/kbd]` are the only markup; any other `<`, `>` or `&` is shown as text.
 Operations shared with the MCP server return messages (`Msg`, a key and parameters) rather than text, so the
 dashboard shows them in the admin's language and MCP in English.
+
+### Check summaries and fixes
+
+The built-in checks' titles are translated by check ID (`checkTitle.*` in the catalogues). Their summaries
+and fixes are translated by message key: bordercheck 0.4+ sends, next to each result's English `summary` and
+`fix`, the same text as `summary_parts` / `fix_parts` (a list of `{"key", "params"}`, see
+[docs/install.md](../docs/install.md#what-is-sent)). `src/checktext.ts` renders them:
+
+- The English templates live in Go, in `internal/msg/catalog.go`, the one table the checks build their English
+  from. `src/i18n/checks.en.json` is generated from it (`go generate ./internal/msg`) and is the set of keys;
+  `src/i18n/checks.zh.ts` and `checks.vi.ts` translate them and are typed `Record<CheckKey, Entry>`, so a
+  missing or extra key fails `npm run typecheck`.
+- Two tests keep Go and the JSON identical: `go test ./internal/msg` (`TestCatalogJSON`) and
+  `test/checks-go-sync.test.ts`, which parses `catalog.go`. `test/checktext.test.ts` checks that every
+  translation has the same parameters (names and types) as the English, keeps every `[code]` command and URL
+  verbatim, and uses only `[code]`/`[kbd]` markup (no `[b]`: inside a fix box it is the label style).
+- Template syntax is the catalogues' (`{name}`, `[code]`, `{one, other}` plurals on `{n}`) plus typed
+  parameters: `{x:dur}` seconds ("5 minutes", "5 phút", "5 分钟"), `{x:ago}` days ("3 days ago"), `{x:date}`
+  a `YYYY-MM-DD` date. Numbers are shown as sent (no grouping: ports, counts).
+- A field is shown translated only when every part's key is known here and its params are exactly the ones
+  that key takes, with the right types; otherwise the English text the machine sent is shown, as for a client
+  older than 0.4. So an older portal shows a newer client's new messages in English, never half-translated.
+  Summary parts join with a space (none in Chinese); fix parts each go on their own line.
+- Parts are untrusted: `parseParts` (used by `report.ts`) drops the whole field if it is not a list of at most
+  24 parts with dotted keys and at most 8 parameters each, named `[a-z][A-Za-z0-9_]*`, each a finite number or
+  a string (control characters removed, cut at 300 characters). Parameters are always escaped and never read
+  as markup; in fixes only https links to the trusted hosts (`linkify`) become anchors, in the translation
+  and in parameters alike.
+
+**Adding or changing a message**: edit `internal/msg/catalog.go` (a key never changes meaning or parameters; a
+sentence that needs different ones gets a new key), use it from the check with `msg.P` / `msg.Of`, run
+`go generate ./internal/msg`, then add the key to `checks.zh.ts` and `checks.vi.ts` (typecheck tells you).
+`go test ./internal/msg` fails on a key no check uses or a check using an unknown key.
+
+Translation conventions: Vietnamese keeps menu paths and setting names exactly as the English OS shows them,
+inside a Vietnamese sentence ("Mở System Settings → Network → Firewall rồi bật lên"), since most people in
+Vietnam run macOS and Windows in English. Chinese gives each path as the Chinese OS shows it, followed once by
+the English path in parentheses ("系统设置 → 网络 → 防火墙（System Settings → Network → Firewall）"), so it works
+whichever language the OS is in; apps with no Chinese UI (Tailscale) stay English. Commands, flags, file paths,
+product names and URLs are never translated.
 
 ## MCP server: ask Claude about the fleet
 

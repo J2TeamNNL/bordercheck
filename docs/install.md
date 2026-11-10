@@ -268,9 +268,20 @@ The report is the same JSON as `bordercheck -json`, plus `email` and `install_id
   "email": "an@acme.com", "install_id": "4f1c…",
   "counts": { "fail": 1, "error": 0, "warn": 1, "pass": 3, "skip": 1, "waived": 0 },
   "results": [ { "id": "firewall", "title": "Firewall is on", "status": "fail", "severity": "high",
-                 "summary": "The macOS firewall is off.", "fix": "…" } ]
+                 "summary": "The macOS firewall is off.", "fix": "…",
+                 "summary_parts": [ { "key": "firewall.mac.off" } ],
+                 "fix_parts": [ { "key": "firewall.mac.off.fix" } ] } ]
 }
 ```
+
+- `summary_parts` and `fix_parts` (since 0.4, optional) are the same summary and fix as message keys with
+  named parameters (strings and integers), in the order the English joins them, for example
+  `[{"key": "listeners.exposed", "params": {"n": 3}}, {"key": "check.moreAllowed", "params": {"n": 2}}]`.
+  The English text is rendered from exactly these parts (`internal/msg/catalog.go`), so the two always agree;
+  the portal uses the parts to show the text in the reader's language and falls back to `summary`/`fix` for a
+  key it does not know. A result whose text has no message (an error from the OS) has no parts. Keys never
+  change meaning: a message with other parameters gets a new key. Receivers that do not know these fields
+  ignore them.
 
 - Secret values are never printed or sent. For long provider tokens (OpenAI, GitHub, AWS…) the report shows the
   last 4 characters, as the providers' own dashboards do, so people can tell which key to rotate (policy
