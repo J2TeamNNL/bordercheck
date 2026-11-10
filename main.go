@@ -118,6 +118,9 @@ func runCheck(args []string) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	// The first Ctrl-C asks the run to wind up; a second one ends the process,
+	// whatever it is stuck on.
+	go func() { <-ctx.Done(); stop() }()
 	var progress check.Progress
 	if isTerminal(os.Stderr) {
 		progress = report.Progress(os.Stderr)
@@ -198,6 +201,9 @@ func runAgent(cmd string, args []string) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	// The first Ctrl-C asks the run to wind up; a second one ends the process,
+	// whatever it is stuck on.
+	go func() { <-ctx.Done(); stop() }()
 
 	switch cmd {
 	case "install":
