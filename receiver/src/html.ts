@@ -304,6 +304,10 @@ background:radial-gradient(circle at 30% 20%,color-mix(in srgb,var(--c) 70%,#fff
 .steps li::before{content:counter(s);flex:none;display:grid;place-items:center;width:28px;height:28px;margin-top:-2px;border-radius:50%;background:var(--glass-hi);color:var(--text);font-weight:700;font-size:13px}
 .steps li b{color:var(--text)}
 kbd{font:600 12px/1 var(--font);padding:3px 7px;border-radius:6px;background:var(--glass-hi);box-shadow:inset 0 -1px 0 rgba(0,0,0,.5);color:var(--text)}
+details.adder{margin-top:28px}
+details.adder>summary{list-style:none}details.adder>summary::-webkit-details-marker{display:none}
+details.adder>summary::before{content:"+";font-weight:700;font-size:16px;line-height:1}
+details.adder[open]>summary{background:var(--glass-hi);color:var(--text)}details.adder[open]>summary::before{content:"−"}
 details.alt{margin-top:16px;border-radius:var(--r);background:var(--glass);box-shadow:var(--hl)}
 details.alt summary{cursor:pointer;list-style:none;padding:18px 22px;font-weight:650;display:flex;justify-content:space-between;align-items:center;border-radius:var(--r);transition:background-color .2s}
 details.alt summary::-webkit-details-marker{display:none}

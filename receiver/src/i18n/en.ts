@@ -215,6 +215,7 @@ export const en = {
   "roles.pending": { one: " · {n} pending invite", other: " · {n} pending invites" },
   "roles.empty": "No roles yet. Create one to start inviting people.",
   "roles.new": "New role",
+  "roles.add": "Add role",
   "roles.create": "Create role",
   "roles.intro": "The box starts with a sample policy that spells out every check; edit it, then create the role.",
   "roles.name": "Name",

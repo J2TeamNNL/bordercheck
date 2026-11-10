@@ -195,6 +195,7 @@ export const zh: Catalog = {
   "roles.pending": " · {n} 个待使用的邀请",
   "roles.empty": "还没有角色。先创建一个角色，再邀请人员。",
   "roles.new": "新建角色",
+  "roles.add": "添加角色",
   "roles.create": "创建角色",
   "roles.intro": "输入框中预置了一份示例策略，列出了所有检查项；修改后即可创建角色。",
   "roles.name": "名称",

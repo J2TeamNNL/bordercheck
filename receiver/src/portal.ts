@@ -10,7 +10,7 @@ import samplePolicy from "./sample-policy.json";
 import { audit, auditStmt, auditStmtIf, MCP_ACTOR, MCP_READ_ACTOR } from "./audit";
 import { commandBlock, installCommands, publicOrigin } from "./enroll";
 import { config, DAY, type Env } from "./env";
-import { COPY_HEADERS, copyButton, html, type Html, layout, note, page, pill } from "./html";
+import { COPY_HEADERS, copyButton, html, Html, layout, note, page, pill } from "./html";
 import { type I18n, type Key, type Msg, msg } from "./i18n";
 import { CHECK_ID_RE, POLICY_CHECKS, today, validateRolePolicy, waiverDateError } from "./roles";
 import { newCode, sha256hex } from "./tokens";
@@ -64,8 +64,9 @@ ${rows.length
 <span class="meta"><span class="big plain">${L.num(r.machines)}</span>${L.t("roles.machines", { n: r.machines })}${r.pending ? L.t("roles.pending", { n: r.pending }) : ""}</span></a>`,
       )}</div>`
     : html`<div class="panel"><p class="muted">${L.t("roles.empty")}</p></div>`}
-<h2 id="new-role">${L.t("roles.new")}</h2>
-${roleForm(L, "/admin/roles", draft?.name ?? "", draft?.policy ?? SAMPLE_POLICY, L.t("roles.create"), L.t("roles.intro"))}`;
+<details class="adder" id="new-role"${draft || rows.length === 0 ? new Html(" open") : ""}><summary class="btn primary">${L.t("roles.add")}</summary>
+<h2>${L.t("roles.new")}</h2>
+${roleForm(L, "/admin/roles", draft?.name ?? "", draft?.policy ?? SAMPLE_POLICY, L.t("roles.create"), L.t("roles.intro"))}</details>`;
   return page(layout(L, L.s("nav.roles"), who, body, "Roles"), status);
 }
 

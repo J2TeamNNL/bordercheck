@@ -196,6 +196,7 @@ export const vi: Catalog = {
   "roles.pending": " · {n} lời mời đang chờ",
   "roles.empty": "Chưa có vai trò nào. Hãy tạo một vai trò để bắt đầu mời mọi người.",
   "roles.new": "Vai trò mới",
+  "roles.add": "Thêm vai trò",
   "roles.create": "Tạo vai trò",
   "roles.intro": "Ô bên dưới có sẵn một policy mẫu liệt kê mọi mục kiểm tra; hãy chỉnh sửa rồi tạo vai trò.",
   "roles.name": "Tên",

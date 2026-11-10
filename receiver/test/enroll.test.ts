@@ -454,6 +454,12 @@ describe("sample policy", () => {
     const filled = await (await adminGet("/admin/roles")).text();
     expect(filled).not.toContain("Paste sample policy");
     expect(filled).toContain("max_lock_minutes");
+    // With roles already there the form is folded behind an "Add role" button; it
+    // opens by itself when there are none, and after a rejected submission.
+    expect((await (await adminGet("/admin/roles")).text())).toMatch(/<details class="adder" id="new-role"( open)?><summary class="btn primary">Add role<\/summary>/);
+    const rejected = await adminPost("/admin/roles", { name: "Broken", policy: "{not json" });
+    expect(rejected.status).toBe(400);
+    expect(await rejected.text()).toContain('<details class="adder" id="new-role" open>');
     expect(filled).toContain("&quot;ai-agents&quot;");
     const { SAMPLE_POLICY } = await import("../src/portal");
     expect(validateRolePolicy(JSON.parse(SAMPLE_POLICY), new Date())).toEqual([]);
