@@ -36,6 +36,24 @@ The install scripts:
 shellcheck -s sh install.sh scripts/*.sh
 ```
 
+The macOS notification app (`macos/notifier/`, Swift, no dependencies; see
+[docs/install.md](docs/install.md#borderchecks-notifications-on-macos)), on a Mac with the Xcode command line tools:
+
+```sh
+scripts/build-notifier.sh --test                 # contract tests: arguments, request parsing, link checks (posts nothing)
+scripts/build-notifier.sh v0.0.0-test --zip      # ad hoc signed build/notifier/Bordercheck.app and dist/…zip
+BORDERCHECK_NOTIFIER_ZIP=$PWD/dist/bordercheck-notifier-v0.0.0-test-darwin-universal.zip \
+  go test -run TestRealNotifierZip -v ./internal/notifier/   # unpacks it; the Developer ID check must refuse it
+printf '%s' '{"v":1,"title":"t","link":"https://r.example.com/r/x","allowed_host":"r.example.com"}' |
+  build/notifier/Bordercheck.app/Contents/MacOS/bordercheck-notifier validate   # what it would post
+```
+
+The icon is drawn by `macos/notifier/Icon/make-icon.swift` (the portal's mark from `receiver/src/html.ts`) at build
+time. Don't launch the app in `status`, `authorize` or `post` mode on a machine whose owner did not expect it:
+`authorize` puts macOS's permission question on screen, and `post` shows a notification. An ad hoc build is
+refused by bordercheck anyway; to try the whole thing, sign it with a Developer ID (`--sign`) and install it with
+`bordercheck install … -notifier-zip <zip>` or `bordercheck notifications -notifier-zip <zip>`.
+
 The receiver (`receiver/`, TypeScript on Cloudflare Workers):
 
 ```sh
@@ -128,6 +146,25 @@ two macOS binaries from the commit you are on (it refuses a dirty tree), signs a
 in a draft release. The workflow then uses them instead of its own, after checking that they were built from
 exactly the tagged commit with nothing uncommitted, signs `SHA256SUMS` over everything and publishes the draft.
 With neither the secrets nor a draft, the release goes out with unsigned macOS binaries and a warning on the run.
+
+The same script builds the notification app, `Bordercheck.app`, from that commit (`scripts/build-notifier.sh`
+records the version, the commit and a clean-tree flag in its `Info.plist`), signs it with `SIGN_ID` (hardened
+runtime, no entitlements), notarizes and staples it, checks it with `spctl`, and uploads
+`bordercheck-notifier-vX.Y.Z-darwin-universal.zip` to the draft. The workflow's `notifier` job takes that zip
+and refuses it unless it is Developer ID signed as `io.github.ptrinh.bordercheck.notifier` with the hardened
+runtime, stapled, accepted by Gatekeeper, universal, signed by the same team as the macOS binaries, and its
+`Info.plist` names exactly the tagged commit, a clean tree and the tag; the zip then goes into `SHA256SUMS` with
+everything else. What that proves: the maintainer's script stamped the app with this commit, and Apple notarized
+it. It does not prove the code was compiled from that commit: unlike the Go binaries' embedded VCS information,
+which the Go toolchain writes, the stamp is written by the build script, and Swift builds are not reproducible
+enough to rebuild and compare. A release without the app goes out with a warning; installed Macs then keep
+using Script Editor for notifications.
+
+Apple Developer setup for the app: nothing beyond the Developer ID Application certificate already used for the
+binaries. Posting local notifications needs no entitlement and no provisioning profile, and a Developer ID app's
+bundle ID does not have to be registered (registering `io.github.ptrinh.bordercheck.notifier` under Identifiers
+is harmless and reserves it). Only the app's Team ID matters to bordercheck: it is pinned at first install, so
+signing a later release with another team would make installed copies refuse the update and keep the old app.
 A bare binary cannot be stapled, so Gatekeeper looks its notarization up online. Windows binaries are not
 Authenticode-signed.
 

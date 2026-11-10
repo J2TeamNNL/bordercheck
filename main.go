@@ -35,6 +35,8 @@ const usage = `Usage:
                                                      enroll with an invite link from IT (no email question);
                                                      run again without the link to finish an interrupted install
   bordercheck status                                 show the install and the last report sent
+  bordercheck notifications                          macOS: let macOS ask whether bordercheck may show its own
+                                                     notifications (install asks when run in a terminal)
   bordercheck send [-force]                          what the service runs; -force sends a report now
   bordercheck update                                 refresh the policy and install a newer signed release now
   bordercheck uninstall
@@ -51,7 +53,7 @@ func main() { os.Exit(run(os.Args[1:])) }
 func run(args []string) int {
 	if len(args) > 0 {
 		switch args[0] {
-		case "install", "uninstall", "status", "send", "update":
+		case "install", "uninstall", "status", "send", "update", "notifications":
 			return runAgent(args[0], args[1:])
 		case "verify":
 			return runVerify(args[1:])
@@ -173,6 +175,7 @@ func runAgent(cmd string, args []string) int {
 	updateRepo := fs.String("update-repo", "", "install with an invite link: take self-updates from this GitHub owner/name instead of the official one")
 	updateKey := fs.String("update-key", "", "install with an invite link: the base64 ed25519 key those releases are signed with")
 	force := fs.Bool("force", false, "send: send a report now even if one is not due")
+	notifierZip := fs.String("notifier-zip", "", "install, notifications (macOS): install the notification app from this zip instead of the release's (for testing a build)")
 	// Flags may come before or after the policies URL.
 	var positional []string
 	for {
@@ -209,7 +212,7 @@ func runAgent(cmd string, args []string) int {
 	case "install":
 		err = agent.Install(ctx, env, agent.InstallOptions{
 			Policy: policySrc, Email: *email, In: os.Stdin, Ask: isTerminal(os.Stdin),
-			UpdateRepo: *updateRepo, UpdateKey: *updateKey})
+			UpdateRepo: *updateRepo, UpdateKey: *updateKey, NotifierZip: *notifierZip})
 	case "uninstall":
 		if err = agent.Uninstall(env); err == nil {
 			fmt.Println("Uninstalled.")
@@ -232,6 +235,8 @@ func runAgent(cmd string, args []string) int {
 		err = agent.Send(ctx, env, *force)
 	case "update":
 		err = agent.Update(ctx, env)
+	case "notifications":
+		err = agent.Notifications(ctx, env, *notifierZip)
 	}
 	if err != nil {
 		return fail(err)

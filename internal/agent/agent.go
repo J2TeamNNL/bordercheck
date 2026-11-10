@@ -13,6 +13,8 @@
 //	                problems the person at the machine was last notified of,
 //	                and the link to this machine's report page
 //	bordercheck.log what each scheduled run did
+//	Bordercheck.app macOS only: the app bordercheck's notifications come from
+//	                (notifier.go)
 package agent
 
 import (
@@ -38,6 +40,7 @@ import (
 	"github.com/ptrinh/bordercheck/internal/check"
 	"github.com/ptrinh/bordercheck/internal/checks"
 	"github.com/ptrinh/bordercheck/internal/hostinfo"
+	"github.com/ptrinh/bordercheck/internal/notifier"
 	"github.com/ptrinh/bordercheck/internal/policy"
 	"github.com/ptrinh/bordercheck/internal/report"
 	"github.com/ptrinh/bordercheck/internal/update"
@@ -94,6 +97,10 @@ type Config struct {
 	UpdateKey  string `json:"update_public_key,omitempty"`
 	// Set for an install made from an invite link; nil for a policies.json one.
 	Enrollment *Enrollment `json:"enrollment,omitempty"`
+	// macOS: the notification app's Team ID, pinned when it was first
+	// installed, and the digest of the bundle as installed (notifier.go).
+	NotifierTeam   string `json:"notifier_team_id,omitempty"`
+	NotifierDigest string `json:"notifier_sha256,omitempty"`
 }
 
 type State struct {
@@ -114,6 +121,11 @@ type State struct {
 	Revoked         time.Time `json:"revoked,omitzero"`
 	RevokedChecked  time.Time `json:"revoked_checked,omitzero"`
 	RevokedNotified bool      `json:"revoked_notified,omitempty"`
+	// macOS: what the notification app last said about bordercheck's own
+	// notifications (authorized, denied, not_determined, or error), and when.
+	Notifications      string    `json:"notifications,omitempty"`
+	NotificationsError string    `json:"notifications_error,omitempty"`
+	NotificationsAt    time.Time `json:"notifications_at,omitzero"`
 }
 
 func readJSON(path string, v any) error {
@@ -152,6 +164,9 @@ type InstallOptions struct {
 	Ask    bool      // In is a terminal, so asking is possible
 	// Invite installs only: the update source, instead of the built-in default.
 	UpdateRepo, UpdateKey string
+	// macOS: install the notification app from this zip instead of downloading
+	// this version's from the release (for testing a build).
+	NotifierZip string
 }
 
 // Install copies bordercheck and its policy into env.Dir, records the user's
@@ -233,6 +248,7 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 		fmt.Fprintf(env.Out, "Updates itself from github.com/%s releases.\n", pol.Update.Repo)
 	}
 	printSends(env.Out, pol)
+	setUpNotifications(ctx, env, &cfg, pol, o.NotifierZip)
 	fmt.Fprintf(env.Out, "\nNow checking this computer for the first time. It usually takes under a minute, %s at most.\n", check.Timeout)
 	if err := Send(ctx, env, true); err != nil {
 		fmt.Fprintf(env.Out, "\nbordercheck is installed and will check every hour, but the first report did not get through (%v). It tries again on its own; \"%s\" send -force tries now.\n",
@@ -282,7 +298,7 @@ func sends(r policy.Report) string {
 // Uninstall removes the service and the install folder, the token with it.
 // The portal is not told: a revoked or forgotten install is IT's to clean up.
 func Uninstall(env Env) error {
-	err := services.unregister()
+	err := errors.Join(services.unregister(), notifier.Remove(env.Dir))
 	for _, name := range []string{"config.json", "state.json", "bordercheck.log", policy.FileName, TokenFile, binName()} {
 		if e := os.Remove(filepath.Join(env.Dir, name)); e != nil && !errors.Is(e, os.ErrNotExist) {
 			err = errors.Join(err, e) // Windows cannot remove a running binary; it goes on the next uninstall
@@ -439,6 +455,7 @@ func updateBinary(ctx context.Context, env Env, cfg Config, st *State, now time.
 		fmt.Fprintf(env.Out, "%s update failed: %v\n", now.Format(time.RFC3339), err)
 	case res.Updated:
 		fmt.Fprintf(env.Out, "%s updated %s → %s; the next run uses it\n", now.Format(time.RFC3339), res.Current, res.Latest)
+		refreshNotifier(ctx, env, res.Latest, now)
 	default:
 		fmt.Fprintf(env.Out, "%s up to date (%s)\n", now.Format(time.RFC3339), res.Current)
 	}
@@ -502,6 +519,11 @@ func Status(env Env) (string, error) {
 		b.WriteString("\n")
 	} else {
 		b.WriteString("Notify:     off\n")
+	}
+	if macNotifier {
+		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+		fmt.Fprintf(&b, "Notifications: %s\n", notificationsNote(ctx, env, cfg))
+		cancel()
 	}
 	for _, w := range pol.ActiveWaivers(identity(cfg), time.Now()) {
 		fmt.Fprintf(&b, "Waiver:     %s until %s (%s)\n", w.Check, w.Until, w.Reason)

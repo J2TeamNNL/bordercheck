@@ -163,7 +163,7 @@ notify is set in the policy's [`notify`](policies.md#notify).
 
 | OS | How | Needs |
 |---|---|---|
-| macOS | `osascript` `display notification` | nothing; listed as Script Editor in System Settings → Notifications |
+| macOS | bordercheck's own app, `Bordercheck.app` in the install folder ([below](#borderchecks-notifications-on-macos)); until the person has allowed it, `osascript` `display notification` | the person's answer to macOS's question; the `osascript` fallback is listed as Script Editor in System Settings → Notifications |
 | Windows | a toast through Windows PowerShell 5.1 | nothing; shown while the user is logged on |
 | Linux | `notify-send`, else `gdbus` to the desktop's notification service | a desktop session |
 
@@ -172,16 +172,85 @@ up a report. `bordercheck send -force` (and the first report at install) is run 
 prints the problems there instead and the next scheduled run does not repeat them. A plain `bordercheck` never
 notifies.
 
-**Report page.** A receiver may answer a report with `{"report_url": "https://<host>/r/<id>"}`, a link to that
+### bordercheck's notifications on macOS
+
+On a Mac, bordercheck installs a small app, `Bordercheck.app`, beside itself in the install folder (bundle ID
+`io.github.ptrinh.bordercheck.notifier`, no Dock icon, it runs for a moment and quits). Notifications come from it,
+so they show **bordercheck**'s name and shield icon, are listed as **bordercheck** in System Settings →
+Notifications, and open the machine's report page when clicked.
+
+**What the person sees.** A banner headed "bordercheck" with "1 problem on this computer", the problems, and
+"Click to open your report page." when the receiver gave this machine a [report page](#report-page). Clicking
+opens that page in the default browser. The link itself is never in the visible text.
+
+**The permission question.** macOS asks once whether "bordercheck" may send notifications. bordercheck lets it ask
+only while the person is at the terminal:
+
+- `bordercheck install` run in a terminal (including `curl … | sh`): after the install lines, it says
+  "bordercheck shows a notification when it finds a new problem on this computer; clicking it opens your report
+  page. macOS will now ask whether "bordercheck" may send notifications. Choose Allow to get them.", then macOS
+  asks, and install says what was chosen before running the first check.
+- `bordercheck notifications`, any time later, which also reinstalls the app if it is missing or changed.
+
+The hourly service never asks: it posts only if the person already allowed it.
+
+| The person… | What happens | `bordercheck status` |
+|---|---|---|
+| allowed | notifications come from bordercheck; a click opens the report page | `Notifications: bordercheck's own (allowed in System Settings); …` |
+| declined, or later turned bordercheck off in System Settings | **nothing** is shown: no Script Editor fallback, no browser. Reports go on as before | `Notifications: turned off for bordercheck in System Settings; …` |
+| has not been asked (a scripted install with no terminal, an install upgraded from a version without the app) or did not answer | notifications come through Script Editor (`osascript`), as before | `Notifications: through Script Editor (osascript) until you allow bordercheck's own; run: bordercheck notifications` |
+
+**To turn them off or back on:** System Settings → Notifications → bordercheck. macOS asks only once, so after a
+"Don't Allow" `bordercheck notifications` just points there. An MDM configuration profile
+(`com.apple.notificationsettings`) can allow or forbid notifications for `io.github.ptrinh.bordercheck.notifier`
+ahead of time; bordercheck then uses that answer without anyone being asked, which suits scripted installs.
+
+**Upgrades.** A copy that updates itself from a version without the app keeps using Script Editor until the
+person runs `bordercheck notifications` (or `bordercheck install` again in a terminal); nothing pops up by
+itself. Once installed, the app is replaced by the new version's after every self-update; macOS keeps the
+person's answer, which belongs to the bundle ID.
+
+**Fallback.** If the release has no app, the download or checks fail, or the app fails or does not answer,
+bordercheck logs why and shows the notification through Script Editor. Uninstall removes the app; macOS may keep
+a "bordercheck" entry in System Settings → Notifications until it tidies up.
+
+**How the app is checked.** It is downloaded for bordercheck's own version from the pinned update source, like a
+[binary update](#updates): only if the release's `SHA256SUMS` is signed by the trusted key and the zip matches it
+(an enrolled install ignores any update source the portal names). It is installed only if its code signature is
+valid, Developer ID, with that bundle ID; the Team ID is pinned at the first install, and a later app from
+another team is refused. A digest of every file is recorded, and before each launch bordercheck checks the digest
+and the signature again; a changed app is not run (`bordercheck notifications` reinstalls it). It is started
+through `/usr/bin/open` with one fixed argument (`status`, `authorize` or `post`); the title, text and link go to
+it in a file in the install folder readable only by this user, which is deleted when it quits, never on a
+command line. Text from check results is cut to length and stripped of control characters by bordercheck and
+again by the app, and treated as plain text. The app opens a link only if it is `https` on exactly the host
+reports go to (checked by bordercheck and again by the app when clicked), never anything else, and runs nothing.
+
+When a notification is clicked after the app has quit, macOS starts the app itself, without bordercheck's
+pre-launch checks; it still runs only with a valid signature, as macOS checks it. macOS keeps a delivered
+notification, with the link it opens, in its notification database for this user until it is cleared; the link
+is otherwise in `state.json` for the same user.
+
+### Report page
+
+A receiver may answer a report with `{"report_url": "https://<host>/r/<id>"}`, a link to that
 machine's own report that needs no login. bordercheck keeps it (in `state.json`, never in the log) only if it is
-https on exactly the host reports go to, and shows it in `bordercheck status`. When a notification announces a
-**high-severity** problem for the first time, the page also opens in the default browser (a `remind_every`
-reminder of the same problem only notifies; it does not open the page again): `open` on macOS, `rundll32 url.dll,FileProtocolHandler` on Windows, `xdg-open` on Linux, the
-link passed as one argument, never through a shell. Linux skips it quietly without a graphical session (a
-systemd user timer often has no `DISPLAY`). With `notify.open_report` off, or when the browser can't be opened,
-or on a reminder, the notification adds "Run bordercheck status for the link to your report page." `bordercheck send -force`
-prints the link on the terminal instead. A receiver that sends no link changes nothing. Anyone who has the link
-can see that machine's failing checks, so treat it like a password.
+https on exactly the host reports go to, and shows it in `bordercheck status`.
+
+- **With bordercheck's own notifications on a Mac**, every notification carries the link and opens the page
+  when clicked. The page **does not open by itself**, whatever `notify.open_report` says: the person chooses
+  when to look.
+- **Otherwise** (Windows, Linux, and a Mac whose notifications still come through Script Editor, which cannot
+  carry a link), when a notification announces a **high-severity** problem for the first time, the page also
+  opens in the default browser (a `remind_every` reminder of the same problem only notifies; it does not open the
+  page again): `open` on macOS, `rundll32 url.dll,FileProtocolHandler` on Windows, `xdg-open` on Linux, the link
+  passed as one argument, never through a shell. Linux skips it quietly without a graphical session (a systemd
+  user timer often has no `DISPLAY`). With `notify.open_report` off, or when the browser can't be opened, or on a
+  reminder, the notification adds "Run bordercheck status for the link to your report page."
+- **Notifications turned off for bordercheck** on a Mac: nothing is shown and the page does not open.
+
+`bordercheck send -force` prints the link on the terminal instead. A receiver that sends no link changes nothing.
+Anyone who has the link can see that machine's failing checks, so treat it like a password.
 
 ## Updates
 

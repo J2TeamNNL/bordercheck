@@ -17,9 +17,11 @@ type Notify struct {
 	Statuses    []check.Status   `json:"statuses"`     // which results notify: "fail" and/or "warn"
 	Severities  []check.Severity `json:"severities"`   // and of which severity; a result without one counts as "medium"
 	RemindEvery string           `json:"remind_every"` // re-announce a problem still there after this long; "0" = never
-	// OpenReport opens the machine's report page in the browser along with a
-	// notification that announces a high-severity problem, when the receiver
-	// returned a link to one.
+	// OpenReport opens the machine's report page in the browser by itself
+	// along with a notification that first announces a high-severity problem,
+	// when the receiver returned a link to one. On a Mac where bordercheck's
+	// own notifications are allowed it does nothing: every notification there
+	// opens the page when clicked (internal/agent/notify.go).
 	OpenReport bool `json:"open_report"`
 }
 

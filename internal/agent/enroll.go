@@ -466,6 +466,7 @@ func installEnrolled(ctx context.Context, env Env, o InstallOptions, cfg Config,
 		fmt.Fprintf(env.Out, "Updates itself from github.com/%s releases.\n", cfg.UpdateRepo)
 	}
 	printSends(env.Out, pol)
+	setUpNotifications(ctx, env, &cfg, pol, o.NotifierZip)
 	fmt.Fprintln(env.Out)
 	return Send(ctx, env, true)
 }
@@ -493,10 +494,14 @@ func notifyRevoked(ctx context.Context, env Env, st *State, now time.Time, force
 		st.RevokedNotified = true
 		return
 	}
-	if err := showNotification(ctx, msg); err != nil {
+	switch err := showMessage(ctx, env, st, msg, now); {
+	case errors.Is(err, errNotificationsOff): // they turned notifications off: status says it
+		fmt.Fprintf(env.Out, "%s not notified (install revoked): %v\n", now.Format(time.RFC3339), err)
+	case err != nil:
 		fmt.Fprintf(env.Out, "%s notification not shown: %v\n", now.Format(time.RFC3339), err)
 		return
+	default:
+		fmt.Fprintf(env.Out, "%s notified: install revoked\n", now.Format(time.RFC3339))
 	}
 	st.RevokedNotified = true
-	fmt.Fprintf(env.Out, "%s notified: install revoked\n", now.Format(time.RFC3339))
 }

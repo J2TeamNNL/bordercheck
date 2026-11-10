@@ -20,6 +20,14 @@ on:
 # release for this tag, and the release job below uses those instead of its own
 # (only if they were built from exactly this commit) and publishes the draft.
 # With neither, the release goes out with unsigned macOS binaries.
+#
+# Bordercheck.app, the app bordercheck's macOS notifications come from, is only
+# ever built and signed on the maintainer's Mac (scripts/sign-macos-release.sh).
+# The notifier job takes its zip from the draft and refuses it unless it is
+# Developer ID signed with the hardened runtime, notarized and stapled,
+# universal, and its Info.plist names exactly this commit, built from a clean
+# tree, and this version. Without one the release goes out without it (and a
+# warning): installed copies then keep showing notifications through osascript.
 
 permissions:
   contents: read
@@ -149,8 +157,65 @@ jobs:
           path: dist/bordercheck-*-darwin-*
           if-no-files-found: error
 
+  notifier:
+    runs-on: macos-latest
+    permissions:
+      contents: write # only to see the draft release; this job writes nothing
+    steps:
+      - name: Take Bordercheck.app from the draft release and check it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir -p notifier
+          touch notifier/.keep
+          zip="bordercheck-notifier-$GITHUB_REF_NAME-darwin-universal.zip"
+          draft=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null || true)
+          if [ "$draft" != true ] || ! gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "$zip" --dir notifier; then
+            msg="No $zip in a draft release for $GITHUB_REF_NAME: this release has no notification app, so macOS installs keep showing notifications through osascript (Script Editor)."
+            echo "::warning title=No macOS notification app::$msg"
+            printf '## :warning: No macOS notification app\n\n%s\n' "$msg" >>"$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          fail() { echo "::error::$zip: $*"; rm -f "notifier/$zip"; exit 1; }
+          # Only Bordercheck.app/... inside: no other paths, no links.
+          if zipinfo -1 "notifier/$zip" | grep -qv '^Bordercheck\.app/'; then fail "has files outside Bordercheck.app"; fi
+          work=$(mktemp -d)
+          ditto -x -k "notifier/$zip" "$work"
+          app="$work/Bordercheck.app"
+          [ -z "$(find "$app" -type l)" ] || fail "has symbolic links"
+          req='anchor apple generic and identifier "io.github.ptrinh.bordercheck.notifier" and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists'
+          codesign --verify --strict --deep --verbose=2 --test-requirement "=$req" "$app" || fail "is not Developer ID signed as io.github.ptrinh.bordercheck.notifier"
+          info=$(codesign --display --verbose=2 "$app" 2>&1)
+          printf '%s\n' "$info" | grep -E '^(Identifier|Authority|TeamIdentifier|Timestamp|Runtime|Format)'
+          printf '%s\n' "$info" | grep -q '^Runtime Version=' || fail "is not signed with the hardened runtime"
+          xcrun stapler validate "$app" || fail "has no stapled notarization ticket"
+          spctl --assess --type execute --verbose=2 "$app" || fail "is refused by Gatekeeper"
+          plist="$app/Contents/Info.plist"
+          pb() { /usr/libexec/PlistBuddy -c "Print :$1" "$plist"; }
+          [ "$(pb BCSourceCommit)" = "$GITHUB_SHA" ] || fail "was built from $(pb BCSourceCommit), not $GITHUB_SHA"
+          [ "$(pb BCSourceTreeClean)" = true ] || fail "was built from a modified tree"
+          [ "$(pb BCVersion)" = "$GITHUB_REF_NAME" ] || fail "is version $(pb BCVersion), not $GITHUB_REF_NAME"
+          [ "$(pb CFBundleIdentifier)" = io.github.ptrinh.bordercheck.notifier ] || fail "has another bundle ID"
+          archs=" $(lipo -archs "$app/Contents/MacOS/bordercheck-notifier") "
+          case $archs in *" arm64 "*) ;; *) fail "has no arm64 code" ;; esac
+          case $archs in *" x86_64 "*) ;; *) fail "has no x86_64 code" ;; esac
+          # Signed by the same team as the macOS binaries in the draft.
+          team=$(printf '%s\n' "$info" | sed -n 's/^TeamIdentifier=//p')
+          if gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "bordercheck-$GITHUB_REF_NAME-darwin-arm64" --dir "$work"; then
+            bin_team=$(codesign --display --verbose=2 "$work/bordercheck-$GITHUB_REF_NAME-darwin-arm64" 2>&1 | sed -n 's/^TeamIdentifier=//p')
+            [ "$bin_team" = "$team" ] || fail "is signed by team $team, the macOS binaries by $bin_team"
+          fi
+          echo "## macOS notification app: Developer ID ($team), notarized and stapled, built from $GITHUB_SHA" >>"$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notifier
+          path: notifier/
+          include-hidden-files: true
+          if-no-files-found: error
+
   release:
-    needs: macos
+    needs: [macos, notifier]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -167,8 +232,17 @@ jobs:
         with:
           name: darwin
           path: darwin/
+      - uses: actions/download-artifact@v4
+        with:
+          name: notifier
+          path: notifier/
       - name: Take the macOS binaries from the signing job
         run: cp -f darwin/bordercheck-*-darwin-* dist/ && rm -rf darwin
+      - name: Take the checked notification app, if there is one
+        run: |
+          zip="notifier/bordercheck-notifier-$GITHUB_REF_NAME-darwin-universal.zip"
+          if [ -f "$zip" ]; then cp -f "$zip" dist/; fi
+          rm -rf notifier
       - name: Use the macOS binaries signed on the maintainer's Mac, if a draft release holds them
         env:
           GH_TOKEN: ${{ github.token }}

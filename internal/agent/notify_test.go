@@ -3,14 +3,17 @@ package agent
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/notifier"
 	"github.com/ptrinh/bordercheck/internal/notify"
 	"github.com/ptrinh/bordercheck/internal/policy"
+	"github.com/ptrinh/bordercheck/internal/update"
 )
 
 // Tests never put a notification on the desktop of the machine running them.
@@ -22,6 +25,12 @@ func TestMain(m *testing.M) {
 	services.register = func(string, string) error { return nil }
 	services.unregister = func() error { return nil }
 	services.status = func() string { return "fake service" }
+	// Nor the notification app: never launched, fetched or checked for real.
+	ntfRun = func(context.Context, string, notifier.Mode, string, string) error { return errors.New("not in tests") }
+	ntfVerify = func(context.Context, string, string) (string, error) { return "", errors.New("not in tests") }
+	ntfFetch = func(context.Context, *http.Client, update.Source, string, string, int64) ([]byte, error) {
+		return nil, errors.New("not in tests")
+	}
 	os.Exit(m.Run())
 }
 

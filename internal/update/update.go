@@ -86,6 +86,42 @@ func Run(ctx context.Context, client *http.Client, src Source, current, bin stri
 	return res, nil
 }
 
+// FetchAsset downloads one file of release version from src, under the same
+// rules as a binary update: the release's SHA256SUMS must be signed by the
+// trusted key and the file must match its line. At most limit bytes.
+func FetchAsset(ctx context.Context, client *http.Client, src Source, version, name string, limit int64) ([]byte, error) {
+	if _, _, ok := parseVersion(version); !ok {
+		return nil, fmt.Errorf("%q is not a release version", version)
+	}
+	if _, err := publicKey(src.PublicKey); err != nil {
+		return nil, err
+	}
+	base := src.GitHub + "/" + src.Repo + "/releases/download/" + version + "/"
+	sums, err := get(ctx, client, base+"SHA256SUMS", 64<<10)
+	if err != nil {
+		return nil, err
+	}
+	sig, err := get(ctx, client, base+"SHA256SUMS.sig", 1<<10)
+	if err != nil {
+		return nil, err
+	}
+	if err := VerifySums(sums, sig, src.PublicKey); err != nil {
+		return nil, fmt.Errorf("SHA256SUMS of %s is not signed by the trusted key", version)
+	}
+	want, err := SumFor(sums, name)
+	if err != nil {
+		return nil, fmt.Errorf("release %s: %w", version, err)
+	}
+	data, err := get(ctx, client, base+name, limit)
+	if err != nil {
+		return nil, err
+	}
+	if got := sha256.Sum256(data); !bytes.Equal(got[:], want) {
+		return nil, fmt.Errorf("%s does not match its SHA256SUMS entry", name)
+	}
+	return data, nil
+}
+
 // VerifySums checks that sig (base64, as in SHA256SUMS.sig) is an ed25519
 // signature of sums by the base64 key pubKey ("" = OfficialKey).
 func VerifySums(sums, sig []byte, pubKey string) error {

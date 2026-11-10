@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key><string>io.github.ptrinh.bordercheck.notifier</string>
+	<!-- The name in the notification banner and in System Settings → Notifications. -->
+	<key>CFBundleName</key><string>bordercheck</string>
+	<key>CFBundleDisplayName</key><string>bordercheck</string>
+	<key>CFBundleExecutable</key><string>bordercheck-notifier</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+	<key>CFBundleDevelopmentRegion</key><string>en</string>
+	<key>CFBundleShortVersionString</key><string>@SHORT_VERSION@</string>
+	<key>CFBundleVersion</key><string>@SHORT_VERSION@</string>
+	<key>LSMinimumSystemVersion</key><string>11.0</string>
+	<!-- No Dock icon or menu bar: it runs for a moment and quits. -->
+	<key>LSUIElement</key><true/>
+	<!-- Where it was built from, written by scripts/build-notifier.sh and checked by the release workflow. -->
+	<key>BCVersion</key><string>@VERSION@</string>
+	<key>BCSourceCommit</key><string>@COMMIT@</string>
+	<key>BCSourceTreeClean</key><@CLEAN@/>
+</dict>
+</plist>

@@ -103,7 +103,7 @@ OS: [the agent guide](install.md#notifications).
 | `statuses` | `["fail"]` | Which results notify: `"fail"` and/or `"warn"`. |
 | `severities` | `["high", "medium"]` | And of which severity (`"low"`, `"medium"`, `"high"`). A result without a severity counts as medium. |
 | `remind_every` | `"24h"` | Announce a problem that is still there again after this long; `"0"` = never; otherwise at least `1h`. |
-| `open_report` | `true` | When a notification announces a high-severity problem for the first time and the receiver returned a link to the machine's report page, open it in the browser. Reminders of the same problem do not open it again. |
+| `open_report` | `true` | When a notification announces a high-severity problem for the first time and the receiver returned a link to the machine's report page, open it in the browser by itself. Reminders of the same problem do not open it again. Not needed, and so not done, on a Mac where bordercheck's own notifications are allowed: there every notification opens the page when clicked ([details](install.md#report-page)). Windows, Linux and Macs still on Script Editor notifications are unchanged. |
 
 With `enabled` true, `statuses` and `severities` must not be empty; set `enabled` to `false` to turn
 notifications off.

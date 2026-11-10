@@ -20,6 +20,14 @@ jobs:
       - name: Lint the install scripts
         if: runner.os == 'Linux'
         run: shellcheck -s sh install.sh scripts/*.sh
+      # The notification app: its contract tests, and an ad hoc signed build
+      # (never launched) that the Developer ID check must refuse.
+      - name: Build and test the macOS notification app
+        if: runner.os == 'macOS'
+        run: |
+          scripts/build-notifier.sh --test
+          scripts/build-notifier.sh "ci-${GITHUB_SHA::7}" --zip
+          BORDERCHECK_NOTIFIER_ZIP="$PWD/dist/bordercheck-notifier-ci-${GITHUB_SHA::7}-darwin-universal.zip" go test -run TestRealNotifierZip -v ./internal/notifier/
       - name: Parse install.ps1
         if: runner.os == 'Windows'
         shell: pwsh

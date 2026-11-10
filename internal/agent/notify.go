@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/notifier"
 	"github.com/ptrinh/bordercheck/internal/notify"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
@@ -28,13 +29,24 @@ var showNotification = notify.Show
 // A notification that cannot be shown is logged and tried again next time.
 //
 // When the receiver gave this machine a report page (st.ReportPage, on the host
-// reports go to, reportURL) and an announced problem is high severity, the page
-// opens in the browser too, the first time that problem is announced (not
-// with its reminders), unless the policy turns notify.open_report off;
-// when it is off or the page cannot be opened, the notification only adds a
-// hint to run bordercheck status for the link. A forced send prints the link
-// on the terminal (env.Term), never in the log. The link is a secret: it is
-// never written to env.Out.
+// reports go to, reportURL):
+//
+//   - On a Mac with bordercheck's own notifications allowed (notifier.go),
+//     every notification carries the link and opens the page when clicked;
+//     the page never opens by itself, whatever notify.open_report says. The
+//     person chooses when to look, and nothing pops up uninvited.
+//   - Otherwise (Windows, Linux, and a Mac whose notifications still come
+//     through Script Editor, which cannot carry a link), as before: when an
+//     announced problem is high severity, the page opens in the browser too,
+//     the first time that problem is announced (not with its reminders),
+//     unless the policy turns notify.open_report off; when it is off or the
+//     page cannot be opened, the notification only adds a hint to run
+//     bordercheck status for the link.
+//   - If the person turned bordercheck's notifications off in System
+//     Settings, nothing is shown and nothing opens.
+//
+// A forced send prints the link on the terminal (env.Term), never in the
+// log. The link is a secret: it is never written to env.Out.
 func notifyUser(ctx context.Context, env Env, n policy.Notify, results []check.Result, st *State, now time.Time, force bool, reportURL string) {
 	seen := st.Notified
 	due, next := notify.Plan(results, n, seen, now)
@@ -51,6 +63,30 @@ func notifyUser(ctx context.Context, env Env, n policy.Notify, results []check.R
 			fmt.Fprintf(env.Term, "Your report page: %s\n\n", link)
 		}
 		return
+	}
+	// bordercheck's own notification on a Mac: clickable, nothing opened.
+	click := ""
+	if link != "" && notifier.CheckLink(link, hostOf(reportURL)) == nil {
+		click = link
+	}
+	own := msg
+	switch {
+	case click != "":
+		own.Body += "\nClick to open your report page."
+	case high:
+		own.Body += "\nRun bordercheck status for the link to your report page."
+	}
+	switch posted, err := ownNotification(ctx, env, st, own, click, hostOf(reportURL), now); {
+	case posted:
+		fmt.Fprintf(env.Out, "%s notified: %d problem(s)\n", now.Format(time.RFC3339), len(due))
+		return
+	case errors.Is(err, errNotificationsOff):
+		// They said no: not Script Editor either, and not the browser. The
+		// problems count as announced, so this is logged once per problem.
+		fmt.Fprintf(env.Out, "%s not notified of %d problem(s): %v\n", now.Format(time.RFC3339), len(due), err)
+		return
+	case err != nil:
+		fmt.Fprintf(env.Out, "%s bordercheck's notification app failed, using Script Editor: %v\n", now.Format(time.RFC3339), err)
 	}
 	// The page opens by itself only for a high-severity problem that was not
 	// there before. A reminder of one already announced just notifies: a
