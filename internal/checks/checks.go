@@ -52,7 +52,7 @@ func AllWith(p policy.Policy, local Local) []check.Check {
 			}}, c.Firewall.Common},
 		{check.Check{ID: "disk-encryption", Title: "Disk is encrypted", Run: diskEncryption}, c.DiskEncryption},
 		{check.Check{ID: "listeners", Title: "Nothing listens beyond localhost",
-			Run: func(ctx context.Context) check.Result { return listeners(ctx, c.Listeners.Allow) }}, c.Listeners.Common},
+			Run: func(ctx context.Context) check.Result { return listeners(ctx, c.Listeners) }}, c.Listeners.Common},
 		{check.Check{ID: "tailscale", Title: "Tailscale blocks incoming connections", Run: tailscale}, c.Tailscale},
 		{check.Check{ID: "docker", Title: "Docker containers stay isolated",
 			Run: func(ctx context.Context) check.Result { return docker(ctx, c.Docker) }}, c.Docker.Common},

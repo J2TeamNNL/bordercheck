@@ -59,6 +59,12 @@
           "process": "ControlCenter",
           "port": "7000"
         }
+      ],
+      "lower_severity": [
+        "ControlCenter",
+        "DropboxFileProvider",
+        "Dropbox",
+        "Spotify"
       ]
     },
     "tailscale": {},

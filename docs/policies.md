@@ -230,6 +230,8 @@ also shows ports held by system services on macOS.
 |---|---|---|
 | `allow` | `[{"process": "rapportd"}]` | Rules `{"process": "<name>", "port": "<port>"}` that may listen beyond localhost. `process` is required and compared without case; without `port`, any port. `rapportd` is Apple Handoff/Continuity. |
 
+| `lower_severity` | `["ControlCenter", "DropboxFileProvider", "Dropbox", "Spotify"]` | Process names (compared without case) whose open ports are a **low** warning instead of a medium one, when nothing else is exposed: AirPlay Receiver (`ControlCenter`), Dropbox LAN sync, Spotify Connect. They are well-known services, low risk on an up-to-date system, but reachable by anyone on the same network (AirPlay Receiver has had remotely exploitable bugs, fixed in system updates). `[]` makes every exposed port medium again. |
+
 Example: `"allow": [{"process": "rapportd"}, {"process": "ControlCenter", "port": "7000"}]` (AirPlay Receiver).
 
 ### tailscale

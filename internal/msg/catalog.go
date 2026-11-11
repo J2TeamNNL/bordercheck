@@ -114,6 +114,10 @@ var Catalog = map[string]Entry{
 	"listeners.pass": pl("1 listening socket, on localhost.", "{n} listening sockets, all on localhost."),
 	"listeners.exposed": pl("1 port can be reached from other machines (LAN, Wi-Fi, Tailscale).",
 		"{n} ports can be reached from other machines (LAN, Wi-Fi, Tailscale)."),
+	"listeners.lower": s("They belong to well-known services such as AirPlay Receiver or Dropbox LAN sync: low risk " +
+		"on an up-to-date system, but still reachable by anyone on the same network."),
+	"listeners.fix.lower": s("Turn off the ones you don't use; each line says where. If you use them, nothing more is " +
+		"needed: keep the system and the app up to date."),
 	"listeners.fix": s("Bind dev servers to 127.0.0.1 (Vite: drop [code]--host[/code]; Docker: " +
 		"[code]-p 127.0.0.1:PORT:PORT[/code]) and quit what you don't need. To share something, use a Cloudflare " +
 		"Tunnel instead of an open port."),

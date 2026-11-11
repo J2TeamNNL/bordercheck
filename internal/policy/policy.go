@@ -144,6 +144,10 @@ type Firewall struct {
 type Listeners struct {
 	Common
 	Allow []ListenerRule `json:"allow"`
+	// LowerSeverity names processes whose open ports are a low warning rather
+	// than a medium one when nothing else is exposed: well-known services such
+	// as AirPlay Receiver (ControlCenter) or Dropbox LAN sync. Compared without case.
+	LowerSeverity []string `json:"lower_severity"`
 }
 
 // ListenerRule allows a process to listen beyond localhost, on one port or, with
@@ -363,7 +367,7 @@ func Default() Policy {
 			Firewall: Firewall{RequireStealth: ptr(true), SuggestOutbound: true},
 			Listeners: Listeners{Allow: []ListenerRule{
 				{Process: "rapportd"}, // Apple Handoff/Continuity
-			}},
+			}, LowerSeverity: []string{"ControlCenter", "DropboxFileProvider", "Dropbox", "Spotify"}},
 			Docker: Docker{AllowContainers: []string{}, AllowMounts: []string{}},
 			Secrets: Secrets{
 				ExtraFiles:         []string{},

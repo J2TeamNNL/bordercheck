@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -39,7 +40,7 @@ var listenerHints = map[string]string{
 	"kdeconnectd":         "KDE Connect",
 }
 
-func listeners(ctx context.Context, allow []policy.ListenerRule) check.Result {
+func listeners(ctx context.Context, opts policy.Listeners) check.Result {
 	ls, note, err := listListeners(ctx)
 	if errors.Is(err, errUnsupported) {
 		return unsupported()
@@ -47,7 +48,7 @@ func listeners(ctx context.Context, allow []policy.ListenerRule) check.Result {
 	if err != nil {
 		return check.Errored(err)
 	}
-	return evalListeners(ls, note, allow)
+	return evalListenersWith(ls, note, opts.Allow, opts.LowerSeverity)
 }
 
 func isLoopback(addr string) bool {
@@ -150,8 +151,16 @@ func parseProcNetTCP(out string) []listener {
 }
 
 func evalListeners(ls []listener, note msg.Text, allow []policy.ListenerRule) check.Result {
+	return evalListenersWith(ls, note, allow, nil)
+}
+
+// evalListenersWith is evalListeners with the policy's lower_severity list:
+// when every exposed port belongs to one of those processes (AirPlay Receiver,
+// Dropbox LAN sync and the like), the warning is low instead of medium.
+func evalListenersWith(ls []listener, note msg.Text, allow []policy.ListenerRule, lower []string) check.Result {
 	var exposed []string
 	allowed := 0
+	onlyLower := true
 	for _, l := range ls {
 		if isLoopback(l.Addr) {
 			continue
@@ -167,6 +176,9 @@ func evalListeners(ls []listener, note msg.Text, allow []policy.ListenerRule) ch
 		if isAnyAddr(where) {
 			where = "all interfaces"
 		}
+		if !slices.ContainsFunc(lower, func(p string) bool { return strings.EqualFold(p, l.Proc) }) {
+			onlyLower = false
+		}
 		line := fmt.Sprintf("%s: port %s on %s", proc, l.Port, where)
 		if hint := listenerHints[proc]; hint != "" {
 			line += " (" + hint + ")"
@@ -180,6 +192,11 @@ func evalListeners(ls []listener, note msg.Text, allow []policy.ListenerRule) ch
 	if len(exposed) == 0 {
 		return check.Result{Status: check.Pass}.
 			WithSummary(append(msg.Of("listeners.pass", "n", len(ls)), note...))
+	}
+	if onlyLower {
+		return check.Result{Status: check.Warn, Severity: check.Low, Evidence: exposed}.
+			WithSummary(slices.Concat(msg.Of("listeners.exposed", "n", len(exposed)), msg.Of("listeners.lower"), note)).
+			WithFix(msg.Of("listeners.fix.lower"))
 	}
 	return check.Result{Status: check.Warn, Severity: check.Medium, Evidence: exposed}.
 		WithSummary(append(msg.Of("listeners.exposed", "n", len(exposed)), note...)).

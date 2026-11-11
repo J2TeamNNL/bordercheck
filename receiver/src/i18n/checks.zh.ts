@@ -94,6 +94,10 @@ export const checksZh: CheckCatalog = {
 
   "listeners.pass": "{n} 个监听套接字，全部只在 localhost 上。",
   "listeners.exposed": "{n} 个端口可被其他设备访问（局域网、Wi-Fi、Tailscale）。",
+  "listeners.lower":
+    "它们属于 AirPlay 接收器（AirPlay Receiver）或 Dropbox 局域网同步（LAN sync）这类常见服务：在系统保持更新的情况下风险较低，但同一网络中的任何人仍可连接到它们。",
+  "listeners.fix.lower":
+    "关闭你不使用的服务；每一行都说明了在哪里关闭。如果你正在使用，则无需其他操作：保持系统和应用为最新版本即可。",
   "listeners.fix":
     "让开发服务器只绑定 127.0.0.1（Vite：去掉 [code]--host[/code]；Docker：[code]-p 127.0.0.1:PORT:PORT[/code]），并关闭不需要的服务。需要共享时，使用 Cloudflare Tunnel，而不是开放端口。",
   "listeners.note.mac": "只能看到你自己的进程；用 sudo 运行可包含系统服务。",

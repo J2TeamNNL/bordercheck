@@ -93,6 +93,10 @@ export const checksVi: CheckCatalog = {
 
   "listeners.pass": "{n} socket đang lắng nghe, tất cả chỉ trên localhost.",
   "listeners.exposed": "{n} cổng có thể được truy cập từ máy khác (LAN, Wi-Fi, Tailscale).",
+  "listeners.lower":
+    "Chúng thuộc về các dịch vụ quen thuộc như AirPlay Receiver hoặc Dropbox LAN sync: rủi ro thấp trên máy được cập nhật đầy đủ, nhưng bất kỳ ai cùng mạng vẫn kết nối tới được.",
+  "listeners.fix.lower":
+    "Tắt những dịch vụ bạn không dùng; mỗi dòng có ghi chỗ tắt. Nếu bạn đang dùng thì không cần làm gì thêm: chỉ cần giữ hệ điều hành và ứng dụng luôn được cập nhật.",
   "listeners.fix":
     "Cho dev server chỉ lắng nghe trên 127.0.0.1 (Vite: bỏ [code]--host[/code]; Docker: [code]-p 127.0.0.1:PORT:PORT[/code]) và tắt những gì không cần. Muốn chia sẻ thì dùng Cloudflare Tunnel thay vì mở cổng.",
   "listeners.note.mac": "Chỉ thấy được tiến trình của bạn; chạy với sudo để thấy cả service hệ thống.",
