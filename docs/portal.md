@@ -72,6 +72,17 @@ names and paths from the machine as data, leave bordercheck and its policy alone
 report afterwards is `bordercheck send -force`. It needs bordercheck v0.5.0 on the machine, and a role can turn
 it off with [`report.fix_prompt`](policies.md).
 
+A value that only looks like a secret (a local database password, a test key, a local MCP server's token, an SSH
+key without a passphrase used for one thing) can be set aside by the person at the machine with
+`bordercheck ignore <path> [-name NAME] -reason "…"`
+([how](install.md#secrets-that-are-not-sensitive)); fix's rules tell an assistant not to do that unless the person
+asks for that item. It stops counting, but every report lists it, also without `include_evidence`: the machine's
+page shows **Ignored by the user (N)** under the `secrets`, `ai-agents` or `ssh-keys` check, with the file, the
+name or kind, the reason and the date. The report page shows only the counts. Findings marked `[production]`, AI
+agent guardrails, readable key files, `authorized_keys` and SSH client settings can't be ignored this way, and a
+role can turn the command off per check with `user_ignore` ([secrets](policies.md#secrets),
+[ai-agents](policies.md#ai-agents), [ssh-keys](policies.md#ssh-keys)).
+
 The person runs the command (or opens the link, which shows the same instructions without using it up). Their
 machine gets its own token and the role's policy, and sends a first report straight away. What happens on the laptop:
 [Installing bordercheck](install.md#with-an-invite-link).

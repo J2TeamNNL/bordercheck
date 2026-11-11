@@ -12,7 +12,8 @@
 // thing: which production secrets sit in plain text, by name and file, with
 // the last characters of the value removed, because "4 marked production" is
 // no use to the person who has to move them. The rest they see by running
-// bordercheck.
+// bordercheck. Of the findings they marked as not sensitive (bordercheck
+// ignore), only the number.
 //
 // When something fails or warns, the page also offers a one-line prompt for an
 // AI coding assistant ("Run `bordercheck fix` and follow what it prints") with
@@ -108,6 +109,9 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   const problems = results.filter((r) => r.status === "fail" || r.status === "warn" || r.status === "error");
   const waived = results.filter((r) => r.status === "waived");
   const okCount = results.filter((r) => r.status === "pass" || r.status === "skip").length;
+  // Only how many the person marked as not sensitive: like the rest of the
+  // evidence, which files and why stay off a page reached by link alone.
+  const userIgnored = results.reduce((n, r) => n + (r.user_ignored?.length ?? 0), 0);
 
   const failing = problems.some((r) => r.status === "fail");
   const tone = problems.length === 0 ? "s-pass" : failing ? "s-fail" : "s-warn";
@@ -119,7 +123,7 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   const body = html`<div class="status-mark ${tone}">${problems.length === 0 ? GLYPH_OK : GLYPH_ATTENTION}</div>
 <p class="eyebrow">${L.t("rep.eyebrow")}</p><h1>${headline}</h1>
 <p class="lead">${L.t("rep.for", { email: row.email || L.s("common.noEmail"), host: row.hostname || L.s("common.noHostname"), when: L.when(row.last_seen) })}${L.lang === "zh" ? "" : " "}${problems.length === 0 ? L.t("rep.okText") : L.t("rep.fixText")}</p>
-<div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}${version ? html`<span class="chip">bordercheck <b>${version}</b></span>` : ""}</div>
+<div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}${userIgnored ? html`<span class="chip">${L.t("rep.userIgnored", { n: userIgnored })}</span>` : ""}${version ? html`<span class="chip">bordercheck <b>${version}</b></span>` : ""}</div>
 ${fixPrompt}
 ${problems.length === 0
     ? ""
@@ -128,6 +132,7 @@ ${problems.length === 0
 <h3>${checkTitle(L, r.id, r.title)}</h3>
 ${r.summary ? html`<div class="body">${summaryHtml(L, r)}</div>` : ""}
 ${prodSecrets(L, r)}
+${r.user_ignored?.length ? html`<p class="dim">${L.t("rep.userIgnored", { n: r.user_ignored.length })}</p>` : ""}
 ${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}</div>`,
       )}`}
 ${waived.length

@@ -320,7 +320,20 @@ function resultCard(L: I18n, r: Result, since: string | undefined, now: number):
 ${waiverNote(L, r, now)}
 ${r.summary ? html`<div class="body">${summaryHtml(L, r)}</div>` : ""}
 ${r.evidence.length ? html`<ul class="evidence">${r.evidence.map((e) => html`<li class="ev">${e}</li>`)}</ul>` : ""}
-${r.fix ? html`<div class="fix"><b>${L.t("machine.fix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}</div>`;
+${r.fix ? html`<div class="fix"><b>${L.t("machine.fix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}
+${userIgnoredList(L, r)}</div>`;
+}
+
+// userIgnoredList shows what the person at the machine marked as not
+// sensitive (bordercheck ignore), with their reasons: every field came from
+// the report, so all of it is escaped like any other report text.
+export function userIgnoredList(L: I18n, r: Result): Html | string {
+  const items = r.user_ignored ?? [];
+  if (!items.length) return "";
+  return html`<div class="ignored"><p><b>${L.t("machine.userIgnored", { n: items.length })}</b> <span class="muted small">${L.t("machine.userIgnoredNote")}</span></p>
+<ul class="evidence">${items.map(
+    (i) => html`<li class="ev">${i.path}  ${i.kind}${i.name ? html` (${i.name})` : ""}: <span class="reason">${i.reason}</span>${i.since ? html` <span class="muted">· ${L.t("machine.userIgnoredSince", { date: L.day(i.since) })}</span>` : ""}</li>`,
+  )}</ul></div>`;
 }
 
 function statTile(L: I18n, n: number, label: Html, tone: string): Html {
@@ -389,7 +402,7 @@ ${problems.map((r) => resultCard(L, r, since.get(r.id), now))}
 <h2>${L.t("machine.fine", { n: fine.length })}</h2>
 ${fine.length
     ? html`<div class="compact">${fine.map(
-        (r) => html`<div>${badge(L, r.status)}<div><div class="t">${checkTitle(L, r.id, r.title)}</div><div class="sub"><code>${r.id}</code>${r.summary ? html` · ${summaryHtml(L, r)}` : ""}</div></div></div>`,
+        (r) => html`<div>${badge(L, r.status)}<div><div class="t">${checkTitle(L, r.id, r.title)}</div><div class="sub"><code>${r.id}</code>${r.summary ? html` · ${summaryHtml(L, r)}` : ""}</div>${userIgnoredList(L, r)}</div></div>`,
       )}</div>`
     : html`<div class="panel"><p class="muted">${L.t("common.none")}</p></div>`}
 <h2>${L.t("machine.details")}</h2>

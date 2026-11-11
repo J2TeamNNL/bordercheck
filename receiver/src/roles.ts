@@ -25,6 +25,10 @@ export const POLICY_CHECKS = [
   "package-managers", "startup-items", "backup",
 ];
 
+// The checks whose findings the person at the machine may mark as not
+// sensitive (bordercheck ignore), each with its own user_ignore switch.
+export const USER_IGNORE_CHECKS = ["secrets", "ai-agents", "ssh-keys"];
+
 export const MAX_WAIVER_DAYS = 365;
 export const CHECK_ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -191,6 +195,9 @@ export function validateRolePolicy(p: unknown, now: Date): Msg[] {
         if (c.on_problem !== undefined && c.on_problem !== "fail" && c.on_problem !== "warn") {
           errs.push(msg("v.onProblem", { where: `checks.${id}.on_problem` }));
         }
+        // Whether the person at the machine may mark secrets as not sensitive
+        // (bordercheck ignore); needs a client that knows the field.
+        if (USER_IGNORE_CHECKS.includes(id) && c.user_ignore !== undefined && typeof c.user_ignore !== "boolean") must("v.mustBool", `checks.${id}.user_ignore`);
       }
   }
   return errs;

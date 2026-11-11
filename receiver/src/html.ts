@@ -269,6 +269,7 @@ background:radial-gradient(90% 140% at 0% 0%,color-mix(in srgb,var(--c) 13%,tran
 .fix span{overflow-wrap:anywhere;white-space:pre-line}
 .waiver{margin-top:10px;color:var(--waived);font-size:14px;overflow-wrap:anywhere}
 .waiver .body{color:var(--dim);white-space:normal}
+.ignored{margin-top:12px;min-width:0}.ignored p{margin:0;overflow-wrap:anywhere}.ignored ul.evidence{margin:8px 0 0;padding:8px 12px;list-style:none;border-radius:10px;background:rgba(0,0,0,.3);box-shadow:inset 0 0 0 1px var(--line)}.ignored li{overflow-wrap:anywhere;padding:2px 0}.ignored .reason{color:var(--text)}
 .compact{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
 .compact>div{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:var(--r-sm);background:var(--glass);box-shadow:var(--hl);min-width:0}
 .compact .t{font-weight:600;overflow-wrap:anywhere}.compact .sub{color:var(--faint);font-size:12.5px;overflow-wrap:anywhere}
