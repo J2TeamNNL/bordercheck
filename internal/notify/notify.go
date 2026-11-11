@@ -22,8 +22,15 @@ import (
 )
 
 // Key names one problem in state.json: a check and its status, so a warn that
-// turns into a fail is announced again.
-func Key(r check.Result) string { return r.ID + ":" + string(r.Status) }
+// turns into a fail is announced again, and whether it shows signs of
+// compromise, so a fail that turns into one is announced again too.
+func Key(r check.Result) string {
+	k := r.ID + ":" + string(r.Status)
+	if len(r.Compromise) > 0 {
+		k += ":compromised"
+	}
+	return k
+}
 
 // Plan decides what to announce. seen maps the Key of each problem announced
 // earlier, and still present in the previous run, to when it was last
@@ -61,12 +68,29 @@ const (
 
 // Compose writes the notification for due problems: which checks, their
 // summaries, and how to see the fix. It never includes evidence.
+//
+// When a problem shows signs of compromise, the notification says so first,
+// with what the signs are (never which item), and to stop and tell IT.
 func Compose(due []check.Result) Message {
 	title := "bordercheck: 1 problem on this computer"
 	if len(due) != 1 {
 		title = fmt.Sprintf("bordercheck: %d problems on this computer", len(due))
 	}
 	var lines []string
+	for _, r := range due {
+		for _, ind := range r.Compromise {
+			if len(lines) == 0 {
+				title = "bordercheck: this computer may be compromised"
+			}
+			if len(lines) < maxLines {
+				lines = append(lines, clean(r.ID)+": "+clip(clean(ind.What.English()), maxSummary))
+			}
+		}
+	}
+	if len(lines) > 0 {
+		lines = append(lines, "Stop using it for work and tell your IT team now. Do not delete the item yourself.")
+		return Message{Title: title, Body: strings.Join(lines, "\n")}
+	}
 	for i, r := range due {
 		if i == maxLines {
 			lines = append(lines, fmt.Sprintf("… and %d more", len(due)-maxLines))

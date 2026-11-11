@@ -13,7 +13,10 @@ on what was left open. bordercheck looks for:
 For each one it finds, it says how to fix it. It runs on macOS, Windows and Linux and needs no admin rights.
 A plain run only reads: it changes nothing and sends nothing.
 
-It is not an antivirus. It does not catch malware; it limits what malware, or a person, can reach.
+It is not an antivirus. It does not catch malware; it limits what malware, or a person, can reach. A few of its
+findings are strong signs that something hostile is already installed (a startup item that downloads and runs
+code, an extension IT has blocked, a crack tool); when it sees one it says so first and, when installed, tells IT
+at once ([signs of compromise](docs/policies.md#signs-of-compromise)).
 
 Companies can install it on every laptop, and each one then reports to the IT team on a schedule. See
 [For organisations](#for-organisations).

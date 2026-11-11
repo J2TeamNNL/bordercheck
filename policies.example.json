@@ -13,7 +13,8 @@
     ],
     "include_ips": false,
     "include_location": false,
-    "fix_prompt": true
+    "fix_prompt": true,
+    "compromise_alert": true
   },
   "update": {
     "binary": true,

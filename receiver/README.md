@@ -607,6 +607,8 @@ picked from the URL; `ALERT_WEBHOOK_FORMAT` overrides it.
 
 | Alert | Raised | Once per |
 |---|---|---|
+| Compromised | when a report says `"compromised": true` and the machine's previous report did not; **delivered to the webhook as soon as the report is stored** (after the response, through `ctx.waitUntil`), not by the cron, which only retries it if that delivery failed | episode: while the machine's reports keep the flag (`machines.compromised_since`), nothing more is raised |
+| Compromise cleared | when the first report without the flag follows one with it; delivered at once the same way | episode |
 | High-severity fail | when a report has a check at `fail` + `high` that wasn't in the previous report | time the check starts failing; a check that stays failing alerts once |
 | Silent | by the cron, when a machine's last report is older than `SILENT_DAYS` | silence; the next report clears it and posts "reporting again" |
 | Digest | by the cron every `DIGEST_HOURS` (`0` = off) | interval |
@@ -615,6 +617,15 @@ Alerts wait in D1 until the webhook accepts them, so an outage delays them inste
 them; after 7 days of failures they are dropped. Values from reports appear inside `code` spans, and Discord
 messages are sent with mentions disabled, so a hostname like `@everyone` or a markdown link can't ping or
 phish your channel. The **Alerts** page lists recent alerts and their delivery, webhook or not.
+
+A **compromised** report comes from a bordercheck that found a sign that hostile code is already on the machine
+(a startup item that downloads and runs code, an extension on the block list, a crack tool or KMS emulator: see
+[docs/policies.md](../docs/policies.md#signs-of-compromise)); it is a small set of strong signs, not malware
+detection. Only a literal `"compromised": true` counts, so a report from an older client never does. The
+webhook line names the machine and the check IDs, never the item (that is on the machine page); the JSON
+format's `alerts` entry carries `checks` and `titles`. While a machine is compromised it is first on
+**Machines**, under the **Compromised** tile and filter, with a banner on its page and on its report page
+(`/r/<id>`, check titles only), and the digest counts it.
 
 `waived` results (a failing check exempted by policy until a date) count as not failing and never alert; the
 dashboard shows them separately with their expiry. When the waiver lapses and the check fails again, that is a
@@ -665,9 +676,9 @@ Vars (`wrangler.jsonc`):
 
 | Table | Holds | Kept |
 |---|---|---|
-| `machines` | Per `install_id`: email, hostname, OS, version, counts, first/last seen, the latest report as received | until you **Forget** the machine on its page |
+| `machines` | Per `install_id`: email, hostname, OS, version, counts, first/last seen, since when its reports say it is compromised, the latest report as received | until you **Forget** the machine on its page |
 | `checks` | Each check's current status per machine and since when | as `machines` |
-| `reports` | Per report: time, counts, each check's status (not the summaries or evidence) | `HISTORY_DAYS`, at most `HISTORY_PER_MACHINE` per machine |
+| `reports` | Per report: time, counts, each check's status, whether it said compromised (not the summaries or evidence) | `HISTORY_DAYS`, at most `HISTORY_PER_MACHINE` per machine |
 | `alerts` | Alerts with an email/hostname/title snapshot | `HISTORY_DAYS` after delivery |
 | `meta` | Last digest time | |
 | `roles` | Role names and policies | until deleted (only when unused) |

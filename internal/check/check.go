@@ -58,6 +58,27 @@ type Result struct {
 	// Unlike Evidence it is always sent, so IT can see what was set aside.
 	// Never holds a value.
 	UserIgnored []Ignored `json:"user_ignored,omitempty"`
+	// Compromise lists signs that hostile code is, or very probably is,
+	// already on this computer, as opposed to a door merely being open. Only
+	// a few findings set it, where the finding is made (see Indicator); a
+	// result that is not a fail never carries it into a report.
+	Compromise []Indicator `json:"compromise,omitempty"`
+}
+
+// Indicator is one sign of compromise: what was found, as a message part so
+// it can be shown translated, and which item, by name or path only. Detail is
+// evidence: it is dropped from a report when the policy leaves evidence out.
+type Indicator struct {
+	What   msg.Part `json:"what"`
+	Detail string   `json:"detail,omitempty"`
+}
+
+// Line is the indicator in English: "what (detail)".
+func (i Indicator) Line() string {
+	if i.Detail == "" {
+		return i.What.English()
+	}
+	return i.What.English() + " (" + i.Detail + ")"
 }
 
 // Ignored is one finding the person at the machine set aside, with their reason.

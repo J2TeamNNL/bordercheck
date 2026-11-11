@@ -440,4 +440,20 @@ export const vi: Catalog = {
   "checkTitle.backup": "Laptop bị mất vẫn tìm được và khôi phục được",
   "rep.prodSecrets": "{n} secret production dạng văn bản thuần",
   "rep.prodSecretsNote": "Chỉ có tên và file; giá trị không bao giờ được gửi đi.",
+
+  "state.compromised": "có dấu hiệu bị xâm nhập",
+  "filter.compromised": "Bị xâm nhập",
+  "tile.compromised": "Bị xâm nhập",
+  "tile.compromisedSub": "báo cáo mới nhất có dấu hiệu bị xâm nhập",
+  "machine.compTitle": "Máy này có thể đã bị xâm nhập",
+  "machine.compLead":
+    "Từ {when}, các báo cáo của máy này cho thấy dấu hiệu phần mềm độc hại đã có trên máy. Hãy coi như máy đã bị xâm nhập: báo người dùng ngừng dùng máy cho công việc, và kiểm tra máy trước khi gỡ bất cứ thứ gì. Sau đó, yêu cầu họ đổi các mật khẩu và key đã dùng trên máy.",
+  "machine.compNote":
+    "Đây chỉ là vài dấu hiệu rõ ràng mà bordercheck thấy được, không phải phát hiện mã độc: máy không có các dấu hiệu này chưa chắc đã sạch.",
+  "machine.compNoDetail": "không gửi kèm mục cụ thể: policy không gửi bằng chứng",
+  "alert.compromised": "bị xâm nhập",
+  "alert.compromise_cleared": "hết dấu hiệu xâm nhập",
+  "rep.compTitle": "Dừng lại: máy tính này có thể đã bị xâm nhập",
+  "rep.compLead":
+    "bordercheck tìm thấy dấu hiệu phần mềm độc hại đã có trên máy tính này ({checks}). Hãy ngừng dùng máy cho công việc và liên hệ bộ phận IT ngay. Đừng tự xoá hay gỡ cài đặt gì: IT cần xem nguyên trạng. Sau khi IT đã kiểm tra, hãy đổi các mật khẩu bạn đã dùng trên máy này.",
 };

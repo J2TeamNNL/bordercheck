@@ -2,7 +2,9 @@
 // the webhook, prune old history. Alerts are raised once per condition (a
 // check newly failing with high severity, a machine going silent) and stay
 // pending until the webhook accepts them, so a webhook outage delays alerts
-// rather than losing or repeating them.
+// rather than losing or repeating them. A machine that starts or stops
+// reporting signs of compromise raises an alert that ingest.ts delivers at
+// once (URGENT_ALERTS); the cron only retries it if that failed.
 
 import { config, DAY, type Env } from "./env";
 import { pruneRateLimits } from "./ratelimit";
@@ -71,6 +73,13 @@ export function alertLine(env: Env, a: AlertRow): string {
       break;
     case "back":
       line = `🔔 ${who}: reporting again (was silent since ${d.last_seen?.slice(0, 10) ?? "?"})`;
+      break;
+    case "compromised":
+      // Check IDs only: which item it is stays on the machine page.
+      line = `🚨 ${who}: SIGNS OF COMPROMISE in ${(d.checks ?? "").split(", ").filter(Boolean).slice(0, 10).map((c) => lit(c, 40)).join(", ") || "`?`"}. Treat the machine as compromised: tell its user to stop using it for work, and look at it before anything is removed.`;
+      break;
+    case "compromise_cleared":
+      line = `✅ ${who}: no longer reports signs of compromise (reported since ${d.since?.slice(0, 10) ?? "?"}). Make sure this was IT's doing.`;
       break;
     case "new_country":
       // Country codes only: no IP or coordinates in webhooks.
@@ -166,10 +175,25 @@ async function markDelivered(env: Env, ids: number[], ts: string, delivery: stri
   }
 }
 
-export async function sendPending(env: Env, now: Date, send: Send = postWebhook): Promise<{ sent: number; failed: string | null }> {
+// Alerts that go to the webhook as soon as the report that raised them is
+// stored (ingest.ts), not at the next hourly cron.
+export const URGENT_ALERTS = ["compromised", "compromise_cleared"];
+
+// sendPending delivers pending alerts: every one (the cron), or only one
+// machine's alerts of some kinds (ingest, for URGENT_ALERTS).
+export async function sendPending(
+  env: Env,
+  now: Date,
+  send: Send = postWebhook,
+  only?: { installId: string; kinds: string[] },
+): Promise<{ sent: number; failed: string | null }> {
   const ts = now.toISOString();
-  const pending = await env.DB.prepare(
-    "SELECT id, kind, install_id, check_id, detail, created_at FROM alerts WHERE sent_at IS NULL ORDER BY id LIMIT 500",
+  const pending = await (only
+    ? env.DB.prepare(
+        `SELECT id, kind, install_id, check_id, detail, created_at FROM alerts
+         WHERE sent_at IS NULL AND install_id = ? AND kind IN (${only.kinds.map(() => "?").join(",")}) ORDER BY id LIMIT 500`,
+      ).bind(only.installId, ...only.kinds)
+    : env.DB.prepare("SELECT id, kind, install_id, check_id, detail, created_at FROM alerts WHERE sent_at IS NULL ORDER BY id LIMIT 500")
   ).all<AlertRow>();
   const rows = pending.results;
   if (!rows.length) return { sent: 0, failed: null };
@@ -210,10 +234,11 @@ function publicAlert(a: AlertRow) {
 export async function digestText(env: Env, now: Date, format: Format): Promise<string> {
   const silentBefore = new Date(now.getTime() - config(env).silentDays * DAY).toISOString();
   const t = await env.DB.prepare(
-    "SELECT COUNT(*) AS n, SUM(fail > 0) AS failing, SUM(high_fail > 0) AS high, SUM(last_seen < ?) AS silent FROM machines",
+    `SELECT COUNT(*) AS n, SUM(fail > 0) AS failing, SUM(high_fail > 0) AS high, SUM(last_seen < ?) AS silent,
+            SUM(compromised_since IS NOT NULL) AS compromised FROM machines`,
   )
     .bind(silentBefore)
-    .first<{ n: number; failing: number | null; high: number | null; silent: number | null }>();
+    .first<{ n: number; failing: number | null; high: number | null; silent: number | null; compromised: number | null }>();
   const top = await env.DB.prepare(
     "SELECT check_id, COUNT(*) AS n FROM checks WHERE status = 'fail' GROUP BY check_id ORDER BY n DESC, check_id LIMIT 5",
   ).all<{ check_id: string; n: number }>();
@@ -221,6 +246,7 @@ export async function digestText(env: Env, now: Date, format: Format): Promise<s
   const lines = [
     `${bold}bordercheck digest${bold}: ${t?.n ?? 0} machines, ${t?.failing ?? 0} non-compliant (${t?.high ?? 0} with a high-severity fail), ${t?.silent ?? 0} silent for more than ${config(env).silentDays} days`,
   ];
+  if (t?.compromised) lines.push(`🚨 ${t.compromised} reporting signs of compromise`);
   if (top.results.length) lines.push("Most failing: " + top.results.map((r) => `${lit(r.check_id, 40)} ${r.n}`).join(", "));
   const base = (env.DASHBOARD_URL ?? "").replace(/\/+$/, "");
   if (base) lines.push(`${base}/admin?filter=failing`);

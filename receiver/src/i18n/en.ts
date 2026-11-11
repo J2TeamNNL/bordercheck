@@ -466,6 +466,23 @@ export const en = {
   "checkTitle.backup": "A lost laptop can be found and restored",
   "rep.prodSecrets": { one: "{n} production secret in plain text", other: "{n} production secrets in plain text" },
   "rep.prodSecretsNote": "Names and files only; the values are never sent.",
+
+  // Signs of compromise
+  "state.compromised": "compromised",
+  "filter.compromised": "Compromised",
+  "tile.compromised": "Compromised",
+  "tile.compromisedSub": "signs of compromise in the latest report",
+  "machine.compTitle": "This machine may be compromised",
+  "machine.compLead":
+    "Since {when} its reports show signs that harmful software is already on it. Treat it as compromised: tell its user to stop using it for work, and examine it before anything is removed. After that, have them change the passwords and keys they used on it.",
+  "machine.compNote":
+    "These are a few strong signs bordercheck can see, not malware detection: a machine without them is not proven clean.",
+  "machine.compNoDetail": "which item it is was not sent: the policy leaves evidence out",
+  "alert.compromised": "compromised",
+  "alert.compromise_cleared": "compromise cleared",
+  "rep.compTitle": "Stop: this computer may be compromised",
+  "rep.compLead":
+    "bordercheck found signs that harmful software is already on this computer ({checks}). Stop using it for work and contact your IT team now. Do not delete or uninstall anything yourself: IT needs to see it as it is. After IT has looked at it, change the passwords you used on this computer.",
 } satisfies Record<string, Entry>;
 
 export type Key = keyof typeof en;

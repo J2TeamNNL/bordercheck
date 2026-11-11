@@ -284,6 +284,10 @@ background:color-mix(in srgb,var(--c) 12%,var(--glass));box-shadow:inset 0 0 0 1
 .note::before{content:"i";flex:none;display:grid;place-items:center;width:20px;height:20px;margin-top:1px;border-radius:50%;background:var(--c);color:#000;font:700 12px/1 var(--font)}
 .note.s-warn::before,.note.s-fail::before{content:"!"}.note.s-pass::before{content:"\\2713"}
 .note>div{min-width:0}.note ul{margin:6px 0 0;padding-left:18px}
+.note.s-comp{--c:var(--fail);background:color-mix(in srgb,var(--fail) 24%,var(--glass));box-shadow:inset 0 0 0 2px var(--fail)}.note.s-comp::before{content:"!"}
+.note.s-comp h2{margin:0 0 6px;font-size:19px;color:#ff8a82}.note.s-comp p{margin:6px 0 0}
+.pill.s-comp{--c:var(--fail);color:#1a0000;background:var(--fail)}
+.tile.t-comp:not(.zero){box-shadow:var(--hl),inset 0 0 0 2px var(--fail)}
 
 label{display:block;font-size:13px;font-weight:650;color:var(--dim);margin:0 0 6px}
 input,select,textarea{font:inherit;color:var(--text);background:rgba(255,255,255,.065);border:0;border-radius:12px;padding:10px 14px;

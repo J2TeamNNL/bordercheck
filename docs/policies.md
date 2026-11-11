@@ -60,6 +60,40 @@ Used only by an installed copy. A plain `bordercheck` never sends anything.
 | `include_ips` | `false` | Also send `host.ips`: the addresses of the machine's own network interfaces that are up (IPv4 and IPv6, without loopback and link-local; at most 16), read locally. bordercheck never asks a "what is my IP" service. |
 | `include_location` | `false` | Meant to send a device position. **It has no effect today**: no OS gives one without a permission prompt, admin rights or a lookup with a third party, so no location is sent. See [Location](#location). |
 | `fix_prompt` | `true` | Allow `bordercheck fix`, which prints this machine's findings with rules an AI coding assistant can follow to fix them together with its user, and let the portal's report page offer the one-line prompt that starts it. `false` turns both off. Needs bordercheck v0.5.0 or later on every machine of the role (older ones reject the unknown field). |
+| `compromise_alert` | `true` | Mark a report **compromised** when a finding is a sign that hostile code is already on the machine (see [Signs of compromise](#signs-of-compromise)), and send it as soon as a check finds a new sign, or the signs clear, whatever `interval` says. `false`: no mark and no early report; those findings report as ordinary fails. Needs a bordercheck with this feature on every machine of the role: an older one rejects the unknown field and keeps its last good policy. |
+
+### Signs of compromise
+
+Most findings are open doors: something that makes an attack easier. A few are signs that the attack has
+already happened. Those findings carry a **sign of compromise**, and only these, for now:
+
+| Check | Sign | Why it counts |
+|---|---|---|
+| `startup-items` | An item that starts at login or on a schedule runs a command that downloads code and runs it (`curl … \| sh`, `powershell -enc …`, `iex (… DownloadString …)`, `mshta http…`, `certutil -urlcache`) | That is how droppers keep themselves on a machine. An item the policy's `allow` list matches is not checked. A program in an odd place, one anyone can change or one that is missing is an ordinary finding. |
+| `extensions` | An installed extension (even disabled) matches the policy's `block` list | IT has declared it malicious or forbidden. An extension from outside a store, or one not on the `allow` list, is an ordinary finding. |
+| `cracked-software` | A crack tool is installed (KMSpico, AutoKMS), or Windows or Office activates against a KMS server on the machine itself (a KMS emulator) | A program from the crack scene that runs with the system's rights, and the usual carrier of bundled malware. A hosts-file line that blocks Adobe's or Autodesk's licence servers is an ordinary finding: it runs nothing. |
+
+This is a small set of strong signs that bordercheck already sees, not malware detection: bordercheck is not an
+antivirus, and a machine without these signs is not proven clean. A sign counts only on a result that fails: a
+waived result, a disabled check and a finding the person ignored with `bordercheck ignore` (which these checks do
+not offer) never mark a report.
+
+When a report carries a sign:
+
+- **The report** has `"compromised": true` and `"compromise_checks"`; each result lists its signs under
+  `compromise` (what it is; which item only when `include_evidence` is on). The flag and the check IDs go whatever
+  `include_evidence` says.
+- **It goes at once.** The service sends a report as soon as a scheduled check finds the signs changed (new, a
+  different one, or gone), instead of waiting for `interval`, and tries again every hour until it gets through.
+  The same signs are not sent again until the next ordinary report. How soon a sign is noticed depends on how
+  often the checks run: every `check_interval`, or every `interval` when it is `""` (with the default policy,
+  once a day, at the daily report). Set `check_interval` (e.g. `"6h"`) to notice sooner.
+- **The person at the machine** sees it first in `bordercheck`, `bordercheck status` and the desktop notification:
+  stop using the computer for work, tell IT, do not just delete the item. `bordercheck fix` tells the AI assistant
+  to stop and send the person to IT instead of fixing anything; this is the one case where it advises changing
+  passwords and rotating keys, after IT has looked.
+- **The portal** shows the machine as Compromised and sends a webhook alert right away (see the
+  [portal guide](portal.md#signs-of-compromise)).
 
 What a report contains, and what the receiver sees regardless of these switches, is in
 [the agent guide](install.md#what-is-sent).

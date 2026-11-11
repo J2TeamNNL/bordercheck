@@ -19,6 +19,7 @@ import { installCommands, publicOrigin } from "./enroll";
 import { config, DAY, type Env } from "./env";
 import { parseGeo, place } from "./geo";
 import { english, type Msg } from "./i18n";
+import checksEn from "./i18n/checks.en.json";
 import {
   type AuditExtra,
   type AuditRow,
@@ -183,6 +184,9 @@ export function machineSummary(env: Env, m: MachineListRow, silentIso: string) {
     last_seen: m.last_seen,
     silent: m.last_seen < silentIso,
     state,
+    // The latest report says the machine shows signs of compromise, since when.
+    compromised: !!m.compromised_since,
+    compromised_since: m.compromised_since ?? null,
     counts: counts(m),
     place: cfg.storeGeo ? place(parseGeo(m.geo)) || null : null,
     untrusted: {
@@ -203,7 +207,7 @@ export async function fleetSummary(env: Env, now: Date): Promise<Record<string, 
   const silentIso = silentBefore(env, now);
   const t = await env.DB.prepare(
     `SELECT COUNT(*) AS machines, SUM(m.fail > 0) AS failing, SUM(m.fail = 0 AND (m.error > 0 OR m.warn > 0)) AS attention,
-            SUM(m.last_seen < ?1) AS silent, SUM(e.revoked_at IS NOT NULL) AS revoked
+            SUM(m.last_seen < ?1) AS silent, SUM(e.revoked_at IS NOT NULL) AS revoked, SUM(m.compromised_since IS NOT NULL) AS compromised
      FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id`,
   ).bind(silentIso).first<Record<string, number | null>>();
   const [waiting, roles, invites, pending, top] = await Promise.all([
@@ -219,6 +223,7 @@ export async function fleetSummary(env: Env, now: Date): Promise<Record<string, 
     silent_days: config(env).silentDays,
     machines: {
       reporting: t?.machines ?? 0,
+      compromised: t?.compromised ?? 0,
       failing: t?.failing ?? 0,
       attention_only: t?.attention ?? 0,
       silent: t?.silent ?? 0,
@@ -306,10 +311,38 @@ export async function machineDetail(env: Env, id: string, o: { evidence?: boolea
     (await env.DB.prepare("SELECT check_id, since FROM checks WHERE install_id = ?").bind(id).all<{ check_id: string; since: string }>()).results.map((c) => [c.check_id, c.since]),
   );
   let results: ReturnType<typeof parseReport>["results"] = [];
+  let compromiseChecks: string[] = [];
   try {
-    results = parseReport(JSON.parse(m.report)).results;
+    const rep = parseReport(JSON.parse(m.report));
+    results = rep.results;
+    compromiseChecks = rep.compromiseChecks;
   } catch {
     out.report_unreadable = true;
+  }
+  // Signs of compromise: which checks, and each sign as a message key from
+  // bordercheck's catalogue; its parameters and the item (only with
+  // evidence) are machine-supplied.
+  if (m.compromised_since) {
+    out.compromise = {
+      since: m.compromised_since,
+      checks: compromiseChecks.slice(0, 50).map(checkRef),
+      signs: results.flatMap((r) =>
+        (r.compromise ?? []).map((i) => {
+          const ref = checkRef(r.id);
+          const knownKey = Object.hasOwn(checksEn, i.what.key);
+          return {
+            check_id: ref.check_id,
+            sign: knownKey ? i.what.key : "other",
+            untrusted: {
+              ...(ref.untrusted ?? {}),
+              ...(knownKey ? {} : { sign: clean(i.what.key, 80) }),
+              ...(Object.keys(i.what.params).length ? { params: Object.fromEntries(Object.entries(i.what.params).map(([k, v]) => [k, typeof v === "string" ? clean(v, 100) : v])) } : {}),
+              ...(o.evidence && i.detail ? { item: clean(i.detail, 200) } : {}),
+            },
+          };
+        }),
+      ).slice(0, 50),
+    };
   }
   results.sort((x, y) => statusRank(x.status) - statusRank(y.status));
   const problems = results.filter((r) => !["pass", "skip"].includes(r.status)).slice(0, 100);
@@ -443,7 +476,13 @@ export function alertItem(x: AlertListRow) {
     raised_at: x.created_at,
     delivered_at: x.sent_at,
     delivery: x.sent_at ? clean(x.delivery, 100) : "pending",
-    untrusted: { ...("untrusted" in ref ? ref.untrusted : {}), email: clean(d.email, 254), hostname: clean(d.hostname, 100), title: clean(d.title, 120) },
+    untrusted: {
+      ...("untrusted" in ref ? ref.untrusted : {}),
+      email: clean(d.email, 254),
+      hostname: clean(d.hostname, 100),
+      title: clean(d.title, 120),
+      ...(d.checks ? { checks: clean(d.checks, 400) } : {}),
+    },
   };
 }
 

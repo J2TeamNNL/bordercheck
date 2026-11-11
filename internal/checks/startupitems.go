@@ -355,6 +355,7 @@ func startupFix(goos string) msg.Text {
 
 func evalStartup(items []startupItem, note msg.Text, e startupEnv, fix msg.Text) check.Result {
 	var high, medium, low []string
+	var compromise []check.Indicator
 	nDL, nOdd, nW, nMiss, total := 0, 0, 0, 0, 0
 	windows := e.goos == "windows"
 	for _, it := range items {
@@ -377,6 +378,10 @@ func evalStartup(items []startupItem, note msg.Text, e startupEnv, fix msg.Text)
 		if startupDownloads(it.Command) {
 			nDL++
 			high = append(high, fmt.Sprintf("%s: %s  runs a command that downloads code and runs it", head, prog))
+			// A sign of compromise: code fetched from the network at every
+			// start is how droppers keep themselves on a machine. (An item
+			// the policy allows never gets here.)
+			compromise = append(compromise, check.Indicator{What: msg.P("compromise.startupDownloadRun"), Detail: head})
 			continue
 		}
 		why := e.suspiciousPlace(it.Program)
@@ -419,6 +424,7 @@ func evalStartup(items []startupItem, note msg.Text, e startupEnv, fix msg.Text)
 	switch {
 	case len(high) > 0:
 		r.Status, r.Severity = check.Fail, check.High
+		r.Compromise = compromise
 	case len(medium) > 0:
 		r.Severity = check.Medium
 	}

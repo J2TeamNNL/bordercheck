@@ -3,7 +3,8 @@
     "interval": "24h",
     "include_evidence": false,
     "include_ips": false,
-    "fix_prompt": true
+    "fix_prompt": true,
+    "compromise_alert": true
   },
   "update": {
     "binary": true,

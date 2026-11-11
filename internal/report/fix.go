@@ -50,6 +50,15 @@ func (r Report) WriteFix(w io.Writer, exe string, send bool) {
 		}
 		return
 	}
+	if r.Compromised {
+		fmt.Fprintf(w, `
+STOP FIRST: this computer shows signs that it may be compromised (checks: %s; the signs are at the top of
+the report below). Do not fix, remove, disable or clean up anything, and do not work through the list
+below. Tell the person: "%s" Help them reach their IT team if they ask. Only after IT has looked at
+the computer, and if IT agrees, help with the rest. This is the one situation in which advising the
+person to change their passwords and rotate their keys (from another, trusted device) is right.
+`, strings.Join(r.CompromiseChecks, ", "), CompromiseAdvice)
+	}
 	fmt.Fprint(w, `
 Rules
 1. Take one problem at a time, worst first. Before every change, say what you are about to do and wait for
@@ -69,6 +78,13 @@ Rules
 
 `)
 	fmt.Fprintf(w, "To fix: %d\n%s\nBEGIN REPORT\n", len(todo), ignoredLine)
+	if r.Compromised {
+		fmt.Fprintln(w, "Signs of compromise:")
+		for _, l := range r.CompromiseLines() {
+			fmt.Fprintln(w, "    · "+l)
+		}
+		fmt.Fprintln(w)
+	}
 	for _, res := range todo {
 		head := string(res.Status)
 		if res.Severity != "" {

@@ -20,6 +20,10 @@
 // a Copy button. The prompt is the same for every report apart from where the
 // program lives on that OS: nothing the machine reported goes into it, the
 // findings and the rules for handling them are printed by bordercheck itself.
+//
+// When the latest report says the machine shows signs of compromise, a banner
+// at the top tells the person to stop using it for work and contact IT, naming
+// only the checks' titles, and the fix prompt is not offered.
 
 import { config, type Env } from "./env";
 import { CAPABILITY_HEADERS, SELF, tooManyRequests } from "./enroll";
@@ -83,7 +87,7 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   // Same work for every id: hash, then one query.
   const h = await sha256hex(id);
   const row = await env.DB.prepare(
-    `SELECT m.email, m.hostname, m.last_seen, m.report, ro.policy AS role_policy
+    `SELECT m.email, m.hostname, m.last_seen, m.report, m.compromised_since, ro.policy AS role_policy
      FROM report_links l
      JOIN machines m ON m.install_id = l.install_id
      JOIN enrollments e ON e.install_id = l.install_id
@@ -91,20 +95,32 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
      WHERE l.link_hash = ?1 AND ?2 = 1 AND l.expires_at > ?3 AND e.revoked_at IS NULL`,
   )
     .bind(h, LINK_RE.test(id) ? 1 : 0, now.toISOString())
-    .first<{ email: string; hostname: string; last_seen: string; report: string; role_policy: string }>();
+    .first<{ email: string; hostname: string; last_seen: string; report: string; compromised_since: string | null; role_policy: string }>();
   if (!row) return notFound(L);
 
   let results: Result[] = [];
   let version = "";
   let os = "";
+  let compromiseChecks: string[] = [];
   try {
     const parsed = parseReport(JSON.parse(row.report));
     results = parsed.results;
     version = parsed.version;
     os = parsed.host.os;
+    compromiseChecks = parsed.compromiseChecks;
   } catch {
     results = [];
   }
+  // Signs of compromise: stop and tell IT, with the checks' titles only (which
+  // item it is, like the rest of the evidence, stays off this page). The AI
+  // fix prompt is not offered: nothing should be cleaned up before IT looks.
+  const compromised = !!row.compromised_since;
+  const titleOf = new Map(results.map((r) => [r.id, r.title]));
+  const compBanner = compromised
+    ? html`<div class="note s-comp" role="alert"><div><h2>${L.t("rep.compTitle")}</h2><p>${L.t("rep.compLead", {
+        checks: compromiseChecks.slice(0, 10).map((id) => checkTitle(L, id, titleOf.get(id))).join(L.lang === "zh" ? "、" : ", ") || "?",
+      })}</p></div></div>`
+    : "";
   results.sort((a, b) => statusRank(a.status) - statusRank(b.status));
   const problems = results.filter((r) => r.status === "fail" || r.status === "warn" || r.status === "error");
   const waived = results.filter((r) => r.status === "waived");
@@ -116,12 +132,12 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   const failing = problems.some((r) => r.status === "fail");
   const tone = problems.length === 0 ? "s-pass" : failing ? "s-fail" : "s-warn";
   const fixPrompt =
-    problems.some((r) => r.status === "fail" || r.status === "warn") && fixSupported(version) && fixAllowed(row.role_policy)
+    !compromised && problems.some((r) => r.status === "fail" || r.status === "warn") && fixSupported(version) && fixAllowed(row.role_policy)
       ? html`<div class="cmd fixp"><div class="cmd-h"><b>${L.t("rep.fixPromptTitle")}</b><span>${L.t("rep.fixPromptSub")}</span>${copyButton(L, "fix-prompt", "copy.prompt")}</div><code class="msg" tabindex="0" id="fix-prompt">${L.s("rep.fixPrompt", { cmd: fixCommand(os) })}</code></div>`
       : "";
   const headline = problems.length === 0 ? L.t("rep.allClear") : L.t("rep.toFixHeadline", { n: problems.length });
   const body = html`<div class="status-mark ${tone}">${problems.length === 0 ? GLYPH_OK : GLYPH_ATTENTION}</div>
-<p class="eyebrow">${L.t("rep.eyebrow")}</p><h1>${headline}</h1>
+<p class="eyebrow">${L.t("rep.eyebrow")}</p>${compBanner}<h1>${headline}</h1>
 <p class="lead">${L.t("rep.for", { email: row.email || L.s("common.noEmail"), host: row.hostname || L.s("common.noHostname"), when: L.when(row.last_seen) })}${L.lang === "zh" ? "" : " "}${problems.length === 0 ? L.t("rep.okText") : L.t("rep.fixText")}</p>
 <div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}${userIgnored ? html`<span class="chip">${L.t("rep.userIgnored", { n: userIgnored })}</span>` : ""}${version ? html`<span class="chip">bordercheck <b>${version}</b></span>` : ""}</div>
 ${fixPrompt}

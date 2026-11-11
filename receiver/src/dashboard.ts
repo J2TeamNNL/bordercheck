@@ -1,5 +1,5 @@
 import { config, DAY, type Env } from "./env";
-import { fixHtml, summaryHtml } from "./checktext";
+import { fixHtml, renderParts, summaryHtml } from "./checktext";
 import { badge, count, html, type Html, layout, note, page, pct, pill, sev, statusClass } from "./html";
 import { type Geo, mapLink, parseGeo, place } from "./geo";
 import { checkTitle, type I18n, type Key } from "./i18n";
@@ -25,10 +25,14 @@ export interface MachineRow {
   pass: number;
   skip: number;
   other: number;
+  // When the current run of reports saying "compromised" began; null when the
+  // latest report does not say so (and for older clients).
+  compromised_since: string | null;
 }
 
 export const FILTERS = {
   all: { label: "All", key: "filter.all", where: "1 = 1" },
+  compromised: { label: "Compromised", key: "filter.compromised", where: "m.compromised_since IS NOT NULL" },
   failing: { label: "Failing", key: "filter.failing", where: "m.fail > 0" },
   attention: { label: "Fail, error or warn", key: "filter.attention", where: "(m.fail > 0 OR m.error > 0 OR m.warn > 0)" },
   silent: { label: "Silent", key: "filter.silent", where: "m.last_seen < ?2" },
@@ -71,10 +75,12 @@ const machineBinds = (o: MachineQuery, after: string) =>
   [o.q, o.silentBefore, `%${o.q.replace(/[\\%_]/g, (c) => "\\" + c)}%`, o.limit, o.check ?? "", o.checkStatus ?? "", o.roleId ?? 0, after];
 
 export async function machineRows(env: Env, o: MachineQuery): Promise<MachineListRow[]> {
-  const order = o.byId ? "m.install_id" : "m.fail > 0 DESC, m.high_fail DESC, m.fail DESC, m.last_seen DESC";
+  const order = o.byId
+    ? "m.install_id"
+    : "m.compromised_since IS NOT NULL DESC, m.fail > 0 DESC, m.high_fail DESC, m.fail DESC, m.last_seen DESC";
   const rows = await env.DB.prepare(
     `SELECT m.install_id, m.email, m.hostname, m.os, m.arch, m.version, m.policy, m.first_seen, m.last_seen, m.report_time,
-            m.fail, m.high_fail, m.error, m.warn, m.waived, m.pass, m.skip, m.other, m.public_ip, m.geo,
+            m.fail, m.high_fail, m.error, m.warn, m.waived, m.pass, m.skip, m.other, m.compromised_since, m.public_ip, m.geo,
             e.install_id IS NOT NULL AS enrolled, e.revoked_at, r.name AS role,
             (SELECT MIN(c.since) FROM checks c WHERE c.install_id = m.install_id AND c.status = 'fail') AS failing_since
      ${MACHINE_FROM}
@@ -123,6 +129,7 @@ export async function waitingCount(env: Env, o: { q?: string; roleId?: number } 
 // The state of a machine as one pill (worst first), plus "silent".
 function state(L: I18n, m: MachineRow, silentBefore: string): Html {
   const parts: Html[] = [];
+  if (m.compromised_since) parts.push(pill("s-comp", L.t("state.compromised")));
   if (m.fail) parts.push(pill("s-fail", L.t("state.noncompliant")));
   else if (m.error || m.warn) parts.push(pill("s-warn", L.t("state.attention")));
   else parts.push(pill("s-pass", L.t("state.ok")));
@@ -147,11 +154,11 @@ export async function machinesPage(env: Env, url: URL, who: string, now: number,
     waitingRows(env, 500),
     env.DB.prepare(
       `SELECT COUNT(*) AS n, SUM(m.fail > 0) AS failing, SUM(m.fail = 0 AND (m.error > 0 OR m.warn > 0)) AS attention,
-              SUM(m.last_seen < ?1) AS silent, SUM(e.revoked_at IS NOT NULL) AS revoked
+              SUM(m.last_seen < ?1) AS silent, SUM(e.revoked_at IS NOT NULL) AS revoked, SUM(m.compromised_since IS NOT NULL) AS compromised
        FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id`,
     )
       .bind(silentBefore)
-      .first<{ n: number; failing: number | null; attention: number | null; silent: number | null; revoked: number | null }>(),
+      .first<{ n: number; failing: number | null; attention: number | null; silent: number | null; revoked: number | null; compromised: number | null }>(),
     checkStats(env, 4),
     env.DB.prepare("SELECT COUNT(*) AS n FROM invites WHERE used_at IS NULL AND revoked_at IS NULL AND expires_at > ?")
       .bind(new Date(now).toISOString())
@@ -171,7 +178,9 @@ export async function machinesPage(env: Env, url: URL, who: string, now: number,
     return `/admin${s ? "?" + s : ""}`;
   };
 
+  const compromised = totals?.compromised ?? 0;
   const overview = html`<div class="tiles">
+${tile(L, "/admin?filter=compromised", compromised, L.t("tile.compromised"), L.t("tile.compromisedSub"), "t-fail t-comp")}
 ${tile(L, "/admin?filter=failing", failing, L.t("tile.failing"), L.t("tile.failingSub"), "t-fail")}
 ${tile(L, "/admin?filter=attention", attention, L.t("tile.attention"), L.t("tile.attentionSub"), "t-warn")}
 ${tile(L, "/admin?filter=silent", totals?.silent ?? 0, L.t("tile.silent"), L.t("tile.silentSub", { n: cfg.silentDays }), "t-skip")}
@@ -336,6 +345,28 @@ export function userIgnoredList(L: I18n, r: Result): Html | string {
   )}</ul></div>`;
 }
 
+// compromiseBanner heads the page of a machine whose latest report says it is
+// compromised: since when, each check, and each sign with its item when the
+// machine sent one. Everything here came from the report, so it is all
+// escaped like any other report text; the signs are rendered from the
+// message catalogue, never from free text.
+export function compromiseBanner(L: I18n, since: string, checks: string[], results: Result[]): Html {
+  const byId = new Map(results.map((r) => [r.id, r]));
+  const ids = [...checks];
+  for (const r of results) if (r.compromise?.length && !ids.includes(r.id)) ids.push(r.id);
+  const items = ids.slice(0, 50).map((id) => {
+    const r = byId.get(id);
+    const signs = (r?.compromise ?? []).map((i) => {
+      const what = renderParts(L, [i.what]) ?? html`<code>${i.what.key}</code>`;
+      return html`<li>${what} ${i.detail ? html`<code class="ev">${i.detail}</code>` : html`<span class="muted small">(${L.t("machine.compNoDetail")})</span>`}</li>`;
+    });
+    return html`<li><b>${checkTitle(L, id, r?.title)}</b> <code class="muted">${id}</code>${signs.length ? html`<ul>${signs}</ul>` : ""}</li>`;
+  });
+  return html`<div class="note s-comp" role="alert"><div><h2>${L.t("machine.compTitle")}</h2>
+<p>${L.t("machine.compLead", { when: L.when(since) })}</p>${items.length ? html`<ul>${items}</ul>` : ""}
+<p class="muted small">${L.t("machine.compNote")}</p></div></div>`;
+}
+
 function statTile(L: I18n, n: number, label: Html, tone: string): Html {
   return html`<div class="tile ${n ? tone : "zero"}"><span class="l">${label}</span><span class="n">${L.num(n)}</span></div>`;
 }
@@ -368,12 +399,16 @@ ${note(L.t("machine.noReportYet", { ago: L.ago(e.enrolled_at, now) }))}
   const since = new Map(checks.results.map((c) => [c.check_id, c.since]));
 
   let results: Result[] = [];
+  let compromiseChecks: string[] = [];
   let unreadable = false;
   try {
-    results = parseReport(JSON.parse(m.report)).results;
+    const rep = parseReport(JSON.parse(m.report));
+    results = rep.results;
+    compromiseChecks = rep.compromiseChecks;
   } catch {
     unreadable = true;
   }
+  const comp = m.compromised_since ? compromiseBanner(L, m.compromised_since, compromiseChecks, results) : "";
   results.sort((a, b) => statusRank(a.status) - statusRank(b.status));
   const problems = results.filter((r) => !["pass", "skip"].includes(r.status));
   const fine = results.filter((r) => ["pass", "skip"].includes(r.status));
@@ -393,6 +428,7 @@ ${note(L.t("machine.noReportYet", { ago: L.ago(e.enrolled_at, now) }))}
   const body = html`<div class="hero">${crumb}<h1>${m.hostname || L.s("common.noHostname")}</h1>
 <p class="lead">${m.email || L.s("common.noEmail")}</p>
 <div class="chips">${state(L, m, silentBefore)}${enrollment?.revoked_at ? pill("s-fail", L.t("state.revoked")) : ""}<span class="chip">${m.os}/${m.arch}</span><span class="chip">bordercheck <b>${m.version}</b></span><span class="chip" title="${L.when(m.last_seen)}">${L.t("machine.reported", { ago: L.ago(m.last_seen, now) })}</span></div></div>
+${comp}
 ${silent ? note(L.t("machine.silentNote", { age: L.age(m.last_seen, now) }), "s-warn") : ""}
 ${unreadable ? note(L.t("machine.unreadable"), "s-fail") : ""}
 <div class="tiles">${statTile(L, m.fail, m.high_fail ? L.t("machine.failHigh", { n: m.high_fail }) : L.t("common.fail"), "t-fail")}${statTile(L, m.error, L.t("common.error"), "t-err")}${statTile(L, m.warn, L.t("common.warn"), "t-warn")}${statTile(L, m.waived, L.t("common.waived"), "t-accent")}${statTile(L, m.pass, L.t("common.pass"), "t-ok")}</div>
@@ -516,8 +552,8 @@ export async function alertRows(env: Env, limit: number, pendingOnly = false, be
   return rows.results;
 }
 
-const ALERT_TONE: Record<string, string> = { high_fail: "s-fail", silent: "s-skip", back: "s-pass", new_country: "s-warn" };
-const ALERT_KEY: Record<string, Key> = { high_fail: "alert.high_fail", silent: "alert.silent", back: "alert.back", new_country: "alert.new_country" };
+const ALERT_TONE: Record<string, string> = { high_fail: "s-fail", silent: "s-skip", back: "s-pass", new_country: "s-warn", compromised: "s-comp", compromise_cleared: "s-pass" };
+const ALERT_KEY: Record<string, Key> = { high_fail: "alert.high_fail", silent: "alert.silent", back: "alert.back", new_country: "alert.new_country", compromised: "alert.compromised", compromise_cleared: "alert.compromise_cleared" };
 
 export async function alertsPage(env: Env, who: string, L: I18n): Promise<Response> {
   const rows = await alertRows(env, 200);
@@ -529,7 +565,7 @@ ${rows.map((a) => {
     const kind = ALERT_KEY[a.kind] ? L.t(ALERT_KEY[a.kind]) : a.kind.replace("_", " ");
     return html`<tr><td class="nowrap">${L.when(a.created_at)}</td><td class="nowrap">${pill(ALERT_TONE[a.kind] ?? "s-other", kind)}</td>
 <td class="who-cell"><a href="${machineLink(a.install_id)}">${d.email || L.s("common.noEmail")}</a><span class="sub">${d.hostname}</span></td>
-<td class="wrap">${a.check_id ? html`<code>${a.check_id}</code><span class="sub">${d.title}</span>` : ""}</td><td class="muted">${a.sent_at ? a.delivery : L.t("alerts.pending")}</td></tr>`;
+<td class="wrap">${a.check_id ? html`<code>${a.check_id}</code><span class="sub">${d.title}</span>` : a.kind === "compromised" && d.checks ? html`<code>${d.checks}</code><span class="sub">${d.titles}</span>` : ""}</td><td class="muted">${a.sent_at ? a.delivery : L.t("alerts.pending")}</td></tr>`;
   })}</tbody></table></div>${rows.length === 0 ? html`<p class="empty">${L.t("alerts.empty")}</p>` : ""}</div>`;
   return page(layout(L, L.s("nav.alerts"), who, body, "Alerts"));
 }

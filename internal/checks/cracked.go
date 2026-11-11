@@ -134,15 +134,23 @@ func evalCracked(f crackFacts, opts policy.CrackedSoftware) check.Result {
 		}
 		ev = append(ev, fmt.Sprintf("%s blocks %s licensing servers: %s", f.HostsPath, v, shown))
 	}
+	// Signs of compromise are only the strongest traces: a KMS emulator this
+	// machine activates against, and an installed crack tool. Both are
+	// programs from the crack scene running with the system's rights, and the
+	// usual carriers of bundled malware. A hosts-file line is not one: it
+	// blocks a licence check, but runs nothing.
+	var compromise []check.Indicator
 	for _, product := range []string{"Windows", "Microsoft Office"} {
 		if s := f.KMS[product]; s != "" && kmsEmulated(s) {
 			vendors[product] = true
 			ev = append(ev, fmt.Sprintf("%s activates against a KMS server on this machine (%s): a KMS emulator", product, s))
+			compromise = append(compromise, check.Indicator{What: msg.P("compromise.kmsEmulator", "product", product), Detail: s})
 		}
 	}
 	for _, t := range f.Tools {
 		vendors["Windows"], vendors["Microsoft Office"] = true, true // these tools activate both
 		ev = append(ev, "crack tool installed: "+t)
+		compromise = append(compromise, check.Indicator{What: msg.P("compromise.crackTool"), Detail: t})
 	}
 	if len(ev) == 0 {
 		return check.Result{Status: check.Pass}.WithSummary(msg.Of("cracked.pass"))
@@ -153,7 +161,7 @@ func evalCracked(f crackFacts, opts policy.CrackedSoftware) check.Result {
 			what = append(what, v)
 		}
 	}
-	return check.Result{Status: check.Fail, Severity: check.High, Evidence: ev}.
+	return check.Result{Status: check.Fail, Severity: check.High, Evidence: ev, Compromise: compromise}.
 		WithSummary(msg.Of("cracked.found", "products", strings.Join(what, ", "))).
 		WithFix(crackFix(vendors, opts.SuggestAlternatives))
 }

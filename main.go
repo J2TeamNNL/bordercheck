@@ -197,6 +197,9 @@ func runCheck(args []string) int {
 		progress = report.Progress(os.Stderr)
 	}
 	rep := report.New(version, pol.Name, pol.Waive(check.RunAllProgress(ctx, selected, progress), waiverIdentity(), time.Now()))
+	if !pol.Report.CompromiseAlert {
+		rep.DropCompromise()
+	}
 	if *jsonOut {
 		if err := rep.WriteJSON(os.Stdout); err != nil {
 			return fail(err)
@@ -238,6 +241,9 @@ func runFix(args []string) int {
 		progress = report.Progress(os.Stderr)
 	}
 	rep := report.New(version, pol.Name, pol.Waive(check.RunAllProgress(ctx, checks.AllWith(pol, localSettings()), progress), waiverIdentity(), time.Now()))
+	if !pol.Report.CompromiseAlert {
+		rep.DropCompromise()
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		exe = "bordercheck"

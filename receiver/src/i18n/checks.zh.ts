@@ -20,6 +20,11 @@ export const checksZh: CheckCatalog = {
   "check.interrupted": "在完成前被中断。",
   "check.moreAllowed": "另有 {n} 项为策略所允许。",
 
+  "compromise.startupDownloadRun": "一个设为自动启动的程序会从互联网下载代码并运行。",
+  "compromise.blockedExtension": "已安装一个被你的组织列为有害而封禁的扩展。",
+  "compromise.crackTool": "已安装软件破解或激活工具。",
+  "compromise.kmsEmulator": "{product} 通过在这台电脑上运行的伪造激活服务器激活。",
+
   "firewall.mac.off": "macOS 防火墙已关闭。",
   "firewall.mac.off.fix":
     "前往 系统设置 → 网络 → 防火墙（System Settings → Network → Firewall），打开防火墙。或运行：[code]sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on[/code]",

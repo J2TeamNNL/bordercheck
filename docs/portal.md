@@ -118,6 +118,30 @@ newly fails a high-severity check, when a machine has been silent for more than 
 every `DIGEST_HOURS` (168 in the sample config; `0` = off). Without a webhook the **Alerts** page still lists
 them. Details: [Alerts](../receiver/README.md#alerts).
 
+### Signs of compromise
+
+A few findings are signs that hostile code is already on a machine rather than an open door: a startup item
+that downloads and runs code, an extension on the role's block list, an installed crack tool or KMS emulator
+([the list](policies.md#signs-of-compromise)). A report with one says `"compromised": true`, and while a
+machine's latest report does:
+
+- **Machines** shows a **Compromised** tile and filter, lists the machine first with a red *compromised* badge;
+  the fleet summary (MCP and REST) counts it, and machine lists carry `compromised` and `compromised_since`.
+- The **machine page** opens with a banner: since when, each check, and each sign with its item (when the role
+  sends evidence). Everything in it came from the machine and is shown as text.
+- The person's **report page** tells them to stop using the computer for work and contact IT, naming the checks
+  only, and does not offer the AI fix prompt.
+- A **compromised** alert is raised once per episode and sent to the webhook as soon as the report is stored, not
+  at the next hourly run (the cron retries if the webhook fails). When a later report no longer carries the flag,
+  a **compromise cleared** alert follows the same way: check that IT made it go away, not someone deleting the
+  evidence. Without a webhook both are on the Alerts page.
+
+Treat the machine as compromised: have the person stop using it for work, look at it before anything is
+removed, then have them change the passwords and keys they used on it. This is a small set of strong signs, not
+malware detection: a machine without them is not proven clean. Machines tell you within `report.check_interval`
+(set it, e.g. `"6h"`, in the role to notice sooner than the daily report). A role that sets
+`report.compromise_alert` needs every machine of the role on a bordercheck that knows the field.
+
 ## 7. A custom domain
 
 Uncomment `routes` in `wrangler.jsonc` with your host, set `DASHBOARD_URL` so alerts and invite links use it,
