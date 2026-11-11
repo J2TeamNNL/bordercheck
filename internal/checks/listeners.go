@@ -48,7 +48,7 @@ func listeners(ctx context.Context, opts policy.Listeners) check.Result {
 	if err != nil {
 		return check.Errored(err)
 	}
-	return evalListenersWith(ls, note, opts.Allow, opts.LowerSeverity)
+	return evalListenersWith(ls, note, opts.Allow, opts.InfoOnly)
 }
 
 func isLoopback(addr string) bool {
@@ -154,9 +154,10 @@ func evalListeners(ls []listener, note msg.Text, allow []policy.ListenerRule) ch
 	return evalListenersWith(ls, note, allow, nil)
 }
 
-// evalListenersWith is evalListeners with the policy's lower_severity list:
-// when every exposed port belongs to one of those processes (AirPlay Receiver,
-// Dropbox LAN sync and the like), the warning is low instead of medium.
+// evalListenersWith is evalListeners with the policy's info_only list: when
+// every exposed port belongs to one of those processes (AirPlay Receiver,
+// Dropbox LAN sync and the like), the check passes and lists them for
+// information, with nothing to fix.
 func evalListenersWith(ls []listener, note msg.Text, allow []policy.ListenerRule, lower []string) check.Result {
 	var exposed []string
 	allowed := 0
@@ -194,9 +195,8 @@ func evalListenersWith(ls []listener, note msg.Text, allow []policy.ListenerRule
 			WithSummary(append(msg.Of("listeners.pass", "n", len(ls)), note...))
 	}
 	if onlyLower {
-		return check.Result{Status: check.Warn, Severity: check.Low, Evidence: exposed}.
-			WithSummary(slices.Concat(msg.Of("listeners.exposed", "n", len(exposed)), msg.Of("listeners.lower"), note)).
-			WithFix(msg.Of("listeners.fix.lower"))
+		return check.Result{Status: check.Pass, Evidence: exposed}.
+			WithSummary(append(msg.Of("listeners.infoOnly", "n", len(exposed)), note...))
 	}
 	return check.Result{Status: check.Warn, Severity: check.Medium, Evidence: exposed}.
 		WithSummary(append(msg.Of("listeners.exposed", "n", len(exposed)), note...)).

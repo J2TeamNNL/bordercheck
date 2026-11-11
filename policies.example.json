@@ -60,7 +60,7 @@
           "port": "7000"
         }
       ],
-      "lower_severity": [
+      "info_only": [
         "ControlCenter",
         "DropboxFileProvider",
         "Dropbox",
