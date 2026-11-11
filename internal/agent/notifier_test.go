@@ -419,7 +419,7 @@ func TestScriptedInstallAndBackgroundNeverAsk(t *testing.T) {
 		f.answers[notifier.ModePost] = a
 		st := State{ReportPage: pageLink}
 		notifyUser(t.Context(), env, policy.Default().Notify, highProblem, &st, time.Now(), false, reportURL)
-		checkOnly(t.Context(), env, readCfg(t, env), mustPolicy(t, env), &st, time.Now())
+		_ = checkOnly(t.Context(), env, readCfg(t, env), mustPolicy(t, env), &st, time.Now(), nil)
 		notifyRevoked(t.Context(), env, &State{}, time.Now(), false)
 		if err := Send(t.Context(), env, false); err != nil {
 			t.Fatal(err)

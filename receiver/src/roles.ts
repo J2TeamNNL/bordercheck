@@ -99,7 +99,7 @@ export function validateRolePolicy(p: unknown, now: Date): Msg[] {
     if (!isObj(p.report)) must("v.mustObject", "report");
     else {
       const r = p.report;
-      keysIn(r, ["url", "headers", "interval", "check_interval", "include_evidence", "email_domains", "include_ips", "include_location", "fix_prompt"], "report", errs);
+      keysIn(r, ["url", "headers", "interval", "check_interval", "include_evidence", "email_domains", "include_ips", "include_location", "fix_prompt", "compromise_alert"], "report", errs);
       if (r.url !== undefined && typeof r.url !== "string") must("v.mustString", "report.url");
       if (r.headers !== undefined) {
         if (!isObj(r.headers)) must("v.mustObject", "report.headers");
@@ -117,7 +117,7 @@ export function validateRolePolicy(p: unknown, now: Date): Msg[] {
         const d = goDuration(r.check_interval);
         if (d === null || d < 15 * 60 * 1000) errs.push(msg("v.minDuration", { where: "report.check_interval", min: "15m" }));
       }
-      for (const k of ["include_evidence", "include_ips", "include_location", "fix_prompt"]) {
+      for (const k of ["include_evidence", "include_ips", "include_location", "fix_prompt", "compromise_alert"]) {
         if (r[k] !== undefined && typeof r[k] !== "boolean") must("v.mustBool", `report.${k}`);
       }
       if (r.email_domains !== undefined) strList(r.email_domains, "report.email_domains", errs);

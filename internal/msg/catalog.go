@@ -20,6 +20,12 @@ var Catalog = map[string]Entry{
 	"check.interrupted": s("Interrupted before it finished."),
 	"check.moreAllowed": s("{n} more allowed by policy."),
 
+	// ---- Signs of compromise (check.Indicator): what was found, without the item ----
+	"compromise.startupDownloadRun": s("A program set to start automatically downloads code from the internet and runs it."),
+	"compromise.blockedExtension":   s("An extension your organisation has blocked as harmful is installed."),
+	"compromise.crackTool":          s("A software crack or activation tool is installed."),
+	"compromise.kmsEmulator":        s("{product} is activated by a fake activation server running on this computer."),
+
 	// ---- What the person at the machine ignored (bordercheck ignore): secrets, ai-agents, ssh-keys ----
 	"ignore.more": pl("1 more ignored by you.", "{n} more ignored by you."),
 	"ignore.all": pl("The only finding is one you marked as not sensitive.",

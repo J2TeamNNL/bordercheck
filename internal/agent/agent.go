@@ -129,7 +129,31 @@ type State struct {
 	Notifications      string    `json:"notifications,omitempty"`
 	NotificationsError string    `json:"notifications_error,omitempty"`
 	NotificationsAt    time.Time `json:"notifications_at,omitzero"`
+	// Signs of compromise ("check-id: what (item)", report.CompromiseLines)
+	// that the last check found, and those in the last report that got
+	// through. While they differ, the service sends a report at once,
+	// whatever report.interval says: a new sign, a changed one, or the signs
+	// clearing. Empty when the policy turns report.compromise_alert off.
+	CompromiseFound []string `json:"compromise_found,omitempty"`
+	CompromiseSent  []string `json:"compromise_sent,omitempty"`
 }
+
+// compromiseChanged reports whether the signs of compromise the last check
+// found have not reached the portal yet.
+func (st State) compromiseChanged() bool { return !slices.Equal(st.CompromiseFound, st.CompromiseSent) }
+
+// newReport is the report for results under pol.
+func newReport(env Env, pol policy.Policy, results []check.Result) report.Report {
+	rep := report.New(env.Version, pol.Name, results)
+	if !pol.Report.CompromiseAlert {
+		rep.DropCompromise()
+	}
+	return rep
+}
+
+// allChecks is checks.AllWith; tests replace it so a run does not depend on
+// the machine it runs on.
+var allChecks = checks.AllWith
 
 // Local is what the person at this computer has set in the install folder
 // dir: the secrets they marked as not sensitive. A list that cannot be read
@@ -356,17 +380,23 @@ func Send(ctx context.Context, env Env, force bool) error {
 	}
 	switch {
 	case force || now.Sub(st.LastSent) >= pol.Report.Every():
-		err = sendReport(ctx, env, cfg, pol, &st, now, force, tok)
-		if errors.Is(err, ErrRevoked) {
-			revoked(ctx, env, &st, now, force)
-		}
+		err = sendReport(ctx, env, cfg, pol, &st, now, force, tok, nil)
+	case pol.Report.CompromiseAlert && st.compromiseChanged():
+		// The last check found the signs of compromise changed, but that
+		// report did not get through: try again every hour, not every
+		// check_interval.
+		fmt.Fprintf(env.Out, "%s signs of compromise not reported yet: sending a report now\n", now.Format(time.RFC3339))
+		err = sendReport(ctx, env, cfg, pol, &st, now, false, tok, nil)
 	case now.Sub(st.LastCheck) >= pol.Report.CheckEvery():
 		// Between reports: check, and tell the person at the machine about
-		// anything new. Nothing is sent.
-		checkOnly(ctx, env, cfg, pol, &st, now)
+		// anything new. Nothing is sent, unless the signs of compromise changed.
+		err = checkOnly(ctx, env, cfg, pol, &st, now, tok)
 	default:
 		fmt.Fprintf(env.Out, "%s nothing due: next check %s, next report %s\n", now.Format(time.RFC3339),
 			st.LastCheck.Add(pol.Report.CheckEvery()).Format(time.RFC3339), st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339))
+	}
+	if errors.Is(err, ErrRevoked) {
+		revoked(ctx, env, &st, now, force)
 	}
 	// After the report, so a broken update never costs a report. Its error is
 	// in state.json and the log; the report's error is what Send returns.
@@ -377,25 +407,43 @@ func Send(ctx context.Context, env Env, force bool) error {
 }
 
 // checkOnly runs the checks without reporting: what the service does when
-// report.check_interval has passed but a report is not due yet.
-func checkOnly(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time) {
-	results := pol.Waive(check.RunAll(ctx, checks.AllWith(pol, Local(env.Dir))), identity(cfg), now)
+// report.check_interval has passed but a report is not due yet. When the signs
+// of compromise differ from those last reported, it sends these results at
+// once instead.
+func checkOnly(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time, tok *bearer) error {
+	results := pol.Waive(check.RunAll(ctx, allChecks(pol, Local(env.Dir))), identity(cfg), now)
 	st.LastCheck = now
-	c := report.New(env.Version, pol.Name, results).Counts
+	rep := newReport(env, pol, results)
+	st.CompromiseFound = rep.CompromiseLines()
+	if pol.Report.CompromiseAlert && st.compromiseChanged() {
+		what := "found"
+		if len(st.CompromiseFound) == 0 {
+			what = "cleared"
+		}
+		fmt.Fprintf(env.Out, "%s signs of compromise %s: sending a report now\n", now.Format(time.RFC3339), what)
+		return sendReport(ctx, env, cfg, pol, st, now, false, tok, results)
+	}
+	c := rep.Counts
 	fmt.Fprintf(env.Out, "%s checked (no report due until %s): %d fail, %d warn, %d pass, %d waived\n", now.Format(time.RFC3339),
 		st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339), c.Fail, c.Warn, c.Pass, c.Waived)
 	notifyUser(ctx, env, pol.Notify, results, st, now, false, pol.Report.URL)
+	return nil
 }
 
-func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time, force bool, tok *bearer) error {
-	st.LastCheck = now
-	var progress check.Progress
-	if force && env.Term != nil { // someone is watching: show how far the checks are
-		progress = report.Progress(env.Term)
+// sendReport runs the checks, or takes results a check just made, and posts the report.
+func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time, force bool, tok *bearer, results []check.Result) error {
+	if results == nil {
+		st.LastCheck = now
+		var progress check.Progress
+		if force && env.Term != nil { // someone is watching: show how far the checks are
+			progress = report.Progress(env.Term)
+		}
+		results = check.RunAllProgress(ctx, allChecks(pol, Local(env.Dir)), progress)
+		results = pol.Waive(results, identity(cfg), now)
 	}
-	results := check.RunAllProgress(ctx, checks.AllWith(pol, Local(env.Dir)), progress)
-	results = pol.Waive(results, identity(cfg), now)
-	rep := report.New(env.Version, pol.Name, results)
+	rep := newReport(env, pol, results)
+	found := rep.CompromiseLines() // before evidence is left out: the details tell one sign from another
+	st.CompromiseFound = found
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID
 	if pol.Report.IncludeIPs {
 		rep.Host.IPs = hostinfo.IPs()
@@ -411,6 +459,15 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 	if !pol.Report.IncludeEvidence {
 		for i := range rep.Results {
 			rep.Results[i].Evidence = nil
+			// The flag, the check IDs and what each sign is still go; which
+			// item it is (a name or path) is evidence.
+			if c := rep.Results[i].Compromise; c != nil {
+				bare := make([]check.Indicator, len(c))
+				for j, ind := range c {
+					bare[j] = check.Indicator{What: ind.What}
+				}
+				rep.Results[i].Compromise = bare
+			}
 		}
 	}
 	st.LastTry = now
@@ -426,10 +483,14 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 	if tok != nil {
 		st.Revoked, st.RevokedChecked, st.RevokedNotified = time.Time{}, time.Time{}, false
 	}
-	st.LastSent, st.LastError = now, ""
+	st.LastSent, st.LastError, st.CompromiseSent = now, "", found
 	c := rep.Counts
-	fmt.Fprintf(env.Out, "%s report sent to %s: %d fail, %d warn, %d pass, %d waived\n",
-		now.Format(time.RFC3339), hostOf(pol.Report.URL), c.Fail, c.Warn, c.Pass, c.Waived)
+	marked := ""
+	if rep.Compromised {
+		marked = " · marked compromised (" + strings.Join(rep.CompromiseChecks, ", ") + ")"
+	}
+	fmt.Fprintf(env.Out, "%s report sent to %s: %d fail, %d warn, %d pass, %d waived%s\n",
+		now.Format(time.RFC3339), hostOf(pol.Report.URL), c.Fail, c.Warn, c.Pass, c.Waived, marked)
 	return nil
 }
 
@@ -483,6 +544,18 @@ func Status(env Env) (string, error) {
 	var st State
 	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
 	var b strings.Builder
+	if len(st.CompromiseFound) > 0 {
+		fmt.Fprintf(&b, "Signs that this computer may be compromised (found by the check on %s):\n", st.LastCheck.Format(time.RFC1123))
+		for _, l := range st.CompromiseFound {
+			fmt.Fprintf(&b, "  · %s\n", l)
+		}
+		if slices.Equal(st.CompromiseFound, st.CompromiseSent) {
+			b.WriteString("Your IT team has been sent a report saying so.\n")
+		} else {
+			b.WriteString("Not reported to your IT team yet; bordercheck keeps trying every hour.\n")
+		}
+		b.WriteString(report.CompromiseAdvice + "\n\n")
+	}
 	fmt.Fprintf(&b, "Installed:  %s (%s)\nEmail:      %s\nInstall ID: %s\n", env.Dir, env.Version, cfg.Email, cfg.InstallID)
 	refreshedFrom := ""
 	if e := cfg.Enrollment; e != nil {
@@ -514,6 +587,11 @@ func Status(env Env) (string, error) {
 	}
 	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results, and anything you ignored with your reason; %s\nService:    %s\n",
 		pol.Report.CheckEvery(), pol.Report.Interval, hostOf(pol.Report.URL), sends(pol.Report), services.status())
+	if pol.Report.CompromiseAlert {
+		fmt.Fprintf(&b, "Compromise: a sign of compromise is reported as soon as a check finds it (checks run every %s)\n", pol.Report.CheckEvery())
+	} else {
+		b.WriteString("Compromise: not flagged (the policy turns report.compromise_alert off)\n")
+	}
 	if entries, err := ignore.Load(env.Dir); err != nil {
 		fmt.Fprintf(&b, "Ignored:    your list cannot be read (%v), so nothing is ignored\n", err)
 	} else if len(entries) > 0 {

@@ -71,6 +71,12 @@ type Report struct {
 	// can follow to fix this machine's findings with its user, and lets the
 	// portal's report page offer the prompt that starts it. On by default.
 	FixPrompt bool `json:"fix_prompt"`
+	// CompromiseAlert marks a report "compromised" when a finding is a sign
+	// that hostile code is already on the machine (check.Indicator), and makes
+	// the installed service send that report as soon as a check finds a new
+	// sign (or the signs clear), whatever Interval says. On by default. Off:
+	// the findings report as ordinary fails, without the mark.
+	CompromiseAlert bool `json:"compromise_alert"`
 }
 
 // Every returns the interval between reports.
@@ -344,7 +350,7 @@ func ptr[T any](v T) *T { return &v }
 func Default() Policy {
 	return Policy{
 		Name:   "built-in",
-		Report: Report{Headers: map[string]string{}, Interval: "24h", EmailDomains: []string{}, IncludeIPs: false, IncludeLocation: false, FixPrompt: true},
+		Report: Report{Headers: map[string]string{}, Interval: "24h", EmailDomains: []string{}, IncludeIPs: false, IncludeLocation: false, FixPrompt: true, CompromiseAlert: true},
 		Update: Update{Interval: "24h", Repo: "ptrinh/bordercheck"},
 		Notify: defaultNotify(),
 

@@ -134,6 +134,7 @@ func evalExtensions(f extFacts, opts policy.Extensions) check.Result {
 	summary := msg.Of("extensions.found", "counts", strings.Join(counts, ", "))
 	var fix msg.Text
 	var ev []string
+	var compromise []check.Indicator
 	status, sev := check.Pass, check.Severity("")
 	raise := func(st check.Status, sv check.Severity) {
 		if st == check.Fail || status == check.Pass {
@@ -149,6 +150,10 @@ func evalExtensions(f extFacts, opts policy.Extensions) check.Result {
 		fix = append(fix, msg.P("extensions.fix.blocked"))
 		for _, e := range blocked {
 			ev = append(ev, "on the block list: "+e.String())
+			// A sign of compromise: IT has declared this extension malicious
+			// or forbidden, and it is installed (even disabled, it can be
+			// turned back on).
+			compromise = append(compromise, check.Indicator{What: msg.P("compromise.blockedExtension"), Detail: e.String()})
 		}
 	}
 	if len(outside) > 0 {
@@ -186,7 +191,7 @@ func evalExtensions(f extFacts, opts policy.Extensions) check.Result {
 	if status == check.Pass {
 		summary = append(summary, msg.P("extensions.pass"))
 	}
-	r := check.Result{Status: status, Severity: sev, Evidence: ev}.WithSummary(summary)
+	r := check.Result{Status: status, Severity: sev, Evidence: ev, Compromise: compromise}.WithSummary(summary)
 	if len(fix) > 0 {
 		r = r.WithFix(fix)
 	}
