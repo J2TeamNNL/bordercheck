@@ -419,6 +419,7 @@ export const zh: Catalog = {
   "checkTitle.disk-encryption": "磁盘已加密",
   "checkTitle.listeners": "没有端口对本机以外开放",
   "checkTitle.tailscale": "Tailscale 阻止传入连接",
+  "checkTitle.mesh-vpn": "私有网络阻止传入连接",
   "checkTitle.docker": "Docker 容器保持隔离",
   "checkTitle.secrets": "没有明文密钥",
   "checkTitle.os-updates": "系统和浏览器保持最新",

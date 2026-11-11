@@ -24,6 +24,10 @@ type remoteService struct {
 	On   bool
 	How  string // why it looks on, e.g. "port 22 open"
 	Fix  msg.Part
+	// For other vendors' tools: the severity (otherwise high, or medium for
+	// remoteMedium) and the summary (otherwise remote.on).
+	High, Medium bool
+	Text         msg.Text
 }
 
 // Guest logins and Remote Apple Events need someone at the keyboard or a
@@ -39,11 +43,24 @@ func remoteAccess(opts policy.RemoteAccess) func(context.Context) check.Result {
 		if err != nil {
 			return check.Errored(err)
 		}
-		return evalRemoteAccess(svcs, notes, opts.Allow)
+		var installed []string
+		if opts.ThirdParty {
+			if raw, err := remoteToolsOS(ctx); err == nil {
+				t, inst, n := remoteTools(raw)
+				svcs, notes, installed = append(svcs, t...), append(notes, n...), inst
+			}
+		}
+		return evalRemoteAccessAll(svcs, notes, opts.Allow, installed)
 	}
 }
 
 func evalRemoteAccess(svcs []remoteService, notes msg.Text, allow []string) check.Result {
+	return evalRemoteAccessAll(svcs, notes, allow, nil)
+}
+
+// evalRemoteAccessAll also lists, in the evidence, the remote-control apps
+// that are only installed.
+func evalRemoteAccessAll(svcs []remoteService, notes msg.Text, allow, installedOnly []string) check.Result {
 	var p issueList
 	var evidence, off, allowed []string
 	for _, s := range svcs {
@@ -61,8 +78,16 @@ func evalRemoteAccess(svcs []remoteService, notes msg.Text, allow []string) chec
 			continue
 		}
 		evidence = append(evidence, line)
-		p.add(!slices.Contains(remoteMedium, s.ID), msg.Of("remote.on", "service", s.Name), s.Fix)
+		high, text := !slices.Contains(remoteMedium, s.ID), msg.Of("remote.on", "service", s.Name)
+		if s.High || s.Medium {
+			high = s.High
+		}
+		if s.Text != nil {
+			text = s.Text
+		}
+		p.add(high, text, s.Fix)
 	}
+	evidence = append(evidence, installedOnly...)
 	if len(allowed) > 0 {
 		notes = append(msg.Of("remote.allowed", "services", strings.Join(allowed, ", ")), notes...)
 	}

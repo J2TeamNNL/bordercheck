@@ -30,12 +30,12 @@ Companies can install it on every laptop, and each one then reports to the IT te
 | `firewall` | macOS Application Firewall and stealth mode; Windows Firewall on every profile; on both, an outbound firewall (LuLu on macOS, simplewall on Windows, suggested if missing); ufw, firewalld or nftables/iptables on Linux (live rules need `sudo`) |
 | `disk-encryption` | FileVault, BitLocker, LUKS/dm-crypt or ZFS encryption |
 | `listeners` | Ports reachable beyond localhost |
-| `tailscale` | "Allow incoming connections" is off (shields up) |
+| `mesh-vpn` | Private networks (Tailscale, ZeroTier, NetBird, WireGuard, Nebula, Hamachi) do not let their other members in: Tailscale shields up, NetBird "Block inbound connections", no inbound rules in Nebula; ZeroTier, WireGuard and Hamachi have no such switch, so a connected one is a warning |
 | `docker` | Containers with ports on 0.0.0.0, host network, privileged, or mounts of `/`, home, credential folders or the Docker socket |
 | `secrets` | Keys in shell files and history, `.env` files, private key files and a dozen credential stores (`~/.aws`, Docker, kubeconfig, `.netrc`, gcloud…) |
 | `os-updates` | OS version against your minimum, automatic updates on, nothing left waiting; Chrome, Edge, Firefox, Brave not stale |
 | `screen-lock` | A password after sleep, and the screen locks soon enough (Linux: GNOME and KDE only) |
-| `remote-access` | SSH server, screen sharing, remote management, RDP and WinRM are off (a guest account is accepted unless the policy says otherwise) |
+| `remote-access` | SSH server, screen sharing, remote management, RDP and WinRM are off (a guest account is accepted unless the policy says otherwise); remote-control apps (TeamViewer, AnyDesk, RustDesk, Chrome Remote Desktop, Splashtop, ScreenConnect, VNC servers) not running or starting by themselves, and not open to unattended access |
 | `ssh-keys` | Private keys without a passphrase or readable by others; who can log in through `authorized_keys` |
 | `tunnels` | ngrok, cloudflared, `tailscale funnel`/`serve`, VS Code tunnels, `ssh -R` and others |
 | `ai-agents` | Plain-text tokens in MCP and agent configs, and settings that skip approvals or the sandbox |
@@ -61,7 +61,7 @@ and run it:
 ```sh
 bordercheck                    # check and print a report
 bordercheck -json              # the same report as JSON
-bordercheck -only secrets,tailscale
+bordercheck -only secrets,mesh-vpn
 bordercheck -list
 ```
 
@@ -95,7 +95,7 @@ Above: the invite an employee opens, and the report page a person sees for their
 A policy only needs what it changes:
 
 ```json
-{ "checks": { "listeners": { "on_problem": "fail" }, "tailscale": { "enabled": false } } }
+{ "checks": { "listeners": { "on_problem": "fail" }, "mesh-vpn": { "enabled": false } } }
 ```
 
 ## Privacy and security

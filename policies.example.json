@@ -67,7 +67,9 @@
         "Spotify"
       ]
     },
-    "tailscale": {},
+    "mesh-vpn": {
+      "allow": []
+    },
     "docker": {
       "allow_containers": [],
       "allow_mounts": []
@@ -149,7 +151,8 @@
     "remote-access": {
       "allow": [
         "guest"
-      ]
+      ],
+      "third_party": true
     },
     "ai-agents": {
       "tokens": true,

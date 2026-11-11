@@ -3,6 +3,7 @@ package policy
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -45,8 +46,10 @@ func normHost(h string) string {
 	return strings.TrimSuffix(h, ".local") // macOS reports "name" or "name.local"
 }
 
-func (w Waiver) matches(id string, who Identity) bool {
-	return w.Check == id &&
+// matches: a waiver for a check's old ID (check.Result.Aliases) applies too,
+// so a "tailscale" waiver keeps covering Tailscale's finding in mesh-vpn.
+func (w Waiver) matches(r check.Result, who Identity) bool {
+	return (w.Check == r.ID || slices.Contains(r.Aliases, w.Check)) &&
 		(w.Email == "" || strings.EqualFold(w.Email, who.Email)) &&
 		(w.InstallID == "" || w.InstallID == who.InstallID) &&
 		(w.Hostname == "" || (who.Hostname != "" && normHost(w.Hostname) == normHost(who.Hostname)))
@@ -67,7 +70,7 @@ func (p Policy) Waive(results []check.Result, who Identity, at time.Time) []chec
 		var active, ended *Waiver
 		for j := range p.Waivers {
 			w := &p.Waivers[j]
-			if !w.matches(r.ID, who) {
+			if !w.matches(r, who) {
 				continue
 			}
 			if w.Until >= today { // YYYY-MM-DD compares as text
@@ -95,7 +98,7 @@ func (p Policy) ActiveWaivers(who Identity, at time.Time) []Waiver {
 	today := at.Format(DateFormat)
 	var out []Waiver
 	for _, w := range p.Waivers {
-		if w.matches(w.Check, who) && w.Until >= today {
+		if w.matches(check.Result{ID: w.Check}, who) && w.Until >= today {
 			out = append(out, w)
 		}
 	}

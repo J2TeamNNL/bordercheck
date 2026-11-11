@@ -26,7 +26,7 @@ const (
 	testToken     = "tok_9f8e7d6c5b4a39281706f5e4d3c2b1a0"
 	testInstallID = "0123456789abcdef0123456789abcdef"
 	allChecksOff  = `"checks": {"firewall": {"enabled": false}, "disk-encryption": {"enabled": false},
-  "listeners": {"enabled": false}, "tailscale": {"enabled": false}, "docker": {"enabled": false},
+  "listeners": {"enabled": false}, "tailscale": {"enabled": false}, "mesh-vpn": {"enabled": false}, "docker": {"enabled": false},
   "secrets": {"enabled": false}, "ssh-keys": {"enabled": false}, "tunnels": {"enabled": false},
   "ai-agents": {"enabled": false}, "os-updates": {"enabled": false}, "screen-lock": {"enabled": false},
   "remote-access": {"enabled": false}}`

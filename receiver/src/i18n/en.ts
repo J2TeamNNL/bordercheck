@@ -446,6 +446,7 @@ export const en = {
   "checkTitle.disk-encryption": "Disk is encrypted",
   "checkTitle.listeners": "Nothing listens beyond localhost",
   "checkTitle.tailscale": "Tailscale blocks incoming connections",
+  "checkTitle.mesh-vpn": "Private networks block incoming connections",
   "checkTitle.docker": "Docker containers stay isolated",
   "checkTitle.secrets": "No plain-text secrets",
   "checkTitle.os-updates": "OS and browsers are up to date",

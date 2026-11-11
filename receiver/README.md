@@ -82,7 +82,7 @@ and an end within a year; no report token in `report.headers`. It does not check
 invalid, so try a role locally first: `bordercheck -policy role.json -print-policy`.
 
 Waivable checks are the ones bordercheck's policy knows (`firewall`, `disk-encryption`, `listeners`,
-`tailscale`, `docker`, `secrets`, `ssh-keys`, `tunnels`, `ai-agents`, `os-updates`, `screen-lock`,
+`mesh-vpn`, `tailscale` (its former name, still accepted), `docker`, `secrets`, `ssh-keys`, `tunnels`, `ai-agents`, `os-updates`, `screen-lock`,
 `remote-access`). An unknown check ID would make bordercheck reject the whole policy, so the portal offers only
 these; a check added to bordercheck later needs this list updated (`POLICY_CHECKS` in `src/roles.ts`).
 

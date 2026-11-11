@@ -24,6 +24,7 @@ export const POLICY_CHECKS = [
   "admin-rights", "os-protections", "sharing",
   "extensions", "browser-passwords", "trust-store",
   "package-managers", "startup-items", "backup",
+  "mesh-vpn", // took over "tailscale" (kept: policies for older clients still set it)
 ];
 
 // The checks whose findings the person at the machine may mark as not

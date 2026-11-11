@@ -66,6 +66,11 @@ type Result struct {
 	// a few findings set it, where the finding is made (see Indicator); a
 	// result that is not a fail never carries it into a report.
 	Compromise []Indicator `json:"compromise,omitempty"`
+	// Aliases are older check IDs the same finding was reported under, e.g.
+	// "tailscale" for a mesh-vpn result whose only finding is Tailscale's.
+	// Waivers and remembered notifications written for an old ID still apply.
+	// Kept in memory only.
+	Aliases []string `json:"-"`
 }
 
 // Indicator is one sign of compromise: what was found, as a message part so

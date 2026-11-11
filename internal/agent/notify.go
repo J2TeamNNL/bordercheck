@@ -92,7 +92,7 @@ func notifyUser(ctx context.Context, env Env, n policy.Notify, results []check.R
 	// there before. A reminder of one already announced just notifies: a
 	// browser tab every day would teach people to ignore it.
 	newHigh := high && slices.ContainsFunc(due, func(r check.Result) bool {
-		_, announced := seen[notify.Key(r)]
+		_, announced := notify.Seen(seen, r)
 		return r.Severity == check.High && !announced
 	})
 	opened := false

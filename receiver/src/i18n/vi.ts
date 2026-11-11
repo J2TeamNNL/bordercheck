@@ -420,6 +420,7 @@ export const vi: Catalog = {
   "checkTitle.disk-encryption": "Ổ đĩa được mã hoá",
   "checkTitle.listeners": "Không có cổng nào mở ra ngoài máy này",
   "checkTitle.tailscale": "Tailscale chặn kết nối đến",
+  "checkTitle.mesh-vpn": "Mạng riêng chặn kết nối đến",
   "checkTitle.docker": "Container Docker được cô lập",
   "checkTitle.secrets": "Không có secret dạng văn bản thuần",
   "checkTitle.os-updates": "Hệ điều hành và trình duyệt được cập nhật",

@@ -103,7 +103,7 @@ export const checksVi: CheckCatalog = {
 
   "tailscale.notInstalled": "Chưa cài Tailscale.",
   "tailscale.denied":
-    "Trên máy này chỉ root hoặc operator của Tailscale mới đọc được thiết lập của Tailscale. Chạy [code]sudo tailscale set --operator=$USER[/code] một lần, hoặc [code]sudo bordercheck -only tailscale[/code]. ({err})",
+    "Trên máy này chỉ root hoặc operator của Tailscale mới đọc được thiết lập của Tailscale. Chạy [code]sudo tailscale set --operator=$USER[/code] một lần, hoặc [code]sudo bordercheck -only mesh-vpn[/code]. ({err})",
   "tailscale.unreadable": "Không đọc được thiết lập của Tailscale; Tailscale có đang chạy không? ({err})",
   "tailscale.badPrefs": "kết quả không như mong đợi từ `tailscale debug prefs`",
   "tailscale.shieldsUp": "Shields up: các thiết bị khác trong tailnet không mở được kết nối tới máy này.",
@@ -111,6 +111,25 @@ export const checksVi: CheckCatalog = {
     "Tailscale đang nhận kết nối đến. Lưu lượng Tailscale có thể đi vòng qua tường lửa của hệ điều hành, nên mọi thiết bị trong tailnet, kể cả thiết bị đã bị chiếm quyền, đều truy cập được mọi cổng máy này đang lắng nghe.",
   "tailscale.open.fix":
     "Mở Tailscale → Settings rồi bỏ chọn \"Allow incoming connections\". Hoặc chạy: [code]tailscale set --shields-up[/code]. Quản trị viên: nên giới hạn thêm thiết bị nào được kết nối tới thiết bị nào bằng ACL của tailnet.",
+
+  "mesh.none": "Không tìm thấy phần mềm mạng riêng (mesh VPN) nào.",
+  "mesh.notConnected": "{tool} đã được cài nhưng chưa kết nối.",
+  "mesh.blocked": "{tool} đang kết nối và chặn kết nối đến.",
+  "mesh.open":
+    "{tool} đang kết nối và không chặn kết nối đến: các thành viên khác trong mạng riêng của nó truy cập được mọi cổng máy này đang lắng nghe, trừ khi tường lửa của máy chặn lại.",
+  "mesh.connUnknown": "{tool} đang chạy; không đọc được nó đã tham gia những mạng nào nếu không có quyền admin.",
+  "mesh.inboundUnknown": "{tool} đang kết nối; không đọc được nó có chặn kết nối đến hay không nếu không có quyền admin.",
+  "mesh.allowed": "Được policy cho phép nhận kết nối đến: {tools}.",
+  "mesh.fix.zerotier":
+    "ZeroTier không tự từ chối kết nối đến ngay trên máy được: hãy rời các mạng không cần ([code]sudo zerotier-cli leave[/code] kèm network ID), bảo đảm tường lửa của máy cũng lọc cả giao diện mạng của ZeroTier, và nhờ quản trị viên của mạng giới hạn lưu lượng bằng flow rules.",
+  "mesh.fix.netbird":
+    "Bật \"Block inbound connections\" của NetBird: [code]netbird up --block-inbound[/code]. Hoặc ngắt kết nối ([code]netbird down[/code]) khi không cần dùng.",
+  "mesh.fix.wireguard":
+    "WireGuard không tự từ chối kết nối đến được: hãy tắt các tunnel không cần, và bảo đảm tường lửa của máy cũng lọc cả giao diện mạng của tunnel.",
+  "mesh.fix.nebula":
+    "Xoá các rule trong firewall.inbound ở file cấu hình của Nebula mà máy này không cần; khi không còn rule nào, Nebula không cho kết nối nào vào.",
+  "mesh.fix.hamachi":
+    "Hamachi không từ chối kết nối đến được: hãy rời các mạng không cần, chuyển Hamachi sang offline khi không dùng, hoặc gỡ cài đặt nó.",
 
   "docker.notInstalled": "Chưa cài Docker.",
   "docker.noPermission": "Docker đã được cài nhưng người dùng này không có quyền dùng (không thuộc nhóm docker), nên chưa kiểm tra được container.",
@@ -243,6 +262,16 @@ export const checksVi: CheckCatalog = {
     "GNOME: mở Settings → System → Remote Desktop rồi tắt Desktop Sharing và Remote Login. xrdp: [code]sudo systemctl disable --now xrdp[/code].",
   "remote.fix.linuxVNC": "Tắt chia sẻ màn hình (GNOME: Settings → Sharing; KDE: Krfb) và dừng các VNC server như x11vnc hay TigerVNC.",
   "remote.fix.linuxGuest": "Đặt [code]allow-guest=false[/code] trong mục [Seat:*] của /etc/lightdm/lightdm.conf.",
+  "remote.tool.running":
+    "{tool} đang chạy hoặc tự khởi động, nên ai có ID và mật khẩu của nó, hoặc tài khoản được liên kết với nó, đều điều khiển được máy này từ xa.",
+  "remote.tool.unattended":
+    "{tool} cho phép kết nối mà không cần ai ở máy này đồng ý: ai có mật khẩu truy cập không giám sát (unattended access) của nó, hoặc tài khoản được liên kết với nó, đều điều khiển được máy này.",
+  "remote.tool.unattendedUnknown":
+    "Không xác định được {tool} có cho phép truy cập không giám sát (mật khẩu cố định hoặc tài khoản được gán) hay không.",
+  "remote.fix.tool":
+    "{tool}: nếu không cần, hãy thoát và gỡ cài đặt. Nếu cần, hãy tắt truy cập không giám sát (mật khẩu cố định) và tuỳ chọn khởi động cùng hệ thống, và chỉ mở nó khi có người ngồi ở máy.",
+  "remote.fix.crd":
+    "Chrome Remote Desktop: nếu không ai cần truy cập máy này khi không có người ở máy, hãy xoá máy khỏi remotedesktop.google.com/access, hoặc gỡ Chrome Remote Desktop Host.",
 
   "sshkeys.pass":
     "Đã kiểm tra {n} private key: tất cả đều có passphrase và chỉ chủ sở hữu đọc được; không có authorized_keys.",

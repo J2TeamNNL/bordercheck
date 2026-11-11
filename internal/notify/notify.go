@@ -32,6 +32,23 @@ func Key(r check.Result) string {
 	return k
 }
 
+// Seen looks a problem up in seen by its Key, or by the Key it had under an
+// older check ID (check.Result.Aliases), so that a machine upgrading across a
+// renamed check is not told about the same problem again.
+func Seen(seen map[string]time.Time, r check.Result) (time.Time, bool) {
+	if t, ok := seen[Key(r)]; ok {
+		return t, true
+	}
+	for _, a := range r.Aliases {
+		old := r
+		old.ID = a
+		if t, ok := seen[Key(old)]; ok {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
 // Plan decides what to announce. seen maps the Key of each problem announced
 // earlier, and still present in the previous run, to when it was last
 // announced. A problem is due when it is new or was last announced at least
@@ -45,7 +62,7 @@ func Plan(results []check.Result, n policy.Notify, seen map[string]time.Time, no
 			continue
 		}
 		k := Key(r)
-		last, ok := seen[k]
+		last, ok := Seen(seen, r)
 		if !ok || (n.Remind() > 0 && now.Sub(last) >= n.Remind()) {
 			due = append(due, r)
 			last = now

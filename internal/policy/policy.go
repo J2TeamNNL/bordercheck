@@ -98,12 +98,15 @@ type Checks struct {
 	Firewall       Firewall  `json:"firewall"`
 	DiskEncryption Common    `json:"disk-encryption"`
 	Listeners      Listeners `json:"listeners"`
-	Tailscale      Common    `json:"tailscale"`
-	Docker         Docker    `json:"docker"`
-	Secrets        Secrets   `json:"secrets"`
-	SSHKeys        SSHKeys   `json:"ssh-keys"`
-	Tunnels        Tunnels   `json:"tunnels"`
-	AIAgents       AIAgents  `json:"ai-agents"`
+	// Tailscale is where Tailscale's rule was before MeshVPN took it over. It
+	// is still accepted (see MeshVPN) and printed only when a policy sets it.
+	Tailscale *Common  `json:"tailscale,omitempty"`
+	MeshVPN   MeshVPN  `json:"mesh-vpn"`
+	Docker    Docker   `json:"docker"`
+	Secrets   Secrets  `json:"secrets"`
+	SSHKeys   SSHKeys  `json:"ssh-keys"`
+	Tunnels   Tunnels  `json:"tunnels"`
+	AIAgents  AIAgents `json:"ai-agents"`
 
 	CrackedSoftware CrackedSoftware `json:"cracked-software"`
 
@@ -289,11 +292,53 @@ type ScreenLock struct {
 }
 
 // RemoteAccessServices are the names RemoteAccess.Allow accepts.
-var RemoteAccessServices = []string{"ssh", "screen-sharing", "remote-management", "remote-apple-events", "rdp", "winrm", "guest"}
+var RemoteAccessServices = append([]string{"ssh", "screen-sharing", "remote-management", "remote-apple-events", "rdp", "winrm", "guest"},
+	RemoteControlTools...)
+
+// RemoteControlTools are the remote-control apps of other vendors that
+// remote-access recognises, by their names in RemoteAccess.Allow.
+var RemoteControlTools = []string{"teamviewer", "anydesk", "rustdesk", "chrome-remote-desktop", "splashtop", "screenconnect", "vnc"}
 
 type RemoteAccess struct {
 	Common
 	Allow []string `json:"allow"` // services from RemoteAccessServices that may be on
+	// ThirdParty also looks for remote-control apps of other vendors
+	// (RemoteControlTools): TeamViewer, AnyDesk and the like.
+	ThirdParty bool `json:"third_party"`
+}
+
+// MeshVPNTools are the names MeshVPN.Allow accepts.
+var MeshVPNTools = []string{"tailscale", "zerotier", "netbird", "wireguard", "nebula", "hamachi"}
+
+// MeshVPN judges private networks (mesh VPNs) whose other members can open
+// connections to this machine. It took over the "tailscale" check of v0.4 and
+// earlier, and a policy's checks.tailscale is still accepted. There, for
+// Tailscale only: enabled false = Tailscale is not judged; on_problem = the
+// status when Tailscale is the only tool with a finding, unless mesh-vpn sets
+// its own on_problem, which wins.
+type MeshVPN struct {
+	Common
+	Allow []string `json:"allow"` // tools from MeshVPNTools that may accept incoming connections
+}
+
+// TailscaleCommon is checks.tailscale, empty when the policy does not set it.
+func (c Checks) TailscaleCommon() Common {
+	if c.Tailscale == nil {
+		return Common{}
+	}
+	return *c.Tailscale
+}
+
+// TailscaleJudged reports whether mesh-vpn judges Tailscale.
+func (c Checks) TailscaleJudged() bool { return c.TailscaleCommon().IsEnabled() }
+
+// TailscaleOnProblem is checks.tailscale.on_problem, which mesh-vpn applies
+// when Tailscale is its only finding and mesh-vpn has no on_problem of its own.
+func (c Checks) TailscaleOnProblem() check.Status {
+	if c.Tailscale == nil || c.MeshVPN.OnProblem != "" {
+		return ""
+	}
+	return c.Tailscale.OnProblem
 }
 
 // AdminRights judges how much power the daily account has.
@@ -390,7 +435,8 @@ func Default() Policy {
 			ScreenLock: ScreenLock{RequirePassword: ptr(true), MaxLockMinutes: 10},
 			// A guest account is accepted unless a policy says otherwise: on macOS it
 			// is a sandboxed, throw-away session.
-			RemoteAccess: RemoteAccess{Allow: []string{"guest"}},
+			RemoteAccess: RemoteAccess{Allow: []string{"guest"}, ThirdParty: true},
+			MeshVPN:      MeshVPN{Allow: []string{}},
 			SSHKeys: SSHKeys{NoPassphrase: true, LoosePermissions: true, AuthorizedKeys: true, AllowKeys: []string{}, ClientConfig: true,
 				UserIgnore: true},
 			Tunnels: Tunnels{Processes: true, TailscaleFunnel: true, TailscaleServe: true, Allow: []string{},
@@ -518,7 +564,7 @@ func (p Policy) validate() error {
 	c := p.Checks
 	for id, on := range map[string]check.Status{
 		"firewall": c.Firewall.OnProblem, "disk-encryption": c.DiskEncryption.OnProblem,
-		"listeners": c.Listeners.OnProblem, "tailscale": c.Tailscale.OnProblem,
+		"listeners": c.Listeners.OnProblem, "tailscale": c.TailscaleCommon().OnProblem, "mesh-vpn": c.MeshVPN.OnProblem,
 		"docker": c.Docker.OnProblem, "secrets": c.Secrets.OnProblem,
 		"os-updates": c.OSUpdates.OnProblem, "screen-lock": c.ScreenLock.OnProblem, "remote-access": c.RemoteAccess.OnProblem,
 		"ssh-keys": c.SSHKeys.OnProblem, "tunnels": c.Tunnels.OnProblem, "ai-agents": c.AIAgents.OnProblem,
@@ -529,6 +575,11 @@ func (p Policy) validate() error {
 	} {
 		if on != "" && on != check.Fail && on != check.Warn {
 			return fmt.Errorf("checks.%s.on_problem must be \"fail\" or \"warn\", not %q", id, on)
+		}
+	}
+	for _, t := range c.MeshVPN.Allow {
+		if !slices.Contains(MeshVPNTools, t) {
+			return fmt.Errorf("checks.mesh-vpn.allow: unknown tool %q (known: %s)", t, strings.Join(MeshVPNTools, ", "))
 		}
 	}
 	for _, r := range c.Listeners.Allow {

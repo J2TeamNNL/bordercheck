@@ -104,7 +104,7 @@ export const checksZh: CheckCatalog = {
 
   "tailscale.notInstalled": "未安装 Tailscale。",
   "tailscale.denied":
-    "在这台电脑上只有 root 或 Tailscale operator 才能读取 Tailscale 的设置。运行一次 [code]sudo tailscale set --operator=$USER[/code]，或运行 [code]sudo bordercheck -only tailscale[/code]。（{err}）",
+    "在这台电脑上只有 root 或 Tailscale operator 才能读取 Tailscale 的设置。运行一次 [code]sudo tailscale set --operator=$USER[/code]，或运行 [code]sudo bordercheck -only mesh-vpn[/code]。（{err}）",
   "tailscale.unreadable": "无法读取 Tailscale 设置；Tailscale 是否正在运行？（{err}）",
   "tailscale.badPrefs": "`tailscale debug prefs` 的输出不符合预期",
   "tailscale.shieldsUp": "Shields up：tailnet 中的其他设备无法主动连接到这台电脑。",
@@ -112,6 +112,23 @@ export const checksZh: CheckCatalog = {
     "Tailscale 接受传入连接。Tailscale 流量可能绕过系统防火墙，因此 tailnet 中的任何设备（包括已被入侵的设备）都能访问这台电脑监听的所有端口。",
   "tailscale.open.fix":
     "在 Tailscale → Settings 中取消勾选“Allow incoming connections”。或运行：[code]tailscale set --shields-up[/code]。管理员：还应使用 tailnet ACL 限制设备之间的访问。",
+
+  "mesh.none": "未发现私有网络（mesh VPN）软件。",
+  "mesh.notConnected": "{tool} 已安装，但未连接。",
+  "mesh.blocked": "{tool} 已连接，并阻止传入连接。",
+  "mesh.open":
+    "{tool} 已连接，但不阻止传入连接：其私有网络中的其他成员可以访问这台电脑监听的所有端口，除非电脑的防火墙将其拦下。",
+  "mesh.connUnknown": "{tool} 正在运行；没有管理员权限无法读取它加入了哪些网络。",
+  "mesh.inboundUnknown": "{tool} 已连接；没有管理员权限无法读取它是否阻止传入连接。",
+  "mesh.allowed": "策略允许接受传入连接：{tools}。",
+  "mesh.fix.zerotier":
+    "ZeroTier 无法在电脑本身拒绝传入连接：退出不需要的网络（[code]sudo zerotier-cli leave[/code] 加上网络 ID），确保电脑的防火墙也过滤 ZeroTier 网络接口，并请网络管理员用 flow rules 限制流量。",
+  "mesh.fix.netbird":
+    "开启 NetBird 的“Block inbound connections”：[code]netbird up --block-inbound[/code]。或在不需要时断开连接（[code]netbird down[/code]）。",
+  "mesh.fix.wireguard":
+    "WireGuard 本身无法拒绝传入连接：停用不需要的隧道，并确保电脑的防火墙也过滤该隧道的网络接口。",
+  "mesh.fix.nebula": "删除 Nebula 配置中 firewall.inbound 下这台电脑不需要的规则；没有任何规则时，Nebula 不放行任何连接。",
+  "mesh.fix.hamachi": "Hamachi 无法拒绝传入连接：退出不需要的网络，不用时让 Hamachi 离线，或将其卸载。",
 
   "docker.notInstalled": "未安装 Docker。",
   "docker.noPermission": "已安装 Docker，但当前用户无权使用（不在 docker 组中），因此未检查其容器。",
@@ -244,6 +261,14 @@ export const checksZh: CheckCatalog = {
     "GNOME：前往 设置 → 系统 → 远程桌面（Settings → System → Remote Desktop），关闭“桌面共享”和“远程登录”（Desktop Sharing、Remote Login）。xrdp：[code]sudo systemctl disable --now xrdp[/code]。",
   "remote.fix.linuxVNC": "关闭屏幕共享（GNOME：设置 → 共享（Settings → Sharing）；KDE：Krfb），并停止 x11vnc、TigerVNC 等 VNC 服务器。",
   "remote.fix.linuxGuest": "在 /etc/lightdm/lightdm.conf 的 [Seat:*] 下设置 [code]allow-guest=false[/code]。",
+  "remote.tool.running": "{tool} 正在运行或会自行启动，因此任何掌握其 ID 和密码、或其所关联账户的人，都能通过它远程控制这台电脑。",
+  "remote.tool.unattended":
+    "{tool} 允许在电脑前无人确认的情况下连接：任何掌握其无人值守访问（unattended access）密码、或其所关联账户的人，都能控制这台电脑。",
+  "remote.tool.unattendedUnknown": "无法确定 {tool} 是否允许无人值守访问（固定密码或已分配的账户）。",
+  "remote.fix.tool":
+    "{tool}：如果不需要，请退出并卸载。否则请关闭其无人值守访问（固定密码）和随系统启动选项，并且只在有人守在电脑前时打开它。",
+  "remote.fix.crd":
+    "Chrome Remote Desktop：如果无需在无人值守时访问这台电脑，请在 remotedesktop.google.com/access 上移除它，或卸载 Chrome Remote Desktop Host。",
 
   "sshkeys.pass": "已检查 {n} 个私钥：全部设有密码短语且仅本人可读；没有 authorized_keys。",
   "sshkeys.hardware": "{n} 个硬件密钥需要配合对应的硬件令牌才能使用，无需处理。",

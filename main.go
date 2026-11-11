@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -179,9 +180,17 @@ func runCheck(args []string) int {
 		}
 		selected = nil
 		for _, id := range strings.Split(*only, ",") {
-			c, ok := byID[strings.TrimSpace(id)]
+			id = strings.TrimSpace(id)
+			if id == "tailscale" { // up to v0.4 Tailscale had a check of its own
+				fmt.Fprintln(os.Stderr, "bordercheck: the tailscale check is now part of mesh-vpn; running mesh-vpn")
+				id = "mesh-vpn"
+			}
+			c, ok := byID[id]
 			if !ok {
 				return fail(fmt.Errorf("unknown or disabled check %q (see -list)", id))
+			}
+			if slices.ContainsFunc(selected, func(s check.Check) bool { return s.ID == c.ID }) {
+				continue
 			}
 			selected = append(selected, c)
 		}

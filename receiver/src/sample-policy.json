@@ -24,7 +24,7 @@
       "on_problem": "warn",
       "allow": [{ "process": "rapportd" }]
     },
-    "tailscale": {},
+    "mesh-vpn": { "allow": [] },
     "docker": { "allow_containers": [], "allow_mounts": [] },
     "secrets": {
       "production_keywords": ["prod", "production", "live"],
@@ -59,7 +59,7 @@
       "max_browser_age_days": 60
     },
     "screen-lock": { "require_password": true, "max_lock_minutes": 10 },
-    "remote-access": { "allow": ["guest"] },
+    "remote-access": { "allow": ["guest"], "third_party": true },
     "admin-rights": { "allow_admin": false },
     "os-protections": { "sip": true, "gatekeeper": true, "antivirus": true, "smartscreen": true, "secure_boot": true, "lsm": true },
     "sharing": { "allow": [] },

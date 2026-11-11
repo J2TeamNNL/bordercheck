@@ -128,7 +128,7 @@ var Catalog = map[string]Entry{
 	// ---- tailscale ----
 	"tailscale.notInstalled": s("Tailscale is not installed."),
 	"tailscale.denied": s("Only root or the Tailscale operator may read Tailscale's settings here. Run " +
-		"[code]sudo tailscale set --operator=$USER[/code] once, or [code]sudo bordercheck -only tailscale[/code]. ({err})"),
+		"[code]sudo tailscale set --operator=$USER[/code] once, or [code]sudo bordercheck -only mesh-vpn[/code]. ({err})"),
 	"tailscale.unreadable": s("Could not read Tailscale settings; is Tailscale running? ({err})"),
 	"tailscale.badPrefs":   s("unexpected output from `tailscale debug prefs`"),
 	"tailscale.shieldsUp":  s("Shields up: other devices on the tailnet cannot open connections to this machine."),
@@ -136,6 +136,27 @@ var Catalog = map[string]Entry{
 		"device on the tailnet, including a hacked one, can reach every port this machine listens on."),
 	"tailscale.open.fix": s("Tailscale → Settings → untick \"Allow incoming connections\". " +
 		"Or: [code]tailscale set --shields-up[/code]. Admins: also limit who can reach whom with tailnet ACLs."),
+
+	// ---- mesh-vpn (Tailscale's messages are the tailscale.* ones above) ----
+	"mesh.none":         s("No private-network (mesh VPN) software was found."),
+	"mesh.notConnected": s("{tool} is installed but not connected."),
+	"mesh.blocked":      s("{tool} is connected and blocks incoming connections."),
+	"mesh.open": s("{tool} is connected and does not block incoming connections: other members of its private network " +
+		"can reach every port this computer listens on, unless the computer's firewall stops them."),
+	"mesh.connUnknown":    s("{tool} is running; which networks it has joined could not be read without admin rights."),
+	"mesh.inboundUnknown": s("{tool} is connected; whether it blocks incoming connections could not be read without admin rights."),
+	"mesh.allowed":        s("Allowed by policy to accept incoming connections: {tools}."),
+	"mesh.fix.zerotier": s("ZeroTier cannot refuse incoming connections on the computer itself: leave networks you do not need " +
+		"([code]sudo zerotier-cli leave[/code] with the network ID), make sure the computer's firewall also filters the ZeroTier " +
+		"interface, and ask the network's admin to limit traffic with flow rules."),
+	"mesh.fix.netbird": s("Turn on NetBird's \"Block inbound connections\": [code]netbird up --block-inbound[/code]. Or disconnect " +
+		"([code]netbird down[/code]) when you do not need it."),
+	"mesh.fix.wireguard": s("WireGuard cannot refuse incoming connections itself: deactivate tunnels you do not need, and make " +
+		"sure the computer's firewall also filters the tunnel's interface."),
+	"mesh.fix.nebula": s("Remove the rules under firewall.inbound in Nebula's config that this computer does not need; " +
+		"with none, Nebula lets no connection in."),
+	"mesh.fix.hamachi": s("Hamachi cannot refuse incoming connections: leave the networks you do not need, go offline in " +
+		"Hamachi when you are not using it, or uninstall it."),
 
 	// ---- docker ----
 	"docker.notInstalled": s("Docker is not installed."),
@@ -286,6 +307,16 @@ var Catalog = map[string]Entry{
 		"xrdp: [code]sudo systemctl disable --now xrdp[/code]."),
 	"remote.fix.linuxVNC": s("Turn off screen sharing (GNOME: Settings → Sharing; KDE: Krfb) and stop VNC servers " +
 		"such as x11vnc or TigerVNC."),
+	"remote.tool.running": s("{tool} is running or starts by itself, so this computer can be controlled remotely through it " +
+		"by whoever has its ID and password, or the account it is linked to."),
+	"remote.tool.unattended": s("{tool} lets people connect without anyone at this computer approving: whoever has its " +
+		"unattended-access password, or the account it is linked to, controls this computer."),
+	"remote.tool.unattendedUnknown": s("Could not tell whether {tool} allows unattended access (a permanent password or " +
+		"an assigned account)."),
+	"remote.fix.tool": s("{tool}: if it is not needed, quit it and uninstall it. Otherwise turn off its unattended access " +
+		"(permanent password) and its option to start with the system, and open it only while someone is at the computer."),
+	"remote.fix.crd": s("Chrome Remote Desktop: if no one needs to reach this computer unattended, remove it on " +
+		"remotedesktop.google.com/access, or uninstall Chrome Remote Desktop Host."),
 	"remote.fix.linuxGuest": s("Set [code]allow-guest=false[/code] under [Seat:*] in /etc/lightdm/lightdm.conf."),
 
 	// ---- ssh-keys ----

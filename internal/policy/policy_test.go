@@ -23,7 +23,7 @@ func TestLoadMergesOverDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := p.Checks
-	if p.Name != "Acme" || c.Listeners.OnProblem != "fail" || c.Docker.IsEnabled() || !c.Tailscale.IsEnabled() {
+	if p.Name != "Acme" || c.Listeners.OnProblem != "fail" || c.Docker.IsEnabled() || !c.TailscaleJudged() {
 		t.Errorf("got %+v", p)
 	}
 	if c.Secrets.WalkDepth != 5 || !*c.Firewall.RequireStealth || len(c.Listeners.Allow) != 1 {

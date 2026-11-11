@@ -30,7 +30,7 @@ A small policy:
   "name": "Acme",
   "report": { "url": "https://bordercheck.acme.com/report", "email_domains": ["acme.com"] },
   "update": { "binary": true, "policy_url": "https://bordercheck.acme.com/policies.json" },
-  "checks": { "listeners": { "on_problem": "fail" }, "tailscale": { "enabled": false } }
+  "checks": { "listeners": { "on_problem": "fail" }, "mesh-vpn": { "enabled": false } }
 }
 ```
 
@@ -175,6 +175,9 @@ identity when this user has installed bordercheck (it reads `config.json` in the
 nothing), so what the person sees matches what IT sees. Without an install there is no email or install ID, so
 no waiver applies.
 
+A waiver for `tailscale` (the check before it became part of `mesh-vpn`) is still accepted, and applies to a
+`mesh-vpn` result whose only finding is Tailscale's; a finding of another tool there needs a `mesh-vpn` waiver.
+
 ## checks
 
 Every check takes two common fields:
@@ -234,9 +237,40 @@ also shows ports held by system services on macOS.
 
 Example: `"allow": [{"process": "rapportd"}, {"process": "ControlCenter", "port": "7000"}]` (AirPlay Receiver).
 
-### tailscale
+### mesh-vpn
 
-No options. Passes when Tailscale's "Allow incoming connections" is off (shields up); fails high when it is on.
+Private networks (mesh VPNs, overlay networks) put the laptop on a network whose other members can open
+connections to it, often past the OS firewall. For each tool that is installed:
+
+| Tool | Connected when | Blocks incoming connections when |
+|---|---|---|
+| Tailscale | (always judged, as the former `tailscale` check) | "Allow incoming connections" is off (shields up), from `tailscale debug prefs`. On: **fail, high**. |
+| ZeroTier | `zerotier-one` runs and has joined a network (`networks.d/*.conf`; on Linux a `zt…` interface, on Windows a "ZeroTier One" one) | Never: only the network's flow rules, set by its admin. |
+| NetBird | the `netbird service run` daemon runs (with the `wt0` interface on Linux) | "Block inbound connections" (`netbird up --block-inbound`, `BlockInbound` in `/etc/netbird/config.json` or `%ProgramData%\Netbird\config.json`). That file is usually readable by root only; then the check says it could not tell. |
+| WireGuard | a tunnel is up: Linux interfaces of type `wireguard` (other than NetBird's `wt0`), the macOS app's connected tunnels (`scutil --nc list`) and `wg-quick`'s, the Windows app's `WireGuardTunnel$…` services | Never: WireGuard has no such switch. |
+| Nebula | `nebula` runs | its config (`-config`, when readable) has no rules under `firewall.inbound`. |
+| Hamachi | `hamachid` or the `Hamachi2Svc` service runs, with its `ham0` / "Hamachi" interface | Never. |
+
+Connected and not blocking (or the tool cannot block): **warn, medium**, with the tool's own control or the
+host firewall as the fix. Installed but not connected: pass, with a word. Where the state cannot be read without
+admin rights, a note says so instead of guessing. Nothing installed: skipped. It only reads (process list,
+interfaces, the tools' state files) and runs no tool's command except `tailscale debug prefs`. Consumer VPNs
+(including Cloudflare WARP / 1.1.1.1) are outbound only and not judged; Twingate does not make the laptop
+reachable. Tailscale Funnel and Serve are judged by `tunnels`.
+
+| Field | Default | |
+|---|---|---|
+| `allow` | `[]` | Tools that may accept incoming connections: `tailscale`, `zerotier`, `netbird`, `wireguard`, `nebula`, `hamachi`. They are listed as allowed instead. |
+
+`mesh-vpn` and its fields need a client that knows them (bordercheck v0.5.0 or later): an older one rejects a policy that sets
+them, so roll the client out to every machine of a role before adding `mesh-vpn` to its policy.
+
+**`checks.tailscale`** (clients up to v0.4 had a separate `tailscale` check) is still accepted and applies to
+Tailscale only: `"enabled": false` leaves Tailscale out of `mesh-vpn` (the other tools are still judged unless
+`mesh-vpn` itself is off); `on_problem` sets the status when Tailscale is `mesh-vpn`'s only finding, unless
+`mesh-vpn` sets its own `on_problem`, which wins. `-print-policy` shows `tailscale` only when the policy sets it.
+`bordercheck -only tailscale` runs `mesh-vpn`. A policy for a mix of old and new clients can keep
+`"tailscale": {…}` and leave `mesh-vpn` out.
 
 ### docker
 
@@ -330,11 +364,37 @@ Never goes online.
 
 | Field | Default | |
 |---|---|---|
-| `allow` | `["guest"]` | Services that may be on: `ssh`, `screen-sharing`, `remote-management`, `remote-apple-events`, `rdp`, `winrm`, `guest`. A guest account is accepted by default; `"allow": []` reports it too. |
+| `allow` | `["guest"]` | Services that may be on: `ssh`, `screen-sharing`, `remote-management`, `remote-apple-events`, `rdp`, `winrm`, `guest`, and the remote-control apps `teamviewer`, `anydesk`, `rustdesk`, `chrome-remote-desktop`, `splashtop`, `screenconnect`, `vnc` (e.g. your organisation's official tool). A guest account is accepted by default; `"allow": []` reports it too. Allowed ones are listed as "on but allowed by policy". |
+| `third_party` | `true` | Also look for remote-control apps of other vendors (below). `false` judges the OS's own services only. |
 
 macOS: Remote Login (SSH), Screen Sharing, Remote Management, Remote Application Scripting, Guest User. Linux:
 SSH server, xrdp / GNOME Remote Desktop, VNC servers, LightDM guest session. Windows: Remote Desktop, WinRM,
 OpenSSH Server, Guest account. Never goes online.
+
+Remote-control apps: whoever has the app's ID and password, or takes over the vendor account it is linked to,
+controls the whole machine. Per app:
+
+- installed only (nothing running, nothing set to start): not a problem; the evidence lists it.
+- running, or set to start by itself (a LaunchAgent/LaunchDaemon that runs at load or is kept alive, not an
+  on-demand helper; a Windows service that runs or starts automatically; an enabled or active systemd unit):
+  **warn, medium**.
+- open to unattended access, where its files show it without admin rights: **fail, high**. AnyDesk: a password
+  on a permission profile (`ad.security.permission_profiles.<profile>.pwd`, AnyDesk 7+) or the older
+  `ad.anynet.pwd_hash`, in `system.conf`/`service.conf` (`/etc/anydesk`, `~/.anydesk`, `%ProgramData%\AnyDesk`,
+  `%AppData%\AnyDesk`); only whether the value is empty is looked at. Chrome Remote Desktop: remote access turned
+  on (`/Library/PrivilegedHelperTools/org.chromium.chromoting.me2me_enabled` on macOS,
+  `~/.config/chrome-remote-desktop/host#….json` on Linux).
+
+TeamViewer (permanent password, Easy Access), RustDesk and Splashtop keep their unattended settings where they
+cannot be read reliably; a running copy gets a "could not tell" note. Apps recognised: TeamViewer, AnyDesk,
+RustDesk, Chrome Remote Desktop (host), Splashtop Streamer (Windows and macOS), ConnectWise ScreenConnect access
+agents, VNC servers (RealVNC, TigerVNC, TightVNC, UltraVNC, x11vnc). Viewers (VNC Viewer, Microsoft Remote
+Desktop / Windows App) are not judged. Not recognised yet: Parsec, LogMeIn, NoMachine, Zoho Assist, GoToMyPC,
+Jump Desktop Connect. Helpers registered through macOS's Background Task Management (`SMAppService`) are only
+seen while they run. None of this counts as a sign of compromise: it is an open door.
+
+`third_party` and the app names in `allow` need a client that knows them (bordercheck v0.5.0 or later); an older client
+rejects a policy that sets them, so update every machine of a role first.
 
 ### ssh-keys
 
@@ -654,10 +714,10 @@ rights or prompts; what cannot be read is said in a note.
     "secrets":    { "ignore_paths": ["~/**/test-fixtures/**"],
                     "extra_patterns": [{ "kind": "Acme token", "regex": "\\bacme_[A-Za-z0-9]{32}\\b", "high": true }],
                     "locations": { "gcloud": false } },
-    "tailscale":  { "enabled": false },
+    "mesh-vpn":   { "allow": ["tailscale"] },
     "os-updates": { "min_os_versions": { "macos": "26", "fedora": "" },
                     "min_browser_versions": { "chrome": "157.0.8103.39" } },
-    "remote-access": { "allow": ["ssh"] },
+    "remote-access": { "allow": ["ssh", "teamviewer"] },
     "ssh-keys":   { "authorized_keys": false, "allow_keys": ["~/.ssh/ci_deploy"] },
     "tunnels":    { "lower_severity": ["cloudflared"] },
     "ai-agents":  { "extra_paths": ["~/.config/acme-agent/mcp.json"] }
