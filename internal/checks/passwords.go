@@ -73,6 +73,9 @@ func evalBrowserPasswordsOn(goos string, ps []pwProfile, opts policy.BrowserPass
 		case p.Stored && p.Logins > 0 && p.Logins < opts.PassBelow:
 			// A handful of saved logins are rarely someone's main passwords.
 			fewNames = add(fewNames, p.Name)
+			if p.Saving {
+				saving = add(saving, p.Name)
+			}
 		case p.Stored:
 			if p.Logins <= 0 || opts.MediumAbove <= 0 || p.Logins > opts.MediumAbove {
 				medium = true
@@ -96,10 +99,15 @@ func evalBrowserPasswordsOn(goos string, ps []pwProfile, opts policy.BrowserPass
 	if len(stored) == 0 {
 		summary := msg.Of("passwords.pass")
 		switch {
+		case len(fewNames) > 0 && len(saving) > 0: // the note says what is saved
+			summary = msg.Of("passwords.savingOn", "browsers", strings.Join(saving, ", "))
+		case len(fewNames) > 0:
+			summary = nil
 		case len(saving) > 0:
 			summary = msg.Of("passwords.passSavingOn", "browsers", strings.Join(saving, ", "))
-		case len(fewNames) > 0:
-			summary = nil // the note says what is there
+		}
+		if len(fewNames) > 0 { // what is saved first, then the advice about saving
+			return check.Result{Status: check.Pass, Evidence: ev}.WithSummary(slices.Concat(note, summary))
 		}
 		return check.Result{Status: check.Pass, Evidence: ev}.WithSummary(append(summary, note...))
 	}

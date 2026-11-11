@@ -198,6 +198,7 @@
   "passwords.notFound": "No supported browser profile found.",
   "passwords.pass": "No passwords are saved in the browsers, and they do not offer to save them.",
   "passwords.passSavingOn": "No passwords are saved in the browsers, but {browsers} still offers to save them: consider turning that off.",
+  "passwords.savingOn": "{browsers} still offers to save passwords: consider turning that off.",
   "passwords.stored": "Passwords are saved in {browsers}. Information-stealing malware takes a browser's saved passwords first.",
   "pm.checksum": {
     "one": "1 setting turns off Go's checksum database.",
