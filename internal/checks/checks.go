@@ -47,6 +47,9 @@ func All(p policy.Policy) []check.Check {
 		{check.Check{ID: "tunnels", Title: "Nothing is tunnelled to the internet", Run: tunnels(c.Tunnels)}, c.Tunnels.Common},
 		{check.Check{ID: "ai-agents", Title: "AI agents keep their guardrails", Run: aiAgents(c.AIAgents, c.Secrets)}, c.AIAgents.Common},
 		{check.Check{ID: "cracked-software", Title: "No cracked software", Run: crackedSoftware(c.CrackedSoftware)}, c.CrackedSoftware.Common},
+		{check.Check{ID: "extensions", Title: "Browser and editor extensions are trusted", Run: extensions(c.Extensions)}, c.Extensions.Common},
+		{check.Check{ID: "browser-passwords", Title: "Passwords are not saved in the browser", Run: browserPasswords(c.BrowserPasswords)}, c.BrowserPasswords.Common},
+		{check.Check{ID: "trust-store", Title: "No unexpected root certificates or proxies", Run: trustStore(c.TrustStore)}, c.TrustStore.Common},
 	}
 	var out []check.Check
 	for _, a := range all {

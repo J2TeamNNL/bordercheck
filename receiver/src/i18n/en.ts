@@ -447,6 +447,9 @@ export const en = {
   "checkTitle.tunnels": "Nothing is tunnelled to the internet",
   "checkTitle.ai-agents": "AI agents keep their guardrails",
   "checkTitle.cracked-software": "No cracked software",
+  "checkTitle.extensions": "Browser and editor extensions are trusted",
+  "checkTitle.browser-passwords": "Passwords are not saved in the browser",
+  "checkTitle.trust-store": "No unexpected root certificates or proxies",
   "rep.prodSecrets": { one: "{n} production secret in plain text", other: "{n} production secrets in plain text" },
   "rep.prodSecretsNote": "Names and files only; the values are never sent.",
 } satisfies Record<string, Entry>;

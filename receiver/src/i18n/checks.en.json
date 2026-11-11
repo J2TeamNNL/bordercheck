@@ -55,6 +55,33 @@
     "one": "1 problem in {containers} running container(s).",
     "other": "{n} problems in {containers} running container(s)."
   },
+  "extensions.allSites": {
+    "one": "1 of them can read and change every website you visit.",
+    "other": "{n} of them can read and change every website you visit."
+  },
+  "extensions.allSitesWarn": {
+    "one": "1 extension can read and change every website you visit: {names}.",
+    "other": "{n} extensions can read and change every website you visit: {names}."
+  },
+  "extensions.blocked": {
+    "one": "1 extension is on the organisation's block list: {names}.",
+    "other": "{n} extensions are on the organisation's block list: {names}."
+  },
+  "extensions.fix.allSites": "Remove extensions you no longer use. In Chrome, Edge or Brave limit the rest: extensions page → Details → Site access → On click or On specific sites.",
+  "extensions.fix.blocked": "Remove it now: in the browser open the extensions page ([code]chrome://extensions[/code], [code]edge://extensions[/code], [code]brave://extensions[/code], or [code]about:addons[/code] in Firefox) → Remove; in the editor open the Extensions view → the extension → Uninstall. Then change the passwords you used in that browser or editor, and tell IT.",
+  "extensions.fix.notAllowed": "Remove extensions your organisation has not approved, or ask IT to add them to the allowed list.",
+  "extensions.fix.outside": "Remove extensions you did not install on purpose (the browser's extensions page → Remove, or the editor's Extensions view → Uninstall) and install the ones you need from the Chrome Web Store, Microsoft Edge Add-ons, addons.mozilla.org or the editor's marketplace. If IT approves one, it can be listed in the policy's allow_unpacked.",
+  "extensions.found": "Extensions found: {counts}.",
+  "extensions.notAllowed": {
+    "one": "1 extension is not on the organisation's allowed list: {names}.",
+    "other": "{n} extensions are not on the organisation's allowed list: {names}."
+  },
+  "extensions.notFound": "No supported browser or code editor profile found.",
+  "extensions.outside": {
+    "one": "1 extension was installed from outside a store (loaded unpacked, from a file or by another program): {names}.",
+    "other": "{n} extensions were installed from outside a store (loaded unpacked, from a file or by another program): {names}."
+  },
+  "extensions.pass": "None is blocked or installed from outside a store.",
   "firewall.linux.firewalldOn": "firewalld is on.",
   "firewall.linux.firewalldOnZone": "firewalld is on (default zone {zone}).",
   "firewall.linux.fix": "Ubuntu/Debian: [code]sudo ufw enable[/code] (it blocks incoming connections and allows outgoing). Fedora/RHEL/openSUSE: [code]sudo systemctl enable --now firewalld[/code].",
@@ -97,6 +124,17 @@
   "outbound.found.winFw": "Windows Firewall blocks outgoing connections by default.",
   "outbound.none.mac": "No outbound firewall (such as LuLu or Little Snitch) controls which apps connect out.",
   "outbound.none.win": "No outbound firewall (such as simplewall, or Windows Firewall blocking outgoing connections by default) controls which apps connect out.",
+  "passwords.allowed": "Allowed by policy: {browsers}.",
+  "passwords.fix": "Move these passwords to a password manager (the browser's password settings can export them), delete them from the browser, and turn off saving.",
+  "passwords.fix.brave": "Brave: Settings → Autofill and passwords → Password Manager → Settings → turn off Offer to save passwords.",
+  "passwords.fix.chrome": "Chrome: Settings → Autofill and passwords → Google Password Manager → Settings → turn off Offer to save passwords.",
+  "passwords.fix.edge": "Edge: Settings → Passwords and autofill (Profiles → Passwords in older versions) → turn off Offer to save passwords.",
+  "passwords.fix.firefox": "Firefox: Settings → Privacy & Security → Passwords → uncheck Ask to save passwords.",
+  "passwords.fix.other": "Other browsers: the password settings → turn off Offer to save passwords.",
+  "passwords.notFound": "No supported browser profile found.",
+  "passwords.pass": "No passwords are saved in the browsers, and they do not offer to save them.",
+  "passwords.passSavingOn": "No passwords are saved in the browsers, but {browsers} still offers to save them: consider turning that off.",
+  "passwords.stored": "Passwords are saved in {browsers}. Information-stealing malware takes a browser's saved passwords first.",
   "remote.allowed": "On but allowed by policy: {services}.",
   "remote.fix.linuxGuest": "Set [code]allow-guest=false[/code] under [Seat:*] in /etc/lightdm/lightdm.conf.",
   "remote.fix.linuxRDP": "GNOME: Settings → System → Remote Desktop → turn off Desktop Sharing and Remote Login. xrdp: [code]sudo systemctl disable --now xrdp[/code].",
@@ -175,6 +213,31 @@
   "tailscale.open.fix": "Tailscale → Settings → untick \"Allow incoming connections\". Or: [code]tailscale set --shields-up[/code]. Admins: also limit who can reach whom with tailnet ACLs.",
   "tailscale.shieldsUp": "Shields up: other devices on the tailnet cannot open connections to this machine.",
   "tailscale.unreadable": "Could not read Tailscale settings; is Tailscale running? ({err})",
+  "trust.ca.devTool": "They include a development or debugging tool's certificate ({tools}): keep it only while you use the tool.",
+  "trust.ca.found": {
+    "one": "1 root certificate was added to the trust store: {names}. Whoever holds its key can read this machine's HTTPS traffic that passes through them. Company TLS inspection and developer tools such as mkcert add one too.",
+    "other": "{n} root certificates were added to the trust store: {names}. Whoever holds their keys can read this machine's HTTPS traffic that passes through them. Company TLS inspection and developer tools such as mkcert add them too."
+  },
+  "trust.ca.hostOnly": {
+    "one": "1 certificate is trusted for one host name only (such as a remote desktop's); not counted.",
+    "other": "{n} certificates are trusted for one host name only (such as a remote desktop's); not counted."
+  },
+  "trust.ca.unknown": "The trust store could not be read: {err}",
+  "trust.fix.allow": "If IT set this up, ask them to list it in the policy (allow_cas, allow_proxies).",
+  "trust.fix.ca.linux": "Delete the file and rebuild the store: [code]sudo update-ca-certificates --fresh[/code] (Debian, Ubuntu) or [code]sudo update-ca-trust[/code] (Fedora, RHEL). For mkcert: [code]mkcert -uninstall[/code].",
+  "trust.fix.ca.mac": "Keychain Access → login or System keychain → Certificates → double-click the certificate → Trust → When using this certificate: Use System Defaults, or delete it. For mkcert: [code]mkcert -uninstall[/code].",
+  "trust.fix.ca.win": "Run [code]certmgr.msc[/code] → Trusted Root Certification Authorities → Certificates → right-click the certificate → Delete. For mkcert: [code]mkcert -uninstall[/code].",
+  "trust.fix.proxy.env": "Remove http_proxy, https_proxy and all_proxy from your shell startup files or environment unless you set them up.",
+  "trust.fix.proxy.linux": "Settings → Network → Network Proxy → turn it off, unless you set it up.",
+  "trust.fix.proxy.mac": "System Settings → Network → your network → Details → Proxies → turn off the proxies you did not set up.",
+  "trust.fix.proxy.win": "Settings → Network & internet → Proxy → turn off Use a proxy server and Use setup script unless you set them up.",
+  "trust.pass": "No root certificates were added to the trust store, and no proxy is set.",
+  "trust.pass.ca": "No root certificates were added to the trust store.",
+  "trust.pass.proxy": "No proxy is set.",
+  "trust.proxy.found": "Web traffic is sent through a proxy: {proxies}. A proxy you did not set up can see every site you visit and read unencrypted traffic.",
+  "trust.proxy.local": "A proxy on this machine is set ({proxies}), usually a local tool such as a VPN client or a debugging proxy.",
+  "trust.proxy.unknown": "The proxy settings could not be read: {err}",
+  "trust.unknown": "Could not read the trust store or the proxy settings: {err}",
   "tunnels.fix": "Stop tunnels you aren't using ([code]tailscale funnel reset[/code], [code]tailscale serve reset[/code]; quit ngrok, [code]ssh -R[/code]…). If you must share something, use a named Cloudflare Tunnel behind Cloudflare Access, not a public URL.",
   "tunnels.found": {
     "one": "1 tunnel publishes this machine beyond the local network.",

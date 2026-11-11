@@ -420,6 +420,9 @@ export const zh: Catalog = {
   "checkTitle.tunnels": "没有通向互联网的隧道",
   "checkTitle.ai-agents": "AI 代理保留安全防护",
   "checkTitle.cracked-software": "没有破解软件",
+  "checkTitle.extensions": "浏览器和编辑器扩展可信",
+  "checkTitle.browser-passwords": "密码没有保存在浏览器中",
+  "checkTitle.trust-store": "没有意外的根证书或代理",
   "rep.prodSecrets": "{n} 个生产环境明文密钥",
   "rep.prodSecretsNote": "仅显示名称和文件；密钥的值从不发送。",
 };

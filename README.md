@@ -37,6 +37,9 @@ Companies can install it on every laptop, and each one then reports to the IT te
 | `tunnels` | ngrok, cloudflared, `tailscale funnel`/`serve`, VS Code tunnels, `ssh -R` and others |
 | `ai-agents` | Plain-text tokens in MCP and agent configs, and settings that skip approvals or the sandbox |
 | `cracked-software` | Traces of cracked Adobe, Autodesk, Windows or Office (blocked licensing servers, KMS emulators, KMSpico); suggests free alternatives |
+| `extensions` | Browser (Chrome, Edge, Brave, Firefox…) and VS Code-family editor extensions on your block list, outside your allow list, or loaded from outside a store |
+| `browser-passwords` | Passwords saved in the browser's own password manager, which information stealers take first |
+| `trust-store` | Root certificates added to the trust store, and a system proxy, PAC file or proxy variable |
 
 `os-updates`, `screen-lock` and `remote-access` never go online: they judge what the machine already knows.
 Details and options for each: [Policies](docs/policies.md#checks).

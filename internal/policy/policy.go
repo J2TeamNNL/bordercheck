@@ -100,6 +100,10 @@ type Checks struct {
 	OSUpdates    OSUpdates    `json:"os-updates"`
 	ScreenLock   ScreenLock   `json:"screen-lock"`
 	RemoteAccess RemoteAccess `json:"remote-access"`
+
+	Extensions       Extensions       `json:"extensions"`
+	BrowserPasswords BrowserPasswords `json:"browser-passwords"`
+	TrustStore       TrustStore       `json:"trust-store"`
 }
 
 // Common is what every check accepts.
@@ -299,6 +303,11 @@ func Default() Policy {
 				LowerSeverity: []string{"cloudflared"}},
 			AIAgents:        AIAgents{Tokens: true, Guardrails: true, ExtraPaths: []string{}, IgnorePaths: []string{}},
 			CrackedSoftware: CrackedSoftware{SuggestAlternatives: true},
+			Extensions: Extensions{Browsers: true, Editors: true, Block: []string{}, Allow: []string{},
+				AllowUnpacked: []string{}},
+			BrowserPasswords: BrowserPasswords{AllowBrowsers: []string{}},
+			TrustStore: TrustStore{CAs: true, Proxies: true, AllowCAs: []string{}, AllowProxies: []string{},
+				CASeverity: check.Medium},
 		},
 	}
 }
@@ -413,6 +422,7 @@ func (p Policy) validate() error {
 		"os-updates": c.OSUpdates.OnProblem, "screen-lock": c.ScreenLock.OnProblem, "remote-access": c.RemoteAccess.OnProblem,
 		"ssh-keys": c.SSHKeys.OnProblem, "tunnels": c.Tunnels.OnProblem, "ai-agents": c.AIAgents.OnProblem,
 		"cracked-software": c.CrackedSoftware.OnProblem,
+		"extensions":       c.Extensions.OnProblem, "browser-passwords": c.BrowserPasswords.OnProblem, "trust-store": c.TrustStore.OnProblem,
 	} {
 		if on != "" && on != check.Fail && on != check.Warn {
 			return fmt.Errorf("checks.%s.on_problem must be \"fail\" or \"warn\", not %q", id, on)
@@ -504,6 +514,9 @@ func (c Checks) validateNew() error {
 		if strings.TrimSpace(p) == "" {
 			return errors.New("checks.ai-agents.extra_paths: empty path")
 		}
+	}
+	if err := c.validateBrowserChecks(); err != nil {
+		return err
 	}
 	return nil
 }

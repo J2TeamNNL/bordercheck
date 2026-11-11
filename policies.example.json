@@ -146,6 +146,24 @@
     },
     "cracked-software": {
       "suggest_alternatives": true
+    },
+    "extensions": {
+      "browsers": true,
+      "editors": true,
+      "block": [],
+      "allow": [],
+      "warn_all_sites": false,
+      "allow_unpacked": []
+    },
+    "browser-passwords": {
+      "allow_browsers": []
+    },
+    "trust-store": {
+      "cas": true,
+      "proxies": true,
+      "allow_cas": [],
+      "allow_proxies": [],
+      "ca_severity": "medium"
     }
   }
 }

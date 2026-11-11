@@ -60,6 +60,14 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 			{path: "~/.claude/settings.json", where: "permissions.defaultMode = bypassPermissions", what: "every tool runs without asking", sev: check.High}}, 4)),
 		id("cracked-software", evalCracked(crackFacts{HostsPath: "/etc/hosts", Hosts: "127.0.0.1 lmlicensing.adobe.com\n0.0.0.0 genuine.autodesk.com\n"},
 			def.CrackedSoftware)),
+		id("extensions", evalExtensions(extFacts{Apps: []string{"Chrome", "Firefox", "VS Code"}, Items: sampleExtItems()},
+			policy.Extensions{Browsers: true, Editors: true, Block: []string{"evil.*"}})),
+		id("browser-passwords", evalBrowserPasswords([]pwProfile{{ID: "chrome", Name: "Chrome", Label: "Chrome (Default)", Saving: true,
+			Stored: true, Details: "Login Data is 96 KB, larger than an empty one (40 KB); Offer to save passwords is on"}}, def.BrowserPasswords)),
+		id("trust-store", evalTrustStore(trustFacts{OS: "darwin", Certs: []trustCert{{Name: "mkcert demo@demo-mac (Demo)",
+			CN: "mkcert demo@demo-mac (Demo)", SHA256: "AB12", Where: "user trust settings"}},
+			Proxies: []trustProxy{{Kind: "HTTP proxy", Host: "proxy.acme.example", Shown: "proxy.acme.example:3128", Where: "system settings"}}},
+			def.TrustStore)),
 	}
 
 	winAuto := winUpdateFacts(kvLines("build=19045\nubr=6093\ndisplay_version=22H2\nno_auto_update=1\nwuauserv_start=Disabled\n" +
@@ -82,6 +90,14 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 		id("ai-agents", evalAIAgents([]aiFinding{{path: `~\AppData\Roaming\Code\User\mcp.json`, what: "Token in an HTTP header in plain text", sev: check.Medium}}, 2)),
 		id("cracked-software", evalCracked(crackFacts{HostsPath: `C:\Windows\System32\drivers\etc\hosts`,
 			KMS: map[string]string{"Windows": "127.0.0.2:1688"}, Tools: []string{`KMSpico (C:\Program Files\KMSpico)`}}, def.CrackedSoftware)),
+		id("extensions", evalExtensions(extFacts{Apps: []string{"Edge", "VS Code"}, Items: []extItem{{App: "VS Code", Where: "VS Code",
+			Editor: true, ID: "acme.tools", Name: "acme.tools", Enabled: true}}},
+			policy.Extensions{Browsers: true, Editors: true, Allow: []string{"ms-*"}, WarnAllSites: true})),
+		id("browser-passwords", evalBrowserPasswords([]pwProfile{{ID: "edge", Name: "Edge", Label: "Edge (Default)", Saving: true,
+			Details: "no saved logins found; Offer to save passwords is on"}}, def.BrowserPasswords)),
+		id("trust-store", evalTrustStore(trustFacts{OS: "windows", Certs: []trustCert{{Name: "Acme TLS CA", CN: "Acme TLS CA",
+			Where: "current user's Root store"}}, Proxies: []trustProxy{{Kind: "PAC file", Host: "wpad.acme.example",
+			Shown: "http://wpad.acme.example/proxy.pac", Where: "system settings"}}}, policy.TrustStore{CAs: true, Proxies: true, CASeverity: check.High})),
 	}
 
 	linux := []check.Result{
@@ -102,6 +118,11 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 		id("tunnels", evalTunnels(nil, def.Tunnels, nil)),
 		id("ai-agents", evalAIAgents(nil, 3)),
 		id("cracked-software", evalCracked(crackFacts{HostsPath: "/etc/hosts"}, def.CrackedSoftware)),
+		id("extensions", evalExtensions(extFacts{}, def.Extensions)),
+		id("browser-passwords", evalBrowserPasswords(nil, def.BrowserPasswords)),
+		id("trust-store", evalTrustStore(trustFacts{OS: "linux", HostOnly: 0, Proxies: []trustProxy{{Kind: "https_proxy", Host: "127.0.0.1",
+			Shown: "127.0.0.1:8080", Where: "environment"}, {Kind: "http_proxy", Host: "proxy.acme.example", Shown: "proxy.acme.example:3128",
+			Where: "environment"}}, CAErr: "x"}, def.TrustStore)),
 	}
 	return map[string][]check.Result{"mac": mac, "windows": win, "linux": linux}
 }

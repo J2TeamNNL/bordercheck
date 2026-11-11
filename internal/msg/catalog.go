@@ -320,4 +320,85 @@ var Catalog = map[string]Entry{
 		"LightCraft for Lightroom, EffectCraft for After Effects, DesignCraft for InDesign, PdfCraft for Acrobat."),
 	"cracked.alt.office":   s("Microsoft Office: WordCraft for Word, GridCraft for Excel, DeckCraft for PowerPoint."),
 	"cracked.alt.autodesk": s("Autodesk: CADCraft for AutoCAD."),
+
+	// ---- extensions ----
+	"extensions.notFound": s("No supported browser or code editor profile found."),
+	"extensions.found":    s("Extensions found: {counts}."),
+	"extensions.pass":     s("None is blocked or installed from outside a store."),
+	"extensions.blocked": pl("1 extension is on the organisation's block list: {names}.",
+		"{n} extensions are on the organisation's block list: {names}."),
+	"extensions.outside": pl("1 extension was installed from outside a store (loaded unpacked, from a file or by another program): {names}.",
+		"{n} extensions were installed from outside a store (loaded unpacked, from a file or by another program): {names}."),
+	"extensions.notAllowed": pl("1 extension is not on the organisation's allowed list: {names}.",
+		"{n} extensions are not on the organisation's allowed list: {names}."),
+	"extensions.allSites": pl("1 of them can read and change every website you visit.",
+		"{n} of them can read and change every website you visit."),
+	"extensions.allSitesWarn": pl("1 extension can read and change every website you visit: {names}.",
+		"{n} extensions can read and change every website you visit: {names}."),
+	"extensions.fix.blocked": s("Remove it now: in the browser open the extensions page ([code]chrome://extensions[/code], " +
+		"[code]edge://extensions[/code], [code]brave://extensions[/code], or [code]about:addons[/code] in Firefox) → Remove; " +
+		"in the editor open the Extensions view → the extension → Uninstall. Then change the passwords you used in that " +
+		"browser or editor, and tell IT."),
+	"extensions.fix.outside": s("Remove extensions you did not install on purpose (the browser's extensions page → Remove, " +
+		"or the editor's Extensions view → Uninstall) and install the ones you need from the Chrome Web Store, Microsoft " +
+		"Edge Add-ons, addons.mozilla.org or the editor's marketplace. If IT approves one, it can be listed in the " +
+		"policy's allow_unpacked."),
+	"extensions.fix.notAllowed": s("Remove extensions your organisation has not approved, or ask IT to add them to the " +
+		"allowed list."),
+	"extensions.fix.allSites": s("Remove extensions you no longer use. In Chrome, Edge or Brave limit the rest: extensions " +
+		"page → Details → Site access → On click or On specific sites."),
+
+	// ---- browser-passwords ----
+	"passwords.notFound": s("No supported browser profile found."),
+	"passwords.pass":     s("No passwords are saved in the browsers, and they do not offer to save them."),
+	"passwords.passSavingOn": s("No passwords are saved in the browsers, but {browsers} still offers to save them: " +
+		"consider turning that off."),
+	"passwords.stored": s("Passwords are saved in {browsers}. Information-stealing malware takes a browser's saved " +
+		"passwords first."),
+	"passwords.allowed": s("Allowed by policy: {browsers}."),
+	"passwords.fix": s("Move these passwords to a password manager (the browser's password settings can export them), " +
+		"delete them from the browser, and turn off saving."),
+	"passwords.fix.chrome": s("Chrome: Settings → Autofill and passwords → Google Password Manager → Settings → turn off " +
+		"Offer to save passwords."),
+	"passwords.fix.edge": s("Edge: Settings → Passwords and autofill (Profiles → Passwords in older versions) → turn off " +
+		"Offer to save passwords."),
+	"passwords.fix.brave": s("Brave: Settings → Autofill and passwords → Password Manager → Settings → turn off Offer " +
+		"to save passwords."),
+	"passwords.fix.firefox": s("Firefox: Settings → Privacy & Security → Passwords → uncheck Ask to save passwords."),
+	"passwords.fix.other":   s("Other browsers: the password settings → turn off Offer to save passwords."),
+
+	// ---- trust-store ----
+	"trust.pass":       s("No root certificates were added to the trust store, and no proxy is set."),
+	"trust.pass.ca":    s("No root certificates were added to the trust store."),
+	"trust.pass.proxy": s("No proxy is set."),
+	"trust.unknown":    s("Could not read the trust store or the proxy settings: {err}"),
+	"trust.ca.found": pl("1 root certificate was added to the trust store: {names}. Whoever holds its key can read "+
+		"this machine's HTTPS traffic that passes through them. Company TLS inspection and developer tools such as "+
+		"mkcert add one too.",
+		"{n} root certificates were added to the trust store: {names}. Whoever holds their keys can read this "+
+			"machine's HTTPS traffic that passes through them. Company TLS inspection and developer tools such as "+
+			"mkcert add them too."),
+	"trust.ca.devTool": s("They include a development or debugging tool's certificate ({tools}): keep it only while you " +
+		"use the tool."),
+	"trust.ca.hostOnly": pl("1 certificate is trusted for one host name only (such as a remote desktop's); not counted.",
+		"{n} certificates are trusted for one host name only (such as a remote desktop's); not counted."),
+	"trust.ca.unknown": s("The trust store could not be read: {err}"),
+	"trust.proxy.found": s("Web traffic is sent through a proxy: {proxies}. A proxy you did not set up can see " +
+		"every site you visit and read unencrypted traffic."),
+	"trust.proxy.local":   s("A proxy on this machine is set ({proxies}), usually a local tool such as a VPN client or a debugging proxy."),
+	"trust.proxy.unknown": s("The proxy settings could not be read: {err}"),
+	"trust.fix.ca.mac": s("Keychain Access → login or System keychain → Certificates → double-click the certificate → " +
+		"Trust → When using this certificate: Use System Defaults, or delete it. For mkcert: [code]mkcert -uninstall[/code]."),
+	"trust.fix.ca.win": s("Run [code]certmgr.msc[/code] → Trusted Root Certification Authorities → Certificates → " +
+		"right-click the certificate → Delete. For mkcert: [code]mkcert -uninstall[/code]."),
+	"trust.fix.ca.linux": s("Delete the file and rebuild the store: [code]sudo update-ca-certificates --fresh[/code] " +
+		"(Debian, Ubuntu) or [code]sudo update-ca-trust[/code] (Fedora, RHEL). For mkcert: [code]mkcert -uninstall[/code]."),
+	"trust.fix.proxy.mac": s("System Settings → Network → your network → Details → Proxies → turn off the proxies " +
+		"you did not set up."),
+	"trust.fix.proxy.win": s("Settings → Network & internet → Proxy → turn off Use a proxy server and Use setup " +
+		"script unless you set them up."),
+	"trust.fix.proxy.linux": s("Settings → Network → Network Proxy → turn it off, unless you set it up."),
+	"trust.fix.proxy.env": s("Remove http_proxy, https_proxy and all_proxy from your shell startup files or " +
+		"environment unless you set them up."),
+	"trust.fix.allow": s("If IT set this up, ask them to list it in the policy (allow_cas, allow_proxies)."),
 }

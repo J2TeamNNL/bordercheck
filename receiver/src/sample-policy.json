@@ -54,6 +54,9 @@
       "max_browser_age_days": 60
     },
     "screen-lock": { "require_password": true, "max_lock_minutes": 10 },
-    "remote-access": { "allow": ["guest"] }
+    "remote-access": { "allow": ["guest"] },
+    "extensions": { "browsers": true, "editors": true, "block": [], "allow": [], "warn_all_sites": false },
+    "browser-passwords": { "allow_browsers": [] },
+    "trust-store": { "cas": true, "proxies": true, "allow_cas": [], "allow_proxies": [], "ca_severity": "medium" }
   }
 }
