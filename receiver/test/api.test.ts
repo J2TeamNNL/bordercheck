@@ -266,7 +266,7 @@ describe("API invites", () => {
     const inv = one.body.invites[0];
     expect(inv).toMatchObject({ email: "new.hire@acme.com", invite_id: expect.any(Number), expires_at: expect.stringMatching(/^\d{4}-/) });
     const code = codeOf(inv.invite_link);
-    expect(inv.install_macos_linux).toBe(`curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- ${BASE}/i/${code}`);
+    expect(inv.install_macos_linux).toBe(`sh ./install.sh '${BASE}/i/${code}'`);
     expect(inv.install_windows).toContain(`${BASE}/i/${code}`);
 
     const many = await api("POST", "/invites", { body: { emails: ["a@acme.com", "b@acme.com"], role_id: roleId } });

@@ -128,8 +128,8 @@ describe("invites and enrollment", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(res.headers.get("content-security-policy")).toContain("default-src 'none'");
     const body = await res.text();
-    expect(body).toContain(`curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- ${BASE}/i/${code}`);
-    expect(body).toContain(`&amp; ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) ${BASE}/i/${code}`);
+    expect(body).toContain(`sh ./install.sh &#39;${BASE}/i/${code}&#39;`);
+    expect(body).toContain(`.\\install.ps1 &#39;${BASE}/i/${code}&#39;`);
     expect(body).not.toContain("an@acme.com");
     expect(body.replace(`<script>${COPY_SCRIPT}</script>`, "")).not.toContain("<script"); // only the hashed Copy script
     expect((await enroll({ code, host: HOST })).status).toBe(200);
@@ -150,8 +150,8 @@ describe("invites and enrollment", () => {
     expect(mac).toContain("On this Mac");
     // Both commands are always on the page, whatever the User-Agent says.
     for (const body of [win, mac, await open(`<script>alert(1)</script>`)]) {
-      expect(body).toContain("install.sh | sh -s -- ");
-      expect(body).toContain("install.ps1)))");
+      expect(body).toContain("sh ./install.sh ");
+      expect(body).toContain("install.ps1 &#39;");
       expect(body.replace(`<script>${COPY_SCRIPT}</script>`, "")).not.toContain("<script");
     }
   });
@@ -163,8 +163,8 @@ describe("invites and enrollment", () => {
       INSTALL_PS1_URL: "https://evil.example/x.ps1; rm -rf ~",
     });
     const body = await res.text();
-    expect(body).toContain("curl -fsSL https://bordercheck.acme.com/install.sh | sh -s -- ");
-    expect(body).toContain("irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1");
+    expect(body).toContain('href="https://bordercheck.acme.com/install.sh"');
+    expect(body).toContain("https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1");
     expect(body).not.toContain("rm -rf");
   });
 });

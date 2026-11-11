@@ -36,7 +36,7 @@ func runIgnoreCommand(cmd string, args []string) int {
 	fs := flag.NewFlagSet("bordercheck "+cmd, flag.ContinueOnError)
 	checkID := fs.String("check", "", "which check: "+strings.Join(ignore.Checks, ", ")+" (found from the path when left out)")
 	name := fs.String("name", "", "only the finding with this name (variable, setting) or kind, as the report shows it")
-	reason := fs.String("reason", "", "ignore: why this is not sensitive (required; IT sees it)")
+	reason := fs.String("reason", "", "ignore: why this is not sensitive (required; shared only with detailed reporting)")
 	list := fs.Bool("list", false, "ignore: show what is ignored on this computer")
 	policyPath := fs.String("policy", "", "policy JSON file")
 	var positional []string
@@ -63,7 +63,9 @@ func runIgnoreCommand(cmd string, args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	env := ignoreEnv{dir: dir, pol: pol, out: os.Stdout, now: time.Now(),
-		scan: func() ([]checks.Item, string, error) { return checks.IgnorableItems(ctx, pol) }}
+		scan: func() ([]checks.Item, string, error) {
+			return checks.IgnorableItems(ctx, pol, agent.Local(dir).Privacy)
+		}}
 	switch {
 	case cmd == "ignore" && *list:
 		if len(positional) > 0 || *name != "" || *reason != "" || *checkID != "" {

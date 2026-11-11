@@ -640,6 +640,8 @@ export function issuedItem(w: { env: Env; req: Request }, i: Issued, withExpiry 
     email: i.email,
     ...(withExpiry ? { expires_at: i.expires } : {}),
     invite_link: c.link,
+    download_macos_linux: c.shURL,
+    download_windows: c.ps1URL,
     install_macos_linux: c.sh,
     install_windows: c.ps1,
   };

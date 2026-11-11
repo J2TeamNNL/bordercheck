@@ -18,14 +18,14 @@ import (
 type Host struct {
 	OS       string `json:"os"`
 	Arch     string `json:"arch"`
-	Hostname string `json:"hostname"`
+	Hostname string `json:"hostname,omitempty"`
 	// The machine's own interface addresses, sent by the installed service only
-	// when the policy sets report.include_ips.
+	// when local consent and the policy allow it.
 	IPs []string `json:"ips,omitempty"`
 }
 
-// Location is a device position, sent by the installed service only when the
-// policy sets report.include_location and the OS can give one without asking.
+// Location is a device position, sent by the installed service only with local
+// consent, permission from the policy, and an OS that supplies it without asking.
 type Location struct {
 	Lat       float64   `json:"lat"`
 	Lon       float64   `json:"lon"`

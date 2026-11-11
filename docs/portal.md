@@ -76,7 +76,7 @@ A value that only looks like a secret (a local database password, a test key, a 
 key without a passphrase used for one thing) can be set aside by the person at the machine with
 `bordercheck ignore <path> [-name NAME] -reason "…"`
 ([how](install.md#secrets-that-are-not-sensitive)); fix's rules tell an assistant not to do that unless the person
-asks for that item. It stops counting, but every report lists it, also without `include_evidence`: the machine's
+asks for that item. It stops counting, and detailed reports list it when local consent and `include_evidence` are both enabled: the machine's
 page shows **Ignored by the user (N)** under the `secrets`, `ai-agents` or `ssh-keys` check, with the file, the
 name or kind, the reason and the date. The report page shows only the counts. Findings marked `[production]`, AI
 agent guardrails, readable key files, `authorized_keys` and SSH client settings can't be ignored this way, and a
@@ -208,7 +208,7 @@ AUTH="Authorization: Bearer $BORDERCHECK_API_TOKEN"
 curl -fsS "$BC/roles" -H "$AUTH" | jq -r '.data[] | "\(.role_id)  \(.name)"'   # find the role id
 ```
 
-**Invite a new hire and print their install command.** The `Idempotency-Key` makes a retry safe: the same key
+**Invite a new hire and print their installer URL and command.** The `Idempotency-Key` makes a retry safe: the same key
 again gets `409 already_created` with the invite id instead of a second invite (codes are shown only once;
 re-issue the invite if the first answer was lost).
 
@@ -216,7 +216,7 @@ re-issue the invite if the first answer was lost).
 curl -sS --fail-with-body "$BC/invites" -H "$AUTH" -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: hr-onboarding-4711' \
   -d '{"email": "new.hire@acme.com", "role_id": 3, "note": "HR-4711"}' \
-  | jq -r '.invites[0].install_macos_linux'
+  | jq -r '.invites[0] | .download_macos_linux, .install_macos_linux'
 ```
 
 Send the command (or `.invite_link`) to that person only. `{"emails": [...]}` invites up to 500 at once.

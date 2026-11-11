@@ -55,11 +55,11 @@ type Result struct {
 	WaiverEnded string `json:"-"`
 	// UserIgnored lists findings the person at the machine marked as not
 	// sensitive (`bordercheck ignore`): they do not count toward the status.
-	// Unlike Evidence it is always sent, so IT can see what was set aside.
+	// It is included in detailed reports so IT can see what was set aside.
 	// Never holds a value.
 	UserIgnored []Ignored `json:"user_ignored,omitempty"`
 	// LikelySamples lists findings set aside as sample keys (see samples.go).
-	// Always sent, like UserIgnored; never holds a value.
+	// Included in detailed reports, like UserIgnored; never holds a value.
 	LikelySamples []LikelySample `json:"likely_samples,omitempty"`
 	// Compromise lists signs that hostile code is, or very probably is,
 	// already on this computer, as opposed to a door merely being open. Only

@@ -53,20 +53,14 @@ no shared report token and no shared `policies.json` endpoint.
 1. **Roles** (dashboard → Roles). A role is a name and a policy, the same JSON as `policies.json`. Leave out
    `report.url`, `report.headers` and `update.policy_url`: they are filled in per machine.
 2. **Invites** (→ Invites). Paste one or many emails, pick a role, optionally an expiry (default `INVITE_DAYS`)
-   and a note. The page then shows, **once**, each person's invite link and install commands:
-
-   ```sh
-   curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.acme.com/i/<code>
-   ```
-   ```powershell
-   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/i/<code>
-   ```
+   and a note. The page then shows each person's invite link once, alongside script download links and
+   commands to run the reviewed local scripts. See [installation](../docs/install.md#with-an-invite-link).
 
    Send each person their own (this version sends no email). Only a hash of the code is stored, so a lost
    command can't be shown again: **Re-issue** the invite (the old code stops working). Invites are listed as
    pending, used, expired or revoked, so you can see who hasn't installed. `INSTALL_SH_URL` /
    `INSTALL_PS1_URL` point the commands at your own copy of the scripts.
-3. The person runs the command. bordercheck exchanges the code for a token for **that machine**; the code then
+3. The person saves and reviews the script, then runs the command. bordercheck exchanges the code for a token for **that machine**; the code then
    stops working. Opening the link in a browser shows the same instructions (and doesn't use it up).
 4. **Machines** (→ a machine's page): role, the invite and email it came from, **Revoke** (its token stops
    working at once; history stays; **Restore** undoes it), **Change role**, and **Waivers**: pick a check, an end
@@ -96,7 +90,7 @@ characters). `GET` returns an HTML page with the install commands; it never cons
 **`POST /enroll`**, no auth header, JSON body:
 
 ```json
-{"code": "<code>", "host": {"os": "darwin", "arch": "arm64", "hostname": "an-mbp"}, "version": "v0.4.0"}
+{"code": "<code>", "host": {"os": "darwin", "arch": "arm64"}, "version": "v0.4.0"}
 ```
 
 `200`:
@@ -685,7 +679,7 @@ Vars (`wrangler.jsonc`):
 | `meta` | Last digest time | |
 | `roles` | Role names and policies | until deleted (only when unused) |
 | `invites` | Email, role, note, who made it, expiry, state; SHA-256 of the code | kept |
-| `enrollments` | Per enrolled machine: email, role, invite, hostname/OS at enrollment, revoked or not; SHA-256 of the token | kept (revoking keeps it) |
+| `enrollments` | Per enrolled machine: email, role, invite, OS at enrollment (older clients may also supply a hostname), revoked or not; SHA-256 of the token | kept (revoking keeps it) |
 | `machine_waivers` | Check, end date, reason, who added/removed it | kept |
 | `audit` | Who changed what and when | kept |
 | `report_links` | SHA-256 of each live report link, its machine and expiry | until it expires or is replaced |
@@ -703,7 +697,7 @@ law (e.g. GDPR: purpose, minimisation, retention), and switch off what you don't
 | Public IP | `CF-Connecting-IP`, set by Cloudflare (no other header is trusted) | `STORE_PUBLIC_IP` | latest on `machines`, per report in `reports` |
 | IP-based location: country, region, city, coordinates, time zone, ASN and network name | Cloudflare's `request.cf` (an estimate from the IP, often only city-level) | `STORE_GEO` | as above |
 | Local interface addresses | the report's `host.ips`, sent by the machine if its policy allows; unverified | `STORE_PUBLIC_IP` | as above, and in the stored latest report |
-| Device-reported position (lat/lon, accuracy, source, time) | the report's `location`, sent by the machine if its policy allows and the OS gives one; unverified | `STORE_GEO` | as above |
+| Device-reported position (lat/lon, accuracy, source, time) | the report's `location`, sent if local settings and policy allow it and the OS gives one; unverified | `STORE_GEO` | as above |
 
 Retention is the history's: per-report rows go after `HISTORY_DAYS` (and beyond `HISTORY_PER_MACHINE`), and a
 machine silent for longer than `HISTORY_DAYS` has its latest IP and locations cleared too. **Forget machine**
@@ -717,7 +711,7 @@ coordinates; the optional new-country alert (`ALERT_NEW_COUNTRY`) carries only t
 Report links never show them.
 
 Only the latest report keeps summaries and evidence. Evidence (file paths, ports, container names) arrives
-only if the policy sets `include_evidence`. Secret values are never in a report. Times are the receiver's
+only if the machine opts in and the policy sets `include_evidence`. Secret values are never in a report. Times are the receiver's
 clock; the machine's own clock is kept beside it. Forgetting a machine deletes its rows; if it reports again it
 comes back as new.
 

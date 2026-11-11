@@ -239,6 +239,9 @@
     "one": "1 package manager runs every package's install scripts.",
     "other": "{n} package managers run every package's install scripts."
   },
+  "privacy.credentialsOff": "Credential-store scanning is off in local privacy settings.",
+  "privacy.secretsOff": "Secret scanning is off in local privacy settings.",
+  "privacy.secretsPartial": "No plain-text secrets found in the locally enabled sources.",
   "prot.avOff": "Microsoft Defender real-time protection is off and no other antivirus is on.",
   "prot.fix.av": "Windows Security → Virus & threat protection → Manage settings → turn on Real-time protection. If it turns itself off again, ask IT: a policy or malware may be switching it off.",
   "prot.fix.gatekeeper": "[code]sudo spctl --global-enable[/code], then System Settings → Privacy & Security → Allow applications from → App Store & Known Developers.",

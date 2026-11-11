@@ -172,8 +172,11 @@ var Catalog = map[string]Entry{
 		"socket, your home folder or credential folders."),
 
 	// ---- secrets ----
-	"secrets.pass":  s("No plain-text secrets in shell files, shell history, credential files or .env files."),
-	"secrets.found": pl("1 secret in plain text across {files} file(s).", "{n} secrets in plain text across {files} file(s)."),
+	"privacy.credentialsOff": s("Credential-store scanning is off in local privacy settings."),
+	"privacy.secretsOff":     s("Secret scanning is off in local privacy settings."),
+	"privacy.secretsPartial": s("No plain-text secrets found in the locally enabled sources."),
+	"secrets.pass":           s("No plain-text secrets in shell files, shell history, credential files or .env files."),
+	"secrets.found":          pl("1 secret in plain text across {files} file(s).", "{n} secrets in plain text across {files} file(s)."),
 	"secrets.foundProd": pl("1 secret in plain text across {files} file(s), {prod} marked production.",
 		"{n} secrets in plain text across {files} file(s), {prod} marked production."),
 	"secrets.incomplete": s("The scan hit its time limit, so some folders were not checked."),

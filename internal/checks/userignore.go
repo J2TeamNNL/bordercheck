@@ -131,13 +131,13 @@ type Item struct {
 // IgnorableItems runs the scans of the enabled checks that take a list of
 // ignored findings and returns every finding, ignorable or not, without
 // applying any list; and the home folder the paths are shown against.
-func IgnorableItems(ctx context.Context, p policy.Policy) (items []Item, home string, err error) {
+func IgnorableItems(ctx context.Context, p policy.Policy, privacy Privacy) (items []Item, home string, err error) {
 	c := p.Checks
 	if home, err = os.UserHomeDir(); err != nil {
 		return nil, "", err
 	}
-	if c.Secrets.IsEnabled() {
-		_, found, bundles, _, err := scanSecrets(ctx, c.Secrets)
+	if c.Secrets.IsEnabled() && privacy.scansSecrets() {
+		_, found, bundles, _, err := scanSecrets(ctx, c.Secrets, privacy)
 		if err != nil {
 			return nil, "", err
 		}
@@ -148,7 +148,10 @@ func IgnorableItems(ctx context.Context, p policy.Policy) (items []Item, home st
 			items = append(items, Item{Check: "secrets", Path: b, Kind: bundleKind})
 		}
 	}
-	if c.AIAgents.IsEnabled() {
+	if c.AIAgents.IsEnabled() && privacy.CredentialStores {
+		if !privacy.allowsExtraPaths() {
+			c.AIAgents.ExtraPaths = nil
+		}
 		_, found, err := scanAIAgents(c.AIAgents, c.Secrets)
 		if err != nil {
 			return nil, "", err
@@ -161,7 +164,7 @@ func IgnorableItems(ctx context.Context, p policy.Policy) (items []Item, home st
 			items = append(items, it)
 		}
 	}
-	if c.SSHKeys.IsEnabled() {
+	if c.SSHKeys.IsEnabled() && privacy.CredentialStores {
 		_, keys, auth, settings, err := scanSSH(c.SSHKeys)
 		if err != nil {
 			return nil, "", err

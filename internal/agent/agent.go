@@ -179,7 +179,26 @@ var allChecks = checks.AllWith
 // counts as empty, and the secrets check says so.
 func Local(dir string) checks.Local {
 	entries, err := ignore.Load(dir)
-	return checks.Local{Ignored: entries, IgnoreErr: err}
+	return checks.Local{Ignored: entries, IgnoreErr: err, Privacy: localPrivacy(dir)}
+}
+
+const privacyFile = "privacy.json"
+
+// localPrivacy only reads settings from the machine. Missing or invalid JSON
+// grants no consent, including after an upgrade from a version without it.
+func localPrivacy(dir string) checks.Privacy {
+	var privacy checks.Privacy
+	if err := readJSON(filepath.Join(dir, privacyFile), &privacy); err != nil {
+		return checks.Privacy{}
+	}
+	return privacy
+}
+
+func reportPermissions(r policy.Report, privacy checks.Privacy) policy.Report {
+	r.IncludeEvidence = r.IncludeEvidence && privacy.ReportDetails
+	r.IncludeIPs = r.IncludeIPs && privacy.ReportDetails
+	r.IncludeLocation = r.IncludeLocation && privacy.ReportDetails
+	return r
 }
 
 func readJSON(path string, v any) error {
@@ -301,7 +320,7 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 	if pol.Update.Binary {
 		fmt.Fprintf(env.Out, "Updates itself from github.com/%s releases.\n", pol.Update.Repo)
 	}
-	printSends(env.Out, pol)
+	printSends(env.Out, reportPermissions(pol.Report, localPrivacy(env.Dir)))
 	setUpNotifications(ctx, env, &cfg, pol, o.NotifierZip)
 	fmt.Fprintf(env.Out, "\nNow checking this computer for the first time. It usually takes under a minute, %s at most.\n", check.Timeout)
 	if err := Send(ctx, env, true); err != nil {
@@ -327,10 +346,8 @@ func schedule(r policy.Report) string {
 }
 
 // printSends says, at install, when the report carries more than results.
-func printSends(w io.Writer, pol policy.Policy) {
-	if pol.Report.IncludeIPs || pol.Report.IncludeLocation {
-		fmt.Fprintf(w, "Your organisation's policy also sends: %s.\n", sends(pol.Report))
-	}
+func printSends(w io.Writer, r policy.Report) {
+	fmt.Fprintf(w, "Reporting permissions: %s.\n", sends(r))
 }
 
 // sends lists what a report carries besides the results.
@@ -354,7 +371,7 @@ func sends(r policy.Report) string {
 // The portal is not told: a revoked or forgotten install is IT's to clean up.
 func Uninstall(env Env) error {
 	err := errors.Join(services.unregister(), notifier.Remove(env.Dir))
-	for _, name := range []string{"config.json", "state.json", "bordercheck.log", policy.FileName, TokenFile, ignore.FileName, binName()} {
+	for _, name := range []string{"config.json", "state.json", "bordercheck.log", policy.FileName, TokenFile, ignore.FileName, privacyFile, binName()} {
 		if e := os.Remove(filepath.Join(env.Dir, name)); e != nil && !errors.Is(e, os.ErrNotExist) {
 			err = errors.Join(err, e) // Windows cannot remove a running binary; it goes on the next uninstall
 		}
@@ -470,10 +487,11 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 	found := rep.CompromiseLines() // before evidence is left out: the details tell one sign from another
 	st.CompromiseFound = found
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID
-	if pol.Report.IncludeIPs {
+	permissions := reportPermissions(pol.Report, localPrivacy(env.Dir))
+	if permissions.IncludeIPs {
 		rep.Host.IPs = hostinfo.IPs()
 	}
-	if pol.Report.IncludeLocation {
+	if permissions.IncludeLocation {
 		if loc, err := hostinfo.Location(ctx); err == nil {
 			rep.Location = loc
 		}
@@ -481,18 +499,12 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 	// After the report is posted, whether or not it got through; a notification
 	// never holds up or fails a report.
 	defer notifyUser(ctx, env, pol.Notify, results, st, now, force, pol.Report.URL)
-	if !pol.Report.IncludeEvidence {
-		for i := range rep.Results {
-			rep.Results[i].Evidence = nil
-			// The flag, the check IDs and what each sign is still go; which
-			// item it is (a name or path) is evidence.
-			if c := rep.Results[i].Compromise; c != nil {
-				bare := make([]check.Indicator, len(c))
-				for j, ind := range c {
-					bare[j] = check.Indicator{What: ind.What}
-				}
-				rep.Results[i].Compromise = bare
-			}
+	if !permissions.IncludeEvidence {
+		// Build a new slice so local notifications keep their full results.
+		rep.Host.Hostname = ""
+		rep.Results = make([]check.Result, 0, len(results))
+		for _, r := range results {
+			rep.Results = append(rep.Results, check.Result{ID: r.ID, Status: r.Status, Severity: r.Severity})
 		}
 	}
 	st.LastTry = now
@@ -610,8 +622,8 @@ func Status(env Env) (string, error) {
 	if refreshedFrom != "" {
 		fmt.Fprintf(&b, " (refreshed from %s)", refreshedFrom)
 	}
-	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results, anything you ignored with your reason, and files set aside as likely sample keys; %s\nService:    %s\n",
-		pol.Report.CheckEvery(), pol.Report.Interval, hostOf(pol.Report.URL), sends(pol.Report), services.status())
+	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      check statuses and device metadata; %s\nService:    %s\n",
+		pol.Report.CheckEvery(), pol.Report.Interval, hostOf(pol.Report.URL), sends(reportPermissions(pol.Report, localPrivacy(env.Dir))), services.status())
 	if pol.Report.CompromiseAlert {
 		fmt.Fprintf(&b, "Compromise: looked for every hour, and reported as soon as a sign is found (the other checks run every %s)\n", pol.Report.CheckEvery())
 	} else {

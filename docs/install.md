@@ -7,8 +7,8 @@ There are two ways to set machines up:
 
 | | Invite links (enrolled) | `policies.json` (static) |
 |---|---|---|
-| What IT does | runs the [portal](portal.md), creates an invite per person, sends them one command | hosts one `policies.json` for everybody and runs its own report endpoint |
-| What the person does | runs the command; nothing to type | runs the command and types their work email |
+| What IT does | runs the [portal](portal.md), creates an invite per person, sends them their invite link | hosts one `policies.json` for everybody and runs its own report endpoint |
+| What the person does | reviews the script and runs it; no email prompt | reviews the script, runs it and types their work email |
 | Who sets the email | IT, in the invite | the person (limited by `report.email_domains`) |
 | Report credential | a token for this install only | whatever your endpoint checks, e.g. one header in the policy, shared by every machine and readable by anyone who can fetch the file |
 | Policy | chosen by the person's role, fetched with the install's token | the same file for everyone |
@@ -20,16 +20,18 @@ policy and sends nothing.
 
 ## With an invite link
 
-IT creates an invite for the person in the portal and sends them the command it shows. macOS and Linux:
+Open the invite link from IT. Download the installer from the invite page, or save
+[`install.sh`](https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh) for macOS/Linux or
+[`install.ps1`](https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1) for Windows. Review
+the script before running it from its directory. Use a regular user account with trusted OpenSSL 3 or
+later on PATH. Replace the example URL with your own invite link.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.acme.com/i/<code>
+sh ./install.sh 'https://bordercheck.acme.com/i/<code>'
 ```
 
-Windows (PowerShell):
-
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/i/<code>
+.\install.ps1 'https://bordercheck.acme.com/i/<code>'
 ```
 
 Or, with the binary already there: `bordercheck install https://bordercheck.acme.com/i/<code>`.
@@ -91,17 +93,16 @@ What enrollment does and does not prove:
 
 ## With a policies.json
 
-Write a policy with a `report.url` (see [Policies](policies.md)), host it at an HTTPS URL, and have people run
-one command. macOS and Linux:
+Write a policy with a `report.url` (see [Policies](policies.md)) and host it at an HTTPS URL.
+Download and review the script as for an invite link, then run it with the policy URL from a regular
+user account.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.acme.com/policies.json
+sh ./install.sh 'https://bordercheck.acme.com/policies.json'
 ```
 
-Windows (PowerShell):
-
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/policies.json
+.\install.ps1 'https://bordercheck.acme.com/policies.json'
 ```
 
 The script picks the latest release for the OS and CPU, [checks it](#what-the-install-script-proves), and runs
@@ -200,7 +201,7 @@ opens that page in the default browser. The link itself is never in the visible 
 **The permission question.** macOS asks once whether "bordercheck" may send notifications. bordercheck lets it ask
 only while the person is at the terminal:
 
-- `bordercheck install` run in a terminal (including `curl … | sh`): after the install lines, it says
+- `bordercheck install` run in a terminal: after the install lines, it says
   "bordercheck shows a notification when it finds a new problem on this computer; clicking it opens your report
   page. macOS will now ask whether "bordercheck" may send notifications. Choose Allow to get them.", then macOS
   asks, and install says what was chosen before running the first check.
@@ -301,35 +302,22 @@ A fork signs its own releases with its own key pair (see [CONTRIBUTING](../CONTR
 
 ## What the install script proves
 
-Before it runs anything it downloaded, the script checks that:
+Both scripts use a trusted OpenSSL executable with Ed25519 support to verify `SHA256SUMS.sig`
+against the release key pinned in the script. Then they verify the downloaded binary against the
+signed SHA-256 checksum. If the verifier is missing, the signature is invalid, or the checksum
+differs, the script stops before running the binary. Dry runs perform both checks without executing it.
 
-1. `SHA256SUMS.sig` is an ed25519 signature of `SHA256SUMS` by the release key written into the script (with
-   OpenSSL 3, as on current Linux distributions), and
-2. the binary matches its line in `SHA256SUMS`.
-
-Stock macOS (LibreSSL) and Windows PowerShell cannot check ed25519, so there the downloaded binary checks the
-signature itself (`bordercheck verify`) with the key from the script, after step 2 passed. Any mismatch stops
-the install with a message and nothing installed.
-
-What that does and does not prove:
-
-- It catches a corrupted or truncated download, a binary swapped on the release without updating `SHA256SUMS`,
-  and (with OpenSSL 3) a release whose `SHA256SUMS` was changed without the signing key.
-- Without OpenSSL 3 the signature check runs inside the binary it is checking, so a binary planted by someone who
-  can edit the release can simply say yes. The checksum still ties it to `SHA256SUMS`, but not `SHA256SUMS` to
-  the key.
-- `curl | sh` trusts whoever controls the script's URL. The script and the release both live on GitHub, so
-  someone who takes over the GitHub account can change both. The signing key protects **updates** of installed
-  copies (which trust only their built-in key) far better than it protects the first install. To close the gap,
-  host `install.sh` yourself (next to `policies.json`) or pin it to a commit
-  (`raw.githubusercontent.com/ptrinh/bordercheck/<commit>/install.sh`).
+Stock macOS and Windows installations may need a separate OpenSSL installation. Get it from a
+source approved by your organisation. For the installer itself, use a reviewed copy from IT or pin
+the download URL to a reviewed commit. The release key in that copy is what the script trusts.
 
 ## Download by hand
 
-Get `bordercheck-<version>-<os>-<arch>` from [Releases](https://github.com/ptrinh/bordercheck/releases/latest)
-(macOS, Linux and Windows; arm64 and amd64) with `SHA256SUMS` and `SHA256SUMS.sig`. Compare
-`shasum -a 256 <file>` with its line in `SHA256SUMS`; then `./<file> verify SHA256SUMS SHA256SUMS.sig <file>`
-checks the signature (with the caveat above: a binary checking itself).
+Get the asset, `SHA256SUMS`, and `SHA256SUMS.sig` from
+[Releases](https://github.com/ptrinh/bordercheck/releases/latest). Use an independent verifier
+with the trusted release public key before executing the asset. The installer can perform this
+verification with `--dry-run` on macOS/Linux or `-DryRun` on Windows. To install from the
+verified release, rerun the reviewed script without the dry-run option.
 
 macOS binaries are signed with a Developer ID and notarized (since v0.2.0), so a browser download opens without a
 Gatekeeper block; a bare binary cannot be stapled, so Gatekeeper looks the notarization up online. Windows
@@ -339,60 +327,51 @@ binaries are not Authenticode-signed yet.
 `brew install ptrinh/tap/bordercheck`, then `bordercheck install <url>`. The service runs its own copy, which
 updates itself; `brew upgrade` updates the one on your PATH.
 
-## What is sent
+## Local privacy settings
 
-The report is the same JSON as `bordercheck -json`, plus `email` and `install_id`, plus `host.ips` and
-`location` only when the policy asks for them:
+To opt in, create a user-readable `privacy.json` in the [install folder](#the-service). For a
+standalone run, use the same folder where an install would store its settings. These are the defaults:
 
 ```json
 {
-  "tool": "bordercheck", "version": "v0.2.0", "policy": "Acme", "time": "2026-10-30T14:46:07Z",
-  "host": { "os": "darwin", "arch": "arm64", "hostname": "an-mbp", "ips": ["192.168.1.23", "2001:db8::23"] },
-  "email": "an@acme.com", "install_id": "4f1c…",
-  "counts": { "fail": 1, "error": 0, "warn": 1, "pass": 3, "skip": 1, "waived": 0 },
-  "results": [ { "id": "firewall", "title": "Firewall is on", "status": "fail", "severity": "high",
-                 "summary": "The macOS firewall is off.", "fix": "…",
-                 "summary_parts": [ { "key": "firewall.mac.off" } ],
-                 "fix_parts": [ { "key": "firewall.mac.off.fix" } ] } ]
+  "shell_history": false,
+  "project_env": false,
+  "credential_stores": false,
+  "report_details": false
 }
 ```
 
-- `summary_parts` and `fix_parts` (since 0.4, optional) are the same summary and fix as message keys with
-  named parameters (strings and integers), in the order the English joins them, for example
-  `[{"key": "listeners.exposed", "params": {"n": 3}}, {"key": "check.moreAllowed", "params": {"n": 2}}]`.
-  The English text is rendered from exactly these parts (`internal/msg/catalog.go`), so the two always agree;
-  the portal uses the parts to show the text in the reader's language and falls back to `summary`/`fix` for a
-  key it does not know. A result whose text has no message (an error from the OS) has no parts. Keys never
-  change meaning: a message with other parameters gets a new key. Receivers that do not know these fields
-  ignore them.
+- `shell_history` allows reading supported shell history files.
+- `project_env` allows finding and reading project `.env` files within the configured scan depth.
+- `credential_stores` allows scanning credential files, shell startup files, private keys, Git
+  credentials, and the SSH, AI-agent, browser-password and package-manager checks. Some package
+  manager configuration files can also hold credentials. The `git-tracked` sample rule requires this permission because it reads Git configuration.
+- `report_details` permits additional report fields, subject to the matching flags in the IT policy.
 
-- Secret values are never printed or sent. For long provider tokens (OpenAI, GitHub, AWS…) the report shows the
-  last 4 characters, as the providers' own dashboards do, so people can tell which key it is (policy
-  `secrets.show_tail`). Passwords show nothing.
-- Evidence (file paths, variable names, ports) leaves the machine only when the policy sets
-  `report.include_evidence`.
-- What the person marked as not sensitive with `bordercheck ignore` is always sent, in the `user_ignored` of
-  the `secrets`, `ai-agents` or `ssh-keys` result: `[{"path": "~/proj/.env", "name": "POSTGRES_PASSWORD", "kind": "Secret-looking
-  variable", "reason": "local Docker database", "since": "2026-11-11"}]`, at most 200, never a value or its last
-  characters. It is the record of what was set aside, so it does not depend on `report.include_evidence`.
-  `bordercheck status` says so. Receivers that do not know the field ignore it.
-- When a failing result shows [signs of compromise](policies.md#signs-of-compromise), the report has
-  `"compromised": true` and `"compromise_checks": ["startup-items"]`, and that result lists its signs:
-  `"compromise": [{"what": {"key": "compromise.startupDownloadRun"}, "detail": "LaunchAgent ~/Library/LaunchAgents/com.x.plist (com.x)"}]`.
-  `what` is a message key like `summary_parts`; `detail` names the item (a name or path, never a command line or
-  a value) and is sent only with `report.include_evidence`. The flag and the check IDs are always sent; none of
-  it is when the policy sets `report.compromise_alert` to `false`. Receivers that do not know the fields ignore
-  them.
-- Secrets set aside as likely sample keys are always sent too, in the `secrets` result's `likely_samples`:
-  `[{"path": "~/forks/app/config/default.pem", "kind": "Private key", "rule": "git-tracked"}]`, at most 200, never a
-  value or its last characters, whatever `report.include_evidence` says ([Sample keys](#sample-keys)).
-- The machine's IP addresses leave it only when the policy sets `report.include_ips`. Whatever the policy says,
-  the receiver sees the public IP address the report arrives from, as every web server does, and may store it or
-  look up a rough location from it.
-- No device location is sent today, whatever the policy says ([why](policies.md#location)). The field would be
-  `{"lat", "lon", "accuracy_m", "source", "time"}`.
-- `bordercheck status` shows what this install sends (evidence, IP addresses, location), and install says so once
-  when IP addresses or location are on. A plain `bordercheck` or `bordercheck -json` never includes them.
+A policy can disable checks or narrow them further. Policy-defined extra secret files and AI config paths can point
+anywhere and require all three scan permissions. With no scan permissions, the secrets check shows
+as skipped. Missing or invalid local settings use the defaults. Existing installations adopt these
+defaults on upgrade, which can reduce detection coverage and remove detail from new reports. The next
+run reads changes to the local file.
+
+## What is sent
+
+By default, the installed agent sends check IDs, statuses, severity, counts and compromise flags,
+along with email, install ID, OS, architecture, tool version, policy name and report time. The portal
+still identifies enrolled devices by their install ID and can alert on a change in compromise state.
+Enrollment sends OS and architecture without the hostname.
+
+- With local `report_details` and policy `report.include_evidence`, reports also include hostname,
+  summaries, fixes, file paths, variable names, ports, per-item compromise details, ignored findings
+  and their reasons, and likely sample keys. Passwords and complete secret values are excluded. A
+  policy can allow up to the last four characters of a long provider token.
+- Interface IPs require local `report_details` and policy `report.include_ips`. The receiver also
+  sees the public IP of the HTTP connection independently. IT can configure its storage in the
+  [portal](portal.md).
+- Location would require local `report_details` and policy `report.include_location`. No supported
+  OS currently supplies a device position to the agent. See [Location](policies.md#location).
+- `bordercheck status` shows the effective reporting permissions. A plain run or `bordercheck -json`
+  displays local findings and sends no report.
 - An enrolled install's token travels in the `Authorization` header, never in the body, and only to the portal
   that issued it. The report page link a receiver may return is kept out of the log.
 - SSH keys: key material is never shown, only type, fingerprint and comment. Tunnels: only the tool name and
@@ -441,10 +420,8 @@ two do (an AI config with a token can be found by both `secrets` and `ai-agents`
 first and refuses a path or name that matches nothing (it lists what it finds in that file, by name), what cannot
 be ignored (and says what to do instead), an empty reason, and a check whose policy sets `user_ignore` to `false`.
 
-Ignored findings no longer count toward their check's status, severity or counts (the summary says how many were
-ignored; if nothing else is left, the check passes). They are not hidden from IT: every report lists each one
-under its check with its path, name, kind, reason and date, also when `report.include_evidence` is off (see
-[What is sent](#what-is-sent)). The list is `ignored.json` in the install folder (one file for the three checks,
+Ignored findings no longer count toward their check's status, severity or counts. Detailed reports can
+include their paths, names, kinds, reasons and dates. See [What is sent](#what-is-sent). The list is `ignored.json` in the install folder (one file for the three checks,
 each entry naming its check), readable by this user only; a plain `bordercheck` run reads it too, installed or
 not, and `bordercheck uninstall` removes it. An entry that no longer matches anything is kept (the finding may
 come back) until `unignore` removes it. A list that cannot be read counts as empty, and the checks say so.
@@ -474,6 +451,4 @@ or other git filters make it differ from what git stores.
 
 Likely samples do not count toward the check's status or counts; the summary says how many there are ("3 more
 look like sample keys."), and if nothing else is left the check passes. The terminal report shows one line with
-the count per rule; `bordercheck -json` lists each one (path, name or kind, rule). Every report sends that list
-to IT, who see it on the machine's page. A real key committed to a repository matches `git-tracked` too, which is
-why the list is not hidden.
+the count per rule; `bordercheck -json` lists each one (path, name or kind, rule). Detailed reports include the list so IT can review cases such as a real key committed to a repository.

@@ -40,7 +40,7 @@ func TestSecretsGitRemotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.find(context.Background(), home)
+	s.find(context.Background(), home, Privacy{CredentialStores: true})
 	found := s.scanGitRemotes(home, p.Locations)
 	var got []string
 	for _, f := range found {
@@ -67,7 +67,7 @@ func TestSecretsGitRemotes(t *testing.T) {
 	off := false
 	p.ShowTail = &off
 	s, _ = newSecretScanner(p, home)
-	s.find(context.Background(), home)
+	s.find(context.Background(), home, Privacy{CredentialStores: true})
 	for _, f := range s.scanGitRemotes(home, p.Locations) {
 		if f.tail != "" {
 			t.Errorf("tail shown: %s", f)
@@ -81,7 +81,7 @@ func TestSecretsGitRemotes(t *testing.T) {
 	p = policy.Default().Checks.Secrets
 	p.WalkDepth = 1
 	s, _ = newSecretScanner(p, home)
-	s.find(context.Background(), home)
+	s.find(context.Background(), home, Privacy{CredentialStores: true})
 	if n := len(s.scanGitRemotes(home, p.Locations)); n != 1 { // ~/.gitconfig only: ~/work/app/.git is two folders down
 		t.Errorf("walk_depth 1: %d findings", n)
 	}
