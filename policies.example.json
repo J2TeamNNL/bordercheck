@@ -165,7 +165,7 @@
       "suggest_alternatives": true
     },
     "admin-rights": {
-      "allow_admin": false
+      "allow_admin": true
     },
     "os-protections": {
       "sip": true,

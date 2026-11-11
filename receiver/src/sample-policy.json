@@ -60,7 +60,7 @@
     },
     "screen-lock": { "require_password": true, "max_lock_minutes": 10 },
     "remote-access": { "allow": ["guest"], "third_party": true },
-    "admin-rights": { "allow_admin": false },
+    "admin-rights": { "allow_admin": true },
     "os-protections": { "sip": true, "gatekeeper": true, "antivirus": true, "smartscreen": true, "secure_boot": true, "lsm": true },
     "sharing": { "allow": [] },
     "extensions": { "browsers": true, "editors": true, "block": [], "allow": [], "warn_all_sites": false },

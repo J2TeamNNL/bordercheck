@@ -7,7 +7,7 @@ import (
 
 func TestAdminProtectionsSharingPolicy(t *testing.T) {
 	d := Default().Checks
-	if d.AdminRights.AllowAdmin || !d.OSProtections.SIP || !d.OSProtections.LSM || !d.OSProtections.SmartScreen ||
+	if !d.AdminRights.AllowAdmin || !d.OSProtections.SIP || !d.OSProtections.LSM || !d.OSProtections.SmartScreen ||
 		d.Sharing.Allow == nil || len(d.Sharing.Allow) != 0 {
 		t.Errorf("defaults: %+v %+v %+v", d.AdminRights, d.OSProtections, d.Sharing)
 	}

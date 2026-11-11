@@ -344,7 +344,7 @@ func (c Checks) TailscaleOnProblem() check.Status {
 // AdminRights judges how much power the daily account has.
 type AdminRights struct {
 	Common
-	AllowAdmin bool `json:"allow_admin"` // the account may be an administrator (passwordless sudo and UAC are still judged)
+	AllowAdmin bool `json:"allow_admin"` // the account may be an administrator, the default (passwordless sudo and UAC are still judged)
 }
 
 // OSProtections judges the OS's own malware defences; each switch turns one part off.
@@ -443,7 +443,7 @@ func Default() Policy {
 				LowerSeverity: []string{"cloudflared"}},
 			AIAgents:        AIAgents{Tokens: true, Guardrails: true, ExtraPaths: []string{}, IgnorePaths: []string{}, UserIgnore: true},
 			CrackedSoftware: CrackedSoftware{SuggestAlternatives: true},
-			AdminRights:     AdminRights{AllowAdmin: false},
+			AdminRights:     AdminRights{AllowAdmin: true},
 			OSProtections: OSProtections{SIP: true, Gatekeeper: true, Antivirus: true, SmartScreen: true, SecureBoot: true,
 				LSM: true},
 			Sharing: Sharing{Allow: []string{}},

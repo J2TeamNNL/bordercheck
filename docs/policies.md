@@ -471,7 +471,7 @@ and setting names only.
 | `sudo` runs some commands without a password | warn, medium |
 | Windows: UAC off (`EnableLUA = 0`) | fail, high |
 | Windows: UAC elevates administrators without asking (`ConsentPromptBehaviorAdmin = 0`) | fail, high for an administrator; warn, medium otherwise |
-| The account is an administrator (macOS `admin`; Linux `sudo`, `wheel` or `admin`; Windows Administrators) | warn, low (medium or high when another finding here applies) |
+| The account is an administrator (macOS `admin`; Linux `sudo`, `wheel` or `admin`; Windows Administrators), when `allow_admin` is `false` | warn, low (medium or high when another finding here applies) |
 | Windows: the built-in Administrator account is enabled | warn, medium |
 
 `sudo -n -l` lists rules without a password only when one of them is `NOPASSWD` (sudo's default
@@ -480,7 +480,7 @@ does not count.
 
 | Field | Default | |
 |---|---|---|
-| `allow_admin` | `false` | Accept an administrator account. Passwordless `sudo` and UAC are still judged. |
+| `allow_admin` | `true` | Accept an administrator account, as most people's own laptop is set up. `false` makes an administrator account a low warning. Passwordless `sudo` and UAC are judged either way. |
 
 ### os-protections
 
