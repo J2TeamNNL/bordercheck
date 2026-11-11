@@ -198,9 +198,12 @@ func TestPackageManagerPaths(t *testing.T) {
 			t.Errorf("darwin %s: no %s", tool, want)
 		}
 	}
-	linux := pmConfigPaths("/home/demo", "linux", func(k string) string { return map[string]string{"XDG_CONFIG_HOME": "/x"}[k] })
-	for tool, want := range map[string]string{"pnpm": "/x/pnpm/config.yaml", "pip": "/x/pip/pip.conf", "bun": "/x/.bunfig.toml",
-		"go": "/x/go/env", "cargo": "/home/demo/.cargo/config.toml"} {
+	// XDG_CONFIG_HOME counts only when it is an absolute path, and what is absolute depends on the OS
+	// the test runs on.
+	xdg := filepath.ToSlash(t.TempDir())
+	linux := pmConfigPaths("/home/demo", "linux", func(k string) string { return map[string]string{"XDG_CONFIG_HOME": filepath.FromSlash(xdg)}[k] })
+	for tool, want := range map[string]string{"pnpm": xdg + "/pnpm/config.yaml", "pip": xdg + "/pip/pip.conf", "bun": xdg + "/.bunfig.toml",
+		"go": xdg + "/go/env", "cargo": "/home/demo/.cargo/config.toml"} {
 		if !has(linux, tool, want) {
 			t.Errorf("linux %s: no %s", tool, want)
 		}
@@ -222,8 +225,8 @@ func TestGatherPackageManagers(t *testing.T) {
 	// only the ones under the temp home are this test's.
 	var mine []string
 	for _, c := range f.Configs {
-		if strings.HasPrefix(c.Path, "~/") {
-			mine = append(mine, c.Path)
+		if p := filepath.ToSlash(c.Path); strings.HasPrefix(p, "~/") { // shown with the OS's separator
+			mine = append(mine, p)
 		}
 	}
 	if !f.Present["npm"] || !f.Present["cargo"] || !slices.Equal(mine, []string{"~/.npmrc", "~/.cargo/config.toml"}) {

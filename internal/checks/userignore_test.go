@@ -3,6 +3,7 @@ package checks
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -199,8 +200,10 @@ func TestUserIgnoreOnMadeUpHome(t *testing.T) {
 		t.Errorf("ai-agents: %s %q %+v %q", r.Status, r.Summary, r.UserIgnored, r.Evidence)
 	}
 	r := all["ssh-keys"]
-	if len(r.UserIgnored) != 1 || r.UserIgnored[0].Kind != "no passphrase (OpenSSH ssh-ed25519)" || strings.Contains(strings.Join(r.Evidence, " "), "aur ") ||
-		!strings.Contains(r.Summary, "1 more ignored by you.") {
+	// Windows has no "readable by other users" finding, so the second key can be ignored there too.
+	wantIgnored := map[bool]int{true: 2, false: 1}[runtime.GOOS == "windows"]
+	if len(r.UserIgnored) != wantIgnored || r.UserIgnored[0].Kind != "no passphrase (OpenSSH ssh-ed25519)" || strings.Contains(strings.Join(r.Evidence, " "), "aur ") ||
+		!strings.Contains(r.Summary, fmt.Sprintf("%d more ignored by you.", wantIgnored)) {
 		t.Errorf("ssh-keys: %s %q %+v %q", r.Status, r.Summary, r.UserIgnored, r.Evidence)
 	}
 	if runtime.GOOS != "windows" && !strings.Contains(strings.Join(r.Evidence, " "), "open") {

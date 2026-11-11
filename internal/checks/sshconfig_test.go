@@ -65,7 +65,7 @@ func TestSSHClientConfig(t *testing.T) {
 	if r.Status != check.Warn || r.Severity != check.Medium || len(r.Evidence) != 9 ||
 		!strings.Contains(r.Summary, "5 settings in the SSH client config weaken every connection") ||
 		!strings.Contains(r.Summary, "4 settings in the SSH client config weaken connections to particular hosts") ||
-		!strings.Contains(r.Fix, "StrictHostKeyChecking accept-new") || r.Evidence[0] != "~/.ssh/config:2  top level: ForwardAgent yes (every host)" {
+		!strings.Contains(r.Fix, "StrictHostKeyChecking accept-new") || filepath.ToSlash(r.Evidence[0]) != "~/.ssh/config:2  top level: ForwardAgent yes (every host)" {
 		t.Errorf("got %s %s %q %q\n%v", r.Status, r.Severity, r.Summary, r.Fix, r.Evidence)
 	}
 	// Specific hosts only: low.
