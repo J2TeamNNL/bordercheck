@@ -1,11 +1,22 @@
 # bordercheck
 
-**Checks your work laptop for open doors, and tells your IT team how it's doing.**
+**Finds the open doors on your work laptop and tells you how to close them.**
 
-Firewalls stop strangers on the internet. They don't stop a dev server listening on every network, a
-Tailscale peer that got hacked, a container with your home folder mounted, or an API key sitting in
-`.zshrc`. bordercheck looks for those on macOS, Linux and Windows and says how to close each one. Installed,
-it reports to your organisation on a schedule.
+One stolen password or one bad download can let someone onto a laptop. How much damage they do next depends
+on what was left open. bordercheck looks for:
+
+- programs that accept connections from other machines
+- API keys and passwords saved as plain text
+- SSH keys with no passphrase
+- tunnels, remote access and AI agents that skip approvals
+
+For each one it finds, it says how to fix it. It runs on macOS, Windows and Linux and needs no admin rights.
+A plain run only reads: it changes nothing and sends nothing.
+
+It is not an antivirus. It does not catch malware; it limits what malware, or a person, can reach.
+
+Companies can install it on every laptop, and each one then reports to the IT team on a schedule. See
+[For organisations](#for-organisations).
 
 <p align="center"><img src="docs/img/portal-machines.png" width="860" alt="The portal's Machines page: tiles for failing, attention, silent, pending invites and awaiting first report; the checks failing most; and a table of every machine with its state, person, role, platform, where it reports from and counts."></p>
 
