@@ -370,6 +370,8 @@ export const checksZh: CheckCatalog = {
   "passwords.stored": "{browsers} 中保存了密码。信息窃取类恶意软件会首先窃取浏览器中保存的密码。",
   "passwords.allowed": "策略允许：{browsers}。",
   "passwords.fix": "将这些密码迁移到密码管理器（浏览器的密码设置可以导出密码），从浏览器中删除它们，并关闭密码保存功能。",
+  "passwords.fix.mac":
+    "在 Mac 上，推荐使用 Apple 的“密码”App（Passwords）：系统自带，可用触控 ID 解锁，能导入浏览器导出的文件，并通过 Apple 的 iCloud Passwords 扩展在 Chrome 和 Edge 中自动填充。",
   "passwords.fix.chrome":
     "Chrome：设置 → 自动填充和密码 → Google 密码管理工具 → 设置（Settings → Autofill and passwords → Google Password Manager → Settings），关闭“提示保存密码”（Offer to save passwords）。",
   "passwords.fix.edge":

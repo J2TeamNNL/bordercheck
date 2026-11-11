@@ -383,6 +383,8 @@ export const checksVi: CheckCatalog = {
   "passwords.allowed": "Được chính sách cho phép: {browsers}.",
   "passwords.fix":
     "Chuyển các mật khẩu này sang một trình quản lý mật khẩu (phần cài đặt mật khẩu của trình duyệt có thể xuất chúng ra), xoá chúng khỏi trình duyệt, rồi tắt tính năng lưu mật khẩu.",
+  "passwords.fix.mac":
+    "Trên máy Mac, nên dùng app Passwords của Apple: có sẵn trong máy, mở khoá bằng Touch ID, nhập được file mà trình duyệt xuất ra, và tự điền trong Chrome và Edge qua tiện ích iCloud Passwords của Apple.",
   "passwords.fix.chrome":
     "Chrome: Settings → Autofill and passwords → Google Password Manager → Settings → tắt Offer to save passwords.",
   "passwords.fix.edge":

@@ -455,6 +455,8 @@ var Catalog = map[string]Entry{
 	"passwords.allowed": s("Allowed by policy: {browsers}."),
 	"passwords.fix": s("Move these passwords to a password manager (the browser's password settings can export them), " +
 		"delete them from the browser, and turn off saving."),
+	"passwords.fix.mac": s("On a Mac, Apple's Passwords app is a good choice: it is built in, unlocks with Touch ID, " +
+		"imports the file the browser exports, and fills in Chrome and Edge through Apple's iCloud Passwords extension."),
 	"passwords.fix.chrome": s("Chrome: Settings → Autofill and passwords → Google Password Manager → Settings → turn off " +
 		"Offer to save passwords."),
 	"passwords.fix.edge": s("Edge: Settings → Passwords and autofill (Profiles → Passwords in older versions) → turn off " +

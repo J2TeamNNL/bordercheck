@@ -43,6 +43,12 @@ type pwProfile struct {
 }
 
 func evalBrowserPasswords(ps []pwProfile, opts policy.BrowserPasswords) check.Result {
+	return evalBrowserPasswordsOn("", ps, opts)
+}
+
+// evalBrowserPasswordsOn is evalBrowserPasswords for one OS: on macOS the fix
+// names Apple's Passwords app, which is built in and fills in Chrome and Edge.
+func evalBrowserPasswordsOn(goos string, ps []pwProfile, opts policy.BrowserPasswords) check.Result {
 	if len(ps) == 0 {
 		return check.SkippedMsg(msg.Of("passwords.notFound"))
 	}
@@ -83,6 +89,9 @@ func evalBrowserPasswords(ps []pwProfile, opts policy.BrowserPasswords) check.Re
 		return check.Result{Status: check.Pass, Evidence: ev}.WithSummary(append(summary, note...))
 	}
 	fix := msg.Of("passwords.fix")
+	if goos == "darwin" {
+		fix = append(fix, msg.P("passwords.fix.mac"))
+	}
 	other := false
 	for _, id := range storedIDs {
 		if k, ok := passwordFixes[id]; ok {
@@ -122,7 +131,7 @@ func browserPasswords(opts policy.BrowserPasswords) func(context.Context) check.
 				ps = append(ps, chromiumPasswords(p))
 			}
 		}
-		return evalBrowserPasswords(ps, opts)
+		return evalBrowserPasswordsOn(runtime.GOOS, ps, opts)
 	}
 }
 

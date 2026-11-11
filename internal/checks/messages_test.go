@@ -65,7 +65,7 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 		id("sharing", evalSharing(macShareServices(map[string]string{"airdrop": "Everyone", "nat": "1"}, "", ""), nil, def.Sharing.Allow)),
 		id("extensions", evalExtensions(extFacts{Apps: []string{"Chrome", "Firefox", "VS Code"}, Items: sampleExtItems()},
 			policy.Extensions{Browsers: true, Editors: true, Block: []string{"evil.*"}})),
-		id("browser-passwords", evalBrowserPasswords([]pwProfile{{ID: "chrome", Name: "Chrome", Label: "Chrome (Default)", Saving: true,
+		id("browser-passwords", evalBrowserPasswordsOn("darwin", []pwProfile{{ID: "chrome", Name: "Chrome", Label: "Chrome (Default)", Saving: true,
 			Stored: true, Details: "Login Data is 96 KB, larger than an empty one (40 KB); Offer to save passwords is on"}}, def.BrowserPasswords)),
 		id("trust-store", evalTrustStore(trustFacts{OS: "darwin", Certs: []trustCert{{Name: "mkcert demo@demo-mac (Demo)",
 			CN: "mkcert demo@demo-mac (Demo)", SHA256: "AB12", Where: "user trust settings"}},
