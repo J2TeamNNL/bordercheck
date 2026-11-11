@@ -96,3 +96,23 @@ func TestEvalBrowserPasswords(t *testing.T) {
 		t.Errorf("allowed: %+v", r)
 	}
 }
+
+// When the logins can be counted, the count decides, whatever the file's size.
+func TestChromiumPasswordFactsCounted(t *testing.T) {
+	p := browserProfile{ID: "chrome", Name: "Chrome", Profile: "Default"}
+	big := map[string]int64{"Login Data": 40960, "Login Data For Account": 49152}
+	// Deleted logins leave a large file with nothing in it.
+	if r := chromiumPasswordFactsCounted(p, []byte(`{}`), big, map[string]int{"Login Data": 0, "Login Data For Account": 0}); r.Stored {
+		t.Errorf("emptied databases: %+v", r)
+	}
+	// A few logins fit in a file of the empty size.
+	r := chromiumPasswordFactsCounted(p, []byte(`{}`), big, map[string]int{"Login Data": 3, "Login Data For Account": 0})
+	if !r.Stored || !strings.Contains(r.Details, "Login Data holds 3 saved login(s)") || strings.Contains(r.Details, "For Account") {
+		t.Errorf("three logins: %+v", r)
+	}
+	// One that could not be counted falls back to its size.
+	r = chromiumPasswordFactsCounted(p, []byte(`{}`), big, map[string]int{"Login Data": 0})
+	if !r.Stored || !strings.Contains(r.Details, "Login Data For Account is 48 KB") {
+		t.Errorf("uncounted: %+v", r)
+	}
+}

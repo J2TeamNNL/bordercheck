@@ -151,7 +151,16 @@ func chromiumPasswords(p browserProfile) pwProfile {
 			sizes[n] = sz
 		}
 	}
-	return chromiumPasswordFacts(p, prefs, sizes)
+	// The number of rows in the logins table, where the file can be read that
+	// way: its size alone cannot tell, since a file keeps its size after the
+	// passwords in it are deleted.
+	counts := map[string]int{}
+	for n := range sizes {
+		if c, err := sqliteTableRows(filepath.Join(p.Dir, n), "logins"); err == nil {
+			counts[n] = c
+		}
+	}
+	return chromiumPasswordFactsCounted(p, prefs, sizes, counts)
 }
 
 // chromiumPasswordFacts judges a Chromium profile from its Preferences
@@ -159,6 +168,13 @@ func chromiumPasswords(p browserProfile) pwProfile {
 // false) and the sizes of its login databases: Login Data on this device,
 // Login Data For Account for passwords kept in the browser account.
 func chromiumPasswordFacts(p browserProfile, prefs []byte, sizes map[string]int64) pwProfile {
+	return chromiumPasswordFactsCounted(p, prefs, sizes, nil)
+}
+
+// chromiumPasswordFactsCounted is chromiumPasswordFacts with the number of
+// saved logins in each database that could be counted (counts); for the rest
+// the size has to do.
+func chromiumPasswordFactsCounted(p browserProfile, prefs []byte, sizes map[string]int64, counts map[string]int) pwProfile {
 	var doc struct {
 		Save *bool `json:"credentials_enable_service"`
 	}
@@ -168,6 +184,13 @@ func chromiumPasswordFacts(p browserProfile, prefs []byte, sizes map[string]int6
 	for _, n := range []string{"Login Data", "Login Data For Account"} {
 		sz, ok := sizes[n]
 		if !ok {
+			continue
+		}
+		if c, counted := counts[n]; counted {
+			if c > 0 {
+				r.Stored = true
+				parts = append(parts, fmt.Sprintf("%s holds %d saved login(s)", n, c))
+			}
 			continue
 		}
 		if sz > chromeEmptyLoginData {

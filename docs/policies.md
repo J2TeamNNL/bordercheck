@@ -507,15 +507,16 @@ browser's enterprise policy and those built into the browser are not counted.
 
 ### browser-passwords
 
-Passwords saved in the browser's own password manager: information stealers take them first. The check never
-opens a login database: Chromium's `Login Data` and `Login Data For Account` are only measured (a file larger than
-an empty one, 40 KB, almost always holds saved logins; a few logins may still fit in an empty-sized file), and from
-Firefox's `logins.json` only the number of entries is kept. No site, user name or password is ever read into the
-result.
+Passwords saved in the browser's own password manager: information stealers take them first. The check counts
+saved logins without reading one: in Chromium's `Login Data` and `Login Data For Account` (SQLite files) it reads
+the schema and the page headers of the `logins` table and adds up the rows, never decoding a row; from Firefox's
+`logins.json` only the number of entries is kept. No site, user name or password is ever read into the result.
+A database it cannot count (an unexpected layout) falls back to its size: larger than an empty one (40 KB) is
+taken as holding saved logins, which can be wrong both ways.
 
 | Reads | |
 |---|---|
-| Chromium browsers | `credentials_enable_service` in `Preferences` ("Offer to save passwords", on unless false); the size of the login databases |
+| Chromium browsers | `credentials_enable_service` in `Preferences` ("Offer to save passwords", on unless false); the number of rows in the login databases |
 | Firefox | `signon.rememberSignons` in `prefs.js` ("Ask to save passwords"); the number of entries in `logins.json` |
 
 Saved passwords warn with medium severity; saving on with nothing saved passes with a note. A setting forced by
