@@ -439,4 +439,19 @@ export const zh: Catalog = {
   "checkTitle.backup": "丢失的笔记本电脑可以找回并恢复数据",
   "rep.prodSecrets": "{n} 个生产环境明文密钥",
   "rep.prodSecretsNote": "仅显示名称和文件；密钥的值从不发送。",
+
+  "state.compromised": "疑似被入侵",
+  "filter.compromised": "疑似被入侵",
+  "tile.compromised": "疑似被入侵",
+  "tile.compromisedSub": "最新报告中有被入侵迹象",
+  "machine.compTitle": "这台机器可能已被入侵",
+  "machine.compLead":
+    "自 {when} 起，它的报告显示有害软件可能已在其上运行。请按已被入侵处理：通知其使用者停止用它办公，并在删除任何东西之前先检查这台机器。之后，让使用者更改在这台机器上用过的密码和密钥。",
+  "machine.compNote": "这些只是 bordercheck 能看到的少数明显迹象，并非恶意软件检测：没有这些迹象的机器不代表一定干净。",
+  "machine.compNoDetail": "未发送具体项目：策略不发送证据",
+  "alert.compromised": "疑似被入侵",
+  "alert.compromise_cleared": "入侵迹象已消失",
+  "rep.compTitle": "请停止使用：这台电脑可能已被入侵",
+  "rep.compLead":
+    "bordercheck 发现有害软件可能已在这台电脑上（{checks}）。请停止用它办公，并立即联系你的 IT 团队。不要自行删除或卸载任何东西：IT 需要看到原样。IT 检查过之后，请更改你在这台电脑上用过的密码。",
 };

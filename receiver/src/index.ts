@@ -156,12 +156,12 @@ async function switchLanguage(req: Request, url: URL, back?: string): Promise<Re
 }
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname;
     if (path === "/report") {
       if (req.method !== "POST") return json({ error: "POST a bordercheck report here" }, 405, { allow: "POST" });
-      return handleReport(req, env);
+      return handleReport(req, env, undefined, undefined, ctx ? { waitUntil: (p) => ctx.waitUntil(p) } : {});
     }
     if (path === "/enroll") {
       if (req.method !== "POST") return json({ error: "bad_request", message: "POST an enrollment here" }, 405, { allow: "POST" });

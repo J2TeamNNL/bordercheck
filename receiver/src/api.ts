@@ -239,6 +239,8 @@ const S = {
     install_id: { type: "string" }, enrolled: { type: "boolean" }, revoked: { type: "boolean" }, role: { type: ["string", "null"] },
     email: { type: ["string", "null"], description: "From the machine's invite, not from its reports." },
     last_seen: { type: "string", format: "date-time" }, silent: { type: "boolean" }, state: { type: "string", enum: ["non-compliant", "attention", "ok"] },
+    compromised: { type: "boolean", description: "The latest report shows signs of compromise: a finding that hostile code is, or very probably is, already on the machine. A few strong signs, not malware detection." },
+    compromised_since: { type: ["string", "null"], format: "date-time", description: "When the current run of reports showing signs of compromise began." },
     counts: { type: "object" }, place: { type: ["string", "null"] },
     enrolled_at: { type: "string", description: "Only for state=no_report." }, untrusted: untrustedS,
   }),
@@ -430,7 +432,7 @@ export const ROUTES: Route[] = [
   },
   {
     method: "GET", path: "/summary", id: "getSummary", tag: "fleet",
-    summary: "Fleet overview: machines reporting, failing, silent, revoked, never reported; roles; invites by state; pending alerts; most failing checks.",
+    summary: "Fleet overview: machines reporting, compromised, failing, silent, revoked, never reported; roles; invites by state; pending alerts; most failing checks.",
     ok: 200, okText: "The summary.", errors: [401],
     run: async (c) => ok(await fleetSummary(c.env, c.now)),
   },
@@ -439,7 +441,7 @@ export const ROUTES: Route[] = [
     summary: "Machines, by install_id. Filter by state, role, a check's status, or a substring of email or hostname.",
     description: "state=no_report lists enrolled machines that have not reported yet. Hostname, OS and version are machine-supplied (under untrusted). No evidence or IP addresses here.",
     query: {
-      state: { type: "string", enum: [...Object.keys(FILTERS), "no_report"], default: "all", description: "all, failing (a check fails), attention (fail, error or warn), silent, revoked, no_report." },
+      state: { type: "string", enum: [...Object.keys(FILTERS), "no_report"], default: "all", description: "all, compromised (the latest report shows signs of compromise), failing (a check fails), attention (fail, error or warn), silent, revoked, no_report." },
       role_id: { type: "integer", minimum: 1, description: "Only machines in this role." },
       check: { type: "string", pattern: "^[a-z0-9][a-z0-9-]{0,63}$", description: "Only machines whose latest report has this check (at check_status)." },
       check_status: { type: "string", enum: KNOWN_STATUSES, default: "fail", description: "With check: the status to match (default fail)." },
@@ -452,7 +454,8 @@ export const ROUTES: Route[] = [
   },
   {
     method: "GET", path: "/machines/{install_id}", id: "getMachine", tag: "machines",
-    summary: "One machine: enrollment, waivers, checks needing attention with since when, passing checks, history; evidence and location only when asked for.",
+    summary: "One machine: enrollment, waivers, signs of compromise if any, checks needing attention with since when, passing checks, history; evidence and location only when asked for.",
+    description: "compromise (only while the latest report shows signs of compromise): since, checks, and signs, each a message key (compromise.startupDownloadRun, compromise.blockedExtension, compromise.crackTool, compromise.kmsEmulator) with its machine-supplied parameters and, with include=evidence, the item (untrusted.item).",
     params: { install_id: installIdP },
     query: {
       include: { type: "string", pattern: "^(evidence|location)(,(evidence|location))?$", description: "Comma-separated: evidence (evidence lines of checks not passing, and user_ignored: the findings the person at the machine marked as not sensitive, with their reasons; user_ignored_count is always there), location (public IP, IP location, device position, local addresses, where stored)." },

@@ -18,6 +18,11 @@ export const checksVi: CheckCatalog = {
   "check.interrupted": "Bị ngắt trước khi chạy xong.",
   "check.moreAllowed": "Còn {n} mục khác được policy cho phép.",
 
+  "compromise.startupDownloadRun": "Một chương trình được đặt để tự chạy khi khởi động tải code từ Internet về rồi chạy nó.",
+  "compromise.blockedExtension": "Một extension mà tổ chức của bạn đã chặn vì có hại đang được cài.",
+  "compromise.crackTool": "Một công cụ crack hoặc kích hoạt bản quyền lậu đang được cài.",
+  "compromise.kmsEmulator": "{product} được kích hoạt bằng một máy chủ kích hoạt giả chạy ngay trên máy này.",
+
   "firewall.mac.off": "Tường lửa macOS đang tắt.",
   "firewall.mac.off.fix":
     "Mở System Settings → Network → Firewall rồi bật lên. Hoặc chạy: [code]sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on[/code]",

@@ -506,7 +506,7 @@ describe("API fleet reads and the audit trail", () => {
   it("summary, checks, alerts, audit with actor filter and pages", async () => {
     const m = await fleet();
     const s = await api("GET", "/summary");
-    expect(s.body.machines).toEqual({ reporting: 2, failing: 1, attention_only: 0, silent: 0, revoked: 0, enrolled_no_report_yet: 0 });
+    expect(s.body.machines).toEqual({ reporting: 2, compromised: 0, failing: 1, attention_only: 0, silent: 0, revoked: 0, enrolled_no_report_yet: 0 });
     expect(s.body.notice).toBeUndefined();
     expect((await api("GET", "/checks")).body.data[0]).toMatchObject({ check_id: "firewall", fail: 1, pass: 1, reported_by: 2 });
     const alerts = await api("GET", "/alerts");

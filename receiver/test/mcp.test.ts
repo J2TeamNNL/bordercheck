@@ -250,7 +250,7 @@ describe("MCP read tools", () => {
     const m = await fleet();
     const s = (await tool("fleet_summary")).data;
     expect(s.notice).toContain("untrusted");
-    expect(s.machines).toEqual({ reporting: 2, failing: 1, attention_only: 0, silent: 0, revoked: 0, enrolled_no_report_yet: 0 });
+    expect(s.machines).toEqual({ reporting: 2, compromised: 0, failing: 1, attention_only: 0, silent: 0, revoked: 0, enrolled_no_report_yet: 0 });
     expect(s.most_failing_checks[0]).toMatchObject({ check_id: "firewall", fail: 1, high: 1 });
 
     const failing = (await tool("list_machines", { filter: "failing" })).data;

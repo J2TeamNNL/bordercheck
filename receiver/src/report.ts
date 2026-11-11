@@ -26,6 +26,33 @@ export interface Result {
   // summary and fix as message keys, for showing them translated (checktext.ts).
   summary_parts?: Part[];
   fix_parts?: Part[];
+  // Signs that hostile code is already on the machine (newer clients);
+  // absent from older clients and from results that are not a fail.
+  compromise?: Indicator[];
+}
+
+// Indicator is one sign of compromise: what it is, as a message part, and
+// which item (a name or path), only when the machine sends evidence.
+export interface Indicator {
+  what: Part;
+  detail: string;
+}
+
+export const MAX_INDICATORS = 20;
+
+// parseIndicators keeps well-formed signs (a valid message part, a string
+// detail if any), capped in number and length; anything else is dropped.
+export function parseIndicators(v: unknown): Indicator[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: Indicator[] = [];
+  for (const x of v.slice(0, MAX_INDICATORS * 2)) {
+    const o = obj(x);
+    const what = parseParts([o.what])?.[0];
+    if (!what || (o.detail !== undefined && typeof o.detail !== "string")) continue;
+    out.push({ what, detail: str(o.detail, 300).replace(/[\n\t]/g, " ").trim() });
+    if (out.length >= MAX_INDICATORS) break;
+  }
+  return out;
 }
 
 export interface UserIgnored {
@@ -67,6 +94,10 @@ export interface Report {
   results: Result[];
   localIps: string[]; // host.ips, validated; device-reported
   location: DeviceLocation | null; // device-reported position, validated
+  // The machine says it shows signs of compromise, in these checks. Only
+  // "compromised": true counts; an older client sends neither.
+  compromised: boolean;
+  compromiseChecks: string[];
 }
 
 export interface DeviceLocation {
@@ -189,12 +220,27 @@ export function parseReport(raw: unknown): Report {
     if (fp) res.fix_parts = fp;
     const ui = parseUserIgnored(o.user_ignored);
     if (ui?.length) res.user_ignored = ui;
+    const ci = parseIndicators(o.compromise);
+    if (ci?.length && status === "fail") res.compromise = ci;
     const w = obj(o.waived);
     if (o.waived !== undefined && (w.until !== undefined || w.reason !== undefined)) {
       res.waived = { until: str(w.until, 32), reason: str(w.reason, 500) };
     }
     return res;
   });
+
+  const compromised = r.compromised === true;
+  const compromiseChecks: string[] = [];
+  if (compromised && Array.isArray(r.compromise_checks)) {
+    for (const c of r.compromise_checks.slice(0, MAX_RESULTS)) {
+      const id = str(c, 64).trim();
+      if (id && !/\s/.test(id) && !compromiseChecks.includes(id)) compromiseChecks.push(id);
+      if (compromiseChecks.length >= 50) break;
+    }
+  }
+  if (compromised && !compromiseChecks.length) {
+    for (const res of results) if (res.compromise && !compromiseChecks.includes(res.id)) compromiseChecks.push(res.id);
+  }
 
   const host = obj(r.host);
   const t = typeof r.time === "string" && !Number.isNaN(Date.parse(r.time)) ? str(r.time, 40) : null;
@@ -209,6 +255,8 @@ export function parseReport(raw: unknown): Report {
     results,
     localIps: parseLocalIps(host.ips),
     location: r.location === undefined ? null : parseLocation(r.location),
+    compromised,
+    compromiseChecks,
   };
 }
 
