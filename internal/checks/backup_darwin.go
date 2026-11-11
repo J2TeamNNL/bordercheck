@@ -9,8 +9,8 @@ import (
 // gatherBackup asks tmutil for the Time Machine destinations and reads Time
 // Machine's preferences for encryption and dates. Without Full Disk Access
 // either may fail; that is reported as "could not tell", never prompted for.
-// Find My Mac is on when NVRAM holds its token: only the variable's name is
-// looked at.
+// Find My Mac is read from its preferences file, then from NVRAM, where only
+// the token's name is looked at (see macFindMy).
 func gatherBackup(ctx context.Context) backupFacts {
 	f := backupFacts{OS: "macos"}
 	if info, err := sysx.Run(ctx, "/usr/bin/tmutil", "destinationinfo", "-X"); err == nil {
@@ -19,8 +19,10 @@ func gatherBackup(ctx context.Context) backupFacts {
 			f.Dests, f.BackupKnown = dests, true
 		}
 	}
-	if out, err := sysx.Run(ctx, "/usr/sbin/nvram", "-p"); err == nil {
-		f.FindMy, f.FindMyKnown = nvramHasFindMy(out), true
+	prefs, perr := plistXML(ctx, "/Library/Preferences/com.apple.FindMyMac.plist")
+	nvram, nerr := sysx.Run(ctx, "/usr/sbin/nvram", "-p")
+	if (perr == nil && prefs != "") || nerr == nil {
+		f.FindMy, f.FindMyKnown = macFindMy(prefs, nvram), true
 	}
 	return f
 }

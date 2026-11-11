@@ -87,6 +87,9 @@ func evalAdminRights(f adminFacts, opts policy.AdminRights) check.Result {
 			evidence = append(evidence, "bordercheck ran elevated")
 		}
 	}
+	// Being an administrator is how most people's own laptop is set up: on
+	// its own it is a low warning; any other finding keeps its severity.
+	onlyAdmin := isAdmin && !opts.AllowAdmin && len(p.high)+len(p.medium) == 0
 	if isAdmin && !opts.AllowAdmin {
 		p.add(false, msg.Of("admin.isAdmin", "groups", strings.Join(f.AdminGroups, ", ")), msg.P(adminFixes[f.Family]))
 	}
@@ -106,7 +109,11 @@ func evalAdminRights(f adminFacts, opts policy.AdminRights) check.Result {
 	if f.SudoChecked && f.NoPasswdScope == sudoNone {
 		pass = append(pass, msg.P("admin.pass.sudo"))
 	}
-	return p.result(pass, notes, evidence)
+	r := p.result(pass, notes, evidence)
+	if onlyAdmin && r.Status == check.Warn {
+		r.Severity = check.Low
+	}
+	return r
 }
 
 // parseGroupNames reads `id -Gn`.

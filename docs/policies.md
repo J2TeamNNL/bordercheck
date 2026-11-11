@@ -369,7 +369,7 @@ and setting names only.
 | `sudo` runs some commands without a password | warn, medium |
 | Windows: UAC off (`EnableLUA = 0`) | fail, high |
 | Windows: UAC elevates administrators without asking (`ConsentPromptBehaviorAdmin = 0`) | fail, high for an administrator; warn, medium otherwise |
-| The account is an administrator (macOS `admin`; Linux `sudo`, `wheel` or `admin`; Windows Administrators) | warn, medium |
+| The account is an administrator (macOS `admin`; Linux `sudo`, `wheel` or `admin`; Windows Administrators) | warn, low (medium or high when another finding here applies) |
 | Windows: the built-in Administrator account is enabled | warn, medium |
 
 `sudo -n -l` lists rules without a password only when one of them is `NOPASSWD` (sudo's default
@@ -573,8 +573,9 @@ rights or prompts; what cannot be read is said in a note.
 
 - macOS: Time Machine destinations from `tmutil destinationinfo`, and their encryption and last backup from
   `/Library/Preferences/com.apple.TimeMachine.plist` (if reading them needs Full Disk Access, the check says it
-  could not tell). Find My Mac is taken as on when NVRAM holds its token (`fmm-mobileme-token-FMM`; only the
-  name is looked at).
+  could not tell). Find My Mac is read from `FMMEnabled` in `/Library/Preferences/com.apple.FindMyMac.plist`;
+  without that file, it is taken as on when NVRAM holds its token (`fmm-mobileme-token-FMM`; only the name is
+  looked at).
 - Windows: Find my device (`LocationSyncEnabled`, and the `AllowFindMyDevice` policy). File History, Windows
   Backup and OneDrive backups are not read.
 - Linux: skipped; there is no standard backup or device-finding service to read.

@@ -96,7 +96,7 @@ func TestEvalAdminRights(t *testing.T) {
 	}{
 		{"mac standard", adminFacts{Family: "macos", Admin: &no, SudoChecked: true}, def, check.Pass, "", "standard user"},
 		{"mac admin", adminFacts{Family: "macos", Admin: &yes, AdminGroups: []string{"admin"}, SudoChecked: true}, def,
-			check.Warn, check.Medium, "administrator (admin)"},
+			check.Warn, check.Low, "administrator (admin)"},
 		{"mac admin allowed", adminFacts{Family: "macos", Admin: &yes, AdminGroups: []string{"admin"}, SudoChecked: true},
 			policy.AdminRights{AllowAdmin: true}, check.Pass, "", "policy allows"},
 		{"nopasswd all", adminFacts{Family: "linux", Admin: &yes, AdminGroups: []string{"sudo"}, SudoChecked: true,

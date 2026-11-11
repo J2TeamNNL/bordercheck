@@ -52,6 +52,23 @@ func TestMacBackupDests(t *testing.T) {
 	}
 }
 
+func TestMacFindMy(t *testing.T) {
+	plist := func(v string) string {
+		return `<plist version="1.0"><dict><key>FMMEnabled</key><` + v + `/></dict></plist>`
+	}
+	token := "fmm-mobileme-token-FMM\tbplist00\n"
+	// Seen on an Apple silicon Mac with Find My on: the file says so, NVRAM shows no token.
+	if !macFindMy(plist("true"), "SystemAudioVolume\t%80\n") {
+		t.Error("FMMEnabled true with no NVRAM token: want on")
+	}
+	if macFindMy(plist("false"), token) {
+		t.Error("FMMEnabled false: want off, whatever NVRAM holds")
+	}
+	if !macFindMy("", token) || macFindMy("", "") {
+		t.Error("no preferences file: the NVRAM token decides")
+	}
+}
+
 func TestNvramFindMy(t *testing.T) {
 	if !nvramHasFindMy("SystemAudioVolume\t%80\nfmm-mobileme-token-FMM\tbplist00%d4...\n") ||
 		nvramHasFindMy("fmm-computer-name\tMac\nprev-lang:kbd\ten:0\n") {

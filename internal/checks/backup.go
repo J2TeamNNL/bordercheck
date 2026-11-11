@@ -188,6 +188,20 @@ func macBackupDests(info, prefs string) ([]backupDest, error) {
 
 func ptrBool(b bool) *bool { return &b }
 
+// macFindMy says whether Find My Mac is on. FMMEnabled in
+// /Library/Preferences/com.apple.FindMyMac.plist (prefs, as XML; "" when the
+// file is absent) decides when it is there. Otherwise the NVRAM token does:
+// on Apple silicon `nvram -p` does not show it to a normal user, so its
+// absence alone never proved Find My was off.
+func macFindMy(prefs, nvram string) bool {
+	if d, err := plistDict(prefs); err == nil {
+		if on, ok := d["FMMEnabled"].(bool); ok {
+			return on
+		}
+	}
+	return nvramHasFindMy(nvram)
+}
+
 // nvramHasFindMy reports whether `nvram -p` lists the variable Find My Mac
 // stores its token in. Only the names are looked at; the value is never kept.
 func nvramHasFindMy(out string) bool {
