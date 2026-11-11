@@ -382,9 +382,9 @@ func evalSecretsWith(found []secretFinding, bundles []string, incomplete bool, f
 // evalSecretsSamples sets aside what the person ignored, then likely samples
 // (sc; nil = none), and judges the rest.
 func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool, fix msg.Text, u *userIgnore, sc *sampleClassifier) check.Result {
-	// Findings marked production are for IT alone to set aside.
+	// A finding marked production can be set aside too; the list IT gets says it was.
 	found = slices.DeleteFunc(slices.Clone(found), func(f secretFinding) bool {
-		return !f.prod && u.take(f.path, nonEmpty(f.name), f.kind, f.kind)
+		return u.take(f.path, nonEmpty(f.name), f.kind, shownKind(f.kind, f.prod))
 	})
 	bundles = slices.DeleteFunc(slices.Clone(bundles), func(b string) bool { return u.take(b, nil, bundleKind, bundleKind) })
 	found, bundles = sc.setAside(found, bundles)

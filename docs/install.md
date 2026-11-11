@@ -421,8 +421,8 @@ reason. Three checks take it:
 
 | Check | What can be ignored | What cannot |
 |---|---|---|
-| `secrets` | any finding, by file, or by variable name or kind | findings marked `[production]` |
-| `ai-agents` | plain-text tokens, by config file, or by the setting the evidence shows (`mcpServers.x.headers.Authorization`) or the header / variable name | guardrails (approvals skipped, sandbox off); tokens marked production |
+| `secrets` | any finding, by file, or by variable name or kind; one marked `[production]` is listed for IT as production | nothing |
+| `ai-agents` | plain-text tokens, by config file, or by the setting the evidence shows (`mcpServers.x.headers.Authorization`) or the header / variable name | guardrails (approvals skipped, sandbox off) |
 | `ssh-keys` | a key without a passphrase (`~/.ssh/aur`) | a key other users can read (`chmod 600` fixes it), `authorized_keys` (who can log in is IT's business), client settings such as `ForwardAgent` |
 
 ```sh

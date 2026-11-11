@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,9 +44,13 @@ func TestEvalSecretsUserIgnored(t *testing.T) {
 			t.Errorf("an ignored finding is in the evidence: %q", e)
 		}
 	}
-	// By file, and a production entry that must not apply: production still fails.
+	// By file, and a file whose finding is marked production: that one is set
+	// aside too, and the list says it was production.
 	r = evalSecretsWith(found, []string{"~/app/c.p12"}, false, nil, ui("secrets", byFile, prodFile))
-	if r.Status != check.Fail || len(r.UserIgnored) != 2 || !strings.Contains(r.Summary, "1 marked production") {
+	if r.Status != check.Warn || len(r.UserIgnored) != 3 || strings.Contains(r.Summary, "marked production") ||
+		!slices.ContainsFunc(r.UserIgnored, func(i check.Ignored) bool {
+			return i.Name == "DB_PASSWORD" && strings.HasSuffix(i.Kind, "[production]")
+		}) {
 		t.Errorf("by file: %s %q %+v", r.Status, r.Summary, r.UserIgnored)
 	}
 	if got := r.UserIgnored[0]; got != (check.Ignored{Path: "~/app/.env", Name: "POSTGRES_PASSWORD", Kind: "Secret-looking variable", Reason: "local only", Since: "2026-11-02"}) {
@@ -108,10 +113,10 @@ func TestEvalAIAgentsUserIgnored(t *testing.T) {
 			t.Errorf("by %s: %s %q %+v %q", name, r.Status, r.Summary, r.UserIgnored, r.Evidence)
 		}
 	}
-	// A whole-file entry never covers guardrails or production tokens.
+	// A whole-file entry never covers guardrails; it does cover a token marked production.
 	r := evalAIAgentsWith([]aiFinding{token, prod, guard}, 2, ui("ai-agents",
 		ignore.Entry{Path: "~/.claude.json", Reason: "r"}, ignore.Entry{Path: "~/.codex/config.toml", Reason: "r"}))
-	if r.Status != check.Fail || len(r.UserIgnored) != 1 || len(r.Evidence) != 2 {
+	if r.Status != check.Fail || len(r.UserIgnored) != 2 || len(r.Evidence) != 1 {
 		t.Errorf("guardrails and production: %s %q %+v %q", r.Status, r.Summary, r.UserIgnored, r.Evidence)
 	}
 	// Only the token: all ignored, a pass.

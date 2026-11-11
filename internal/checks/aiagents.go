@@ -544,9 +544,9 @@ func evalAIAgents(found []aiFinding, files int) check.Result {
 }
 
 func evalAIAgentsWith(found []aiFinding, files int, u *userIgnore) check.Result {
-	// Only plain-text tokens can be set aside, and not those marked production.
+	// Only plain-text tokens can be set aside; one marked production is listed as such.
 	found = slices.DeleteFunc(slices.Clone(found), func(f aiFinding) bool {
-		return f.token && !f.prod && u.take(f.path, f.names(), f.what, f.what)
+		return f.token && u.take(f.path, f.names(), f.what, shownKind(f.what, f.prod))
 	})
 	if len(found) == 0 {
 		return u.finish(check.Result{Status: check.Pass}.WithSummary(msg.Of("ai.pass", "n", files)), nil)

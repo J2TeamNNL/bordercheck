@@ -28,9 +28,9 @@ const sv = "Secret-looking variable"
 var testItems = []checks.Item{
 	{Check: "secrets", Path: "~/app/.env", Names: []string{"POSTGRES_PASSWORD"}, Kind: sv},
 	{Check: "secrets", Path: "~/app/.env", Names: []string{"API_TOKEN"}, Kind: sv},
-	{Check: "secrets", Path: "~/app/.env.production", Names: []string{"DB_PASSWORD"}, Kind: sv, Blocked: checks.BlockedProduction},
+	{Check: "secrets", Path: "~/app/.env.production", Names: []string{"DB_PASSWORD"}, Kind: sv},
 	{Check: "secrets", Path: "~/mixed/.env", Names: []string{"A_TOKEN"}, Kind: sv},
-	{Check: "secrets", Path: "~/mixed/.env", Names: []string{"LIVE_TOKEN"}, Kind: sv, Blocked: checks.BlockedProduction},
+	{Check: "secrets", Path: "~/mixed/.env", Names: []string{"LIVE_TOKEN"}, Kind: sv},
 	{Check: "ai-agents", Path: "~/.claude.json", Names: []string{"mcpServers.mcp-trinh.headers.Authorization", "Authorization"},
 		Kind: "Claude Code: Token in an HTTP header in plain text"},
 	{Check: "ai-agents", Path: "~/.codex/config.toml", Kind: "Codex: commands run without a sandbox", Blocked: checks.BlockedGuardrail},
@@ -78,9 +78,9 @@ func TestIgnoreByFileAndByName(t *testing.T) {
 	if es := load(t, env); len(es) != 2 || es[1].Reason != "new reason" {
 		t.Errorf("replace: %+v", es)
 	}
-	// A file with production findings: the others are ignored, and the output says what still counts.
+	// A file with a production finding: it is ignored with the rest.
 	out.Reset()
-	if err := ignoreAdd(env, "", "~/mixed/.env", "", "sandbox"); err != nil || !strings.Contains(out.String(), "1 finding there still counts") {
+	if err := ignoreAdd(env, "", "~/mixed/.env", "", "sandbox"); err != nil || !strings.Contains(out.String(), "2 findings no longer count") {
 		t.Errorf("mixed: %v %s", err, out)
 	}
 	// An absolute path names the same file; the entry keeps the report's spelling.
@@ -128,8 +128,6 @@ func TestIgnoreRefuses(t *testing.T) {
 		{"", "~/nothing/.env", "", "r", "finds nothing in"},
 		{"ssh-keys", "~/app/.env", "", "r", "the ssh-keys check finds nothing in"},
 		{"", "~/app/.env", "POSTGRES_PASSWRD", "r", "what the secrets check finds there: Secret-looking variable (POSTGRES_PASSWORD), Secret-looking variable (API_TOKEN)"},
-		{"", "~/app/.env.production", "", "r", "marked [production]"},
-		{"", "~/mixed/.env", "LIVE_TOKEN", "r", "marked [production]"},
 		{"", "~/.codex/config.toml", "", "r", "is an AI agent guardrail"},
 		{"", "~/.ssh/open", "", "r", "chmod 600 ~/.ssh/open"},
 		{"", "~/.ssh/authorized_keys", "", "r", "who can log in to this computer is for IT to decide"},

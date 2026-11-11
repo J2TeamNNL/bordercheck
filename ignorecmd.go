@@ -114,9 +114,6 @@ func describe(it checks.Item) string {
 func blockedWhy(it checks.Item) string {
 	what := it.Path + "  " + describe(it)
 	switch it.Blocked {
-	case checks.BlockedProduction:
-		return what + " is marked [production], so it cannot be ignored here: ask IT to waive it, or to change " +
-			"checks.secrets.production_keywords or ignore_paths if it is not production"
 	case checks.BlockedGuardrail:
 		return what + " is an AI agent guardrail (approvals or the sandbox), not a secret, so it cannot be ignored: " +
 			"turn the setting back, or ask IT for a waiver"

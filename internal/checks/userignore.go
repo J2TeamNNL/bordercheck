@@ -25,7 +25,6 @@ const maxIgnoredListed = 200
 
 // Why a finding cannot be ignored by the person at the machine.
 const (
-	BlockedProduction = "production"      // marked [production]
 	BlockedGuardrail  = "guardrail"       // an AI agent set to skip approvals or run unsandboxed
 	BlockedPerms      = "permissions"     // a key file other users can read
 	BlockedAuthorized = "authorized_keys" // who can log in here
@@ -50,6 +49,15 @@ func newUserIgnore(id string, local Local, allowed bool, home string) *userIgnor
 		}
 	}
 	return u
+}
+
+// shownKind is the kind listed for an ignored finding: one marked production
+// says so, since IT is who decides what production means.
+func shownKind(kind string, prod bool) string {
+	if prod {
+		return kind + " [production]"
+	}
+	return kind
 }
 
 // take reports whether an entry covers the finding, and if so records it. A
@@ -134,11 +142,7 @@ func IgnorableItems(ctx context.Context, p policy.Policy) (items []Item, home st
 			return nil, "", err
 		}
 		for _, f := range found {
-			it := Item{Check: "secrets", Path: f.path, Names: nonEmpty(f.name), Kind: f.kind}
-			if f.prod {
-				it.Blocked = BlockedProduction
-			}
-			items = append(items, it)
+			items = append(items, Item{Check: "secrets", Path: f.path, Names: nonEmpty(f.name), Kind: f.kind})
 		}
 		for _, b := range bundles {
 			items = append(items, Item{Check: "secrets", Path: b, Kind: bundleKind})
@@ -151,11 +155,8 @@ func IgnorableItems(ctx context.Context, p policy.Policy) (items []Item, home st
 		}
 		for _, f := range found {
 			it := Item{Check: "ai-agents", Path: f.path, Names: f.names(), Kind: f.what}
-			switch {
-			case !f.token:
+			if !f.token {
 				it.Blocked = BlockedGuardrail
-			case f.prod:
-				it.Blocked = BlockedProduction
 			}
 			items = append(items, it)
 		}
