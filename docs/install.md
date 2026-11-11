@@ -145,8 +145,15 @@ sends a report whenever `report.interval` has passed since the last one that got
 retries the next hour. On Linux, a login with no systemd user session (no systemd, some SSH or WSL setups) gets
 a line in the user's crontab instead; `bordercheck status` says which.
 
+When a check finds [signs of compromise](policies.md#signs-of-compromise) that differ from those last reported (new
+ones, or the old ones gone), the service sends a report at once instead of waiting for `report.interval`, and
+retries hourly until it gets through. `bordercheck status` then starts with "Signs that this computer may be
+compromised", lists them, says whether IT has been sent them, and what to do: stop using the computer for work,
+tell IT, and do not just delete the item. Checks run every `report.check_interval` (or, when it is not set, only
+when a report is due), so that is how soon a sign is noticed.
+
 ```sh
-bordercheck status               # email, enrollment, policy, what is sent, service, last report, report page, updates
+bordercheck status               # signs of compromise if any, email, enrollment, policy, what is sent, service, last report, report page, updates
 bordercheck send -force          # send a report now
 bordercheck fix                  # what to fix and how, as instructions an AI coding assistant can follow with you
 bordercheck ignore <path> -reason "why"   # a secret, AI config token or SSH key that is not sensitive: stops counting, IT still sees it
@@ -162,6 +169,10 @@ fix it". It never shows evidence (paths, ports, variable names), let alone a sec
 announced again every `notify.remind_every`; a fixed problem is forgotten, so it counts as new if it comes back;
 waived results and passing machines stay silent. What was announced is kept in `state.json`. Which problems
 notify is set in the policy's [`notify`](policies.md#notify).
+
+A problem with [signs of compromise](policies.md#signs-of-compromise) is announced as such, and again when a fail
+turns into one: the title is "bordercheck: this computer may be compromised", the text says what the signs are
+(never which item) and "Stop using it for work and tell your IT team now. Do not delete the item yourself."
 
 | OS | How | Needs |
 |---|---|---|
@@ -364,6 +375,13 @@ The report is the same JSON as `bordercheck -json`, plus `email` and `install_id
   variable", "reason": "local Docker database", "since": "2026-11-11"}]`, at most 200, never a value or its last
   characters. It is the record of what was set aside, so it does not depend on `report.include_evidence`.
   `bordercheck status` says so. Receivers that do not know the field ignore it.
+- When a failing result shows [signs of compromise](policies.md#signs-of-compromise), the report has
+  `"compromised": true` and `"compromise_checks": ["startup-items"]`, and that result lists its signs:
+  `"compromise": [{"what": {"key": "compromise.startupDownloadRun"}, "detail": "LaunchAgent ~/Library/LaunchAgents/com.x.plist (com.x)"}]`.
+  `what` is a message key like `summary_parts`; `detail` names the item (a name or path, never a command line or
+  a value) and is sent only with `report.include_evidence`. The flag and the check IDs are always sent; none of
+  it is when the policy sets `report.compromise_alert` to `false`. Receivers that do not know the fields ignore
+  them.
 - The machine's IP addresses leave it only when the policy sets `report.include_ips`. Whatever the policy says,
   the receiver sees the public IP address the report arrives from, as every web server does, and may store it or
   look up a rough location from it.
