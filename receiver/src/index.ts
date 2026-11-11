@@ -21,6 +21,8 @@ import {
   createRole,
   deleteRole,
   invitesPage,
+  issuedLinkPage,
+  issueReportLink,
   type MachineAction,
   machineAction,
   machineParams,
@@ -107,6 +109,18 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
     await forgetMachine(env, m[1]);
     await audit(env, v.who, "machine.forget", m[1]);
     return redirect("/admin");
+  }
+  // A new login-free report link for the admin to pass on: shown once, on the page this returns.
+  m = /^\/admin\/machine\/([A-Za-z0-9_-]+)\/report-link$/.exec(path);
+  if (m && req.method === "POST") {
+    const r = await issueReportLink(env, v.who, m[1], url.origin);
+    if (r.error || !r.url || !r.expires) {
+      return page(
+        layout(L, L.s("notDone.title"), v.who, html`<p class="eyebrow">${L.t("nav.machines")}</p><h1>${L.t("notDone.title")}</h1>${note(L.m(r.error ?? { key: "err.unknownAction" }), "s-fail")}<div class="actions"><a class="btn" href="/admin/machine/${m[1]}">${L.t("notDone.back")}</a></div>`),
+        r.status,
+      );
+    }
+    return issuedLinkPage(L, v.who, m[1], r.url, r.expires);
   }
   m = /^\/admin\/machine\/([A-Za-z0-9_-]+)\/(revoke|restore|role|waivers|reset-link|waivers\/(\d+)\/remove)$/.exec(path);
   if (m && req.method === "POST") {

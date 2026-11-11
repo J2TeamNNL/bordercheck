@@ -67,9 +67,10 @@ export function linkify(text: unknown): Html {
 const CSP =
   "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 
-// The portal's one script: Copy buttons, on exactly three pages (the admin page
-// showing freshly issued invites, the invite page /i/<code>, and a report page
-// /r/<id> that offers the fix prompt). Every other
+// The portal's one script: Copy buttons, on exactly four pages (the admin page
+// showing freshly issued invites, the admin page showing a freshly issued
+// report link, the invite page /i/<code>, and a report page /r/<id> that
+// offers the fix prompt). Every other
 // page is served with CSP above and runs no script at all.
 //
 // What it does: on a click on an element with data-copy="<id>", copy that

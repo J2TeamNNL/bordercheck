@@ -200,9 +200,10 @@ can send `Authorization: Bearer <ADMIN_TOKEN>`. If you use only Access, don't se
 Pages carry a CSP with no scripts at all, and every value from a report (hostname, email, title, summary,
 evidence) is escaped: a report is attacker-controllable input. Forms only accept same-origin posts.
 
-**The one script: Copy buttons.** Three pages carry one small inline script, for Copy buttons: the admin page
+**The one script: Copy buttons.** Four pages carry one small inline script, for Copy buttons: the admin page
 that shows freshly issued invites (after creating or re-issuing them: copy the link, either install command,
-or a ready-to-send message in the admin's language), the invite page `/i/<code>` (copy the command), and a
+or a ready-to-send message in the admin's language), the admin page that shows a freshly issued public report
+link (the machine page's "Copy public report link" button), the invite page `/i/<code>` (copy the command), and a
 report page `/r/<id>` when it offers the fix prompt (copy the prompt; a report page with nothing to fix, from a
 client older than v0.5.0, or of a role with `report.fix_prompt` off, has no script). The
 script (`COPY_SCRIPT` in `src/html.ts`) only copies the `textContent` of an element the server rendered, with
