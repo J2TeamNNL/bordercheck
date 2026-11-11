@@ -54,6 +54,9 @@
       "max_browser_age_days": 60
     },
     "screen-lock": { "require_password": true, "max_lock_minutes": 10 },
-    "remote-access": { "allow": ["guest"] }
+    "remote-access": { "allow": ["guest"] },
+    "admin-rights": { "allow_admin": false },
+    "os-protections": { "sip": true, "gatekeeper": true, "antivirus": true, "smartscreen": true, "secure_boot": true, "lsm": true },
+    "sharing": { "allow": [] }
   }
 }

@@ -47,6 +47,9 @@ func All(p policy.Policy) []check.Check {
 		{check.Check{ID: "tunnels", Title: "Nothing is tunnelled to the internet", Run: tunnels(c.Tunnels)}, c.Tunnels.Common},
 		{check.Check{ID: "ai-agents", Title: "AI agents keep their guardrails", Run: aiAgents(c.AIAgents, c.Secrets)}, c.AIAgents.Common},
 		{check.Check{ID: "cracked-software", Title: "No cracked software", Run: crackedSoftware(c.CrackedSoftware)}, c.CrackedSoftware.Common},
+		{check.Check{ID: "admin-rights", Title: "Daily account has limited rights", Run: adminRights(c.AdminRights)}, c.AdminRights.Common},
+		{check.Check{ID: "os-protections", Title: "Built-in OS protections are on", Run: osProtections(c.OSProtections)}, c.OSProtections.Common},
+		{check.Check{ID: "sharing", Title: "Nothing is shared with nearby devices", Run: sharing(c.Sharing)}, c.Sharing.Common},
 	}
 	var out []check.Check
 	for _, a := range all {

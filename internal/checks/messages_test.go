@@ -60,6 +60,9 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 			{path: "~/.claude/settings.json", where: "permissions.defaultMode = bypassPermissions", what: "every tool runs without asking", sev: check.High}}, 4)),
 		id("cracked-software", evalCracked(crackFacts{HostsPath: "/etc/hosts", Hosts: "127.0.0.1 lmlicensing.adobe.com\n0.0.0.0 genuine.autodesk.com\n"},
 			def.CrackedSoftware)),
+		id("admin-rights", evalAdminRights(adminFacts{Family: "macos", Admin: &on, AdminGroups: []string{"admin"}, SudoChecked: true}, def.AdminRights)),
+		id("os-protections", evalOSProtections(protFacts{Family: "macos", SIP: "disabled", Gatekeeper: &on}, def.OSProtections)),
+		id("sharing", evalSharing(macShareServices(map[string]string{"airdrop": "Everyone", "nat": "1"}, "", ""), nil, def.Sharing.Allow)),
 	}
 
 	winAuto := winUpdateFacts(kvLines("build=19045\nubr=6093\ndisplay_version=22H2\nno_auto_update=1\nwuauserv_start=Disabled\n" +
@@ -82,6 +85,11 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 		id("ai-agents", evalAIAgents([]aiFinding{{path: `~\AppData\Roaming\Code\User\mcp.json`, what: "Token in an HTTP header in plain text", sev: check.Medium}}, 2)),
 		id("cracked-software", evalCracked(crackFacts{HostsPath: `C:\Windows\System32\drivers\etc\hosts`,
 			KMS: map[string]string{"Windows": "127.0.0.2:1688"}, Tools: []string{`KMSpico (C:\Program Files\KMSpico)`}}, def.CrackedSoftware)),
+		id("admin-rights", evalAdminRights(adminFacts{Family: "windows", Admin: &on, AdminGroups: []string{"Administrators"},
+			ConsentAdmin: "0", BuiltinAdmin: true}, def.AdminRights)),
+		id("os-protections", evalOSProtections(protFacts{Family: "windows", DefenderKnown: true, AVKnown: true, SmartScreen: &off,
+			SecureBoot: &off}, def.OSProtections)),
+		id("sharing", evalSharing(winShareServices(kvLines("fps_public=2\ndiscovery_public=1\nshares=Projects\nnearby=2\n")), nil, def.Sharing.Allow)),
 	}
 
 	linux := []check.Result{
@@ -102,6 +110,11 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 		id("tunnels", evalTunnels(nil, def.Tunnels, nil)),
 		id("ai-agents", evalAIAgents(nil, 3)),
 		id("cracked-software", evalCracked(crackFacts{HostsPath: "/etc/hosts"}, def.CrackedSoftware)),
+		id("admin-rights", evalAdminRights(adminFacts{Family: "linux", Admin: &on, AdminGroups: []string{"sudo"}, SudoChecked: true,
+			NoPasswd: []string{"sudo -l"}, NoPasswdScope: sudoAll}, def.AdminRights)),
+		id("os-protections", evalOSProtections(protFacts{Family: "linux", SecureBoot: &off, SELinux: "permissive"}, def.OSProtections)),
+		id("sharing", evalSharing(linuxShareServices(linuxShareFacts{Active: map[string]string{"smbd.service": "active"},
+			SambaConf: "[pub]\nguest ok = yes\n"}), msg.Of("sharing.note.noSystemd"), def.Sharing.Allow)),
 	}
 	return map[string][]check.Result{"mac": mac, "windows": win, "linux": linux}
 }

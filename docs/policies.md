@@ -354,6 +354,83 @@ and never goes online.
 The fix always says to remove the crack and its hosts entries, run a full malware scan, change the passwords and
 tokens used on the machine, and ask IT for a licensed copy.
 
+### admin-rights
+
+How much an attacker gets by running code as the person at the keyboard. Reads group membership, `sudo -n -l`
+(never prompts: `-n` makes sudo fail rather than ask for a password or Touch ID), any sudoers file a normal user
+may read, and on Windows the UAC registry values and the built-in Administrator account. Evidence holds group
+and setting names only.
+
+| Finding | Result |
+|---|---|
+| `sudo` runs every command without a password (`NOPASSWD: ALL`, `Defaults !authenticate`) | fail, high |
+| `sudo` runs some commands without a password | warn, medium |
+| Windows: UAC off (`EnableLUA = 0`) | fail, high |
+| Windows: UAC elevates administrators without asking (`ConsentPromptBehaviorAdmin = 0`) | fail, high for an administrator; warn, medium otherwise |
+| The account is an administrator (macOS `admin`; Linux `sudo`, `wheel` or `admin`; Windows Administrators) | warn, medium |
+| Windows: the built-in Administrator account is enabled | warn, medium |
+
+`sudo -n -l` lists rules without a password only when one of them is `NOPASSWD` (sudo's default
+`listpw=any`) or a recent `sudo` is still cached; the check looks for the rule in the list, so a cached `sudo`
+does not count.
+
+| Field | Default | |
+|---|---|---|
+| `allow_admin` | `false` | Accept an administrator account. Passwordless `sudo` and UAC are still judged. |
+
+### os-protections
+
+The OS's own malware defences. XProtect's updates are judged by `os-updates` ("Install Security Responses and
+system files").
+
+| Looks for | OS | Result |
+|---|---|---|
+| System Integrity Protection off (`csrutil status`); partly off | macOS | fail, high; warn, medium |
+| Gatekeeper off (`spctl --status`) | macOS | fail, high |
+| Microsoft Defender real-time protection off (or Defender passive) and no other antivirus on in Security Center | Windows | fail, high |
+| Defender tamper protection off, when Defender is the active antivirus | Windows | warn, medium |
+| SmartScreen "Check apps and files" off (`SmartScreenEnabled`, or the `EnableSmartScreen` policy) | Windows | warn, medium |
+| Secure Boot off (`UEFISecureBootEnabled` in the registry; the SecureBoot EFI variable or `mokutil --sb-state` on Linux). Legacy BIOS is noted, not judged. | Windows, Linux | warn, medium |
+| Neither AppArmor nor SELinux active, or SELinux permissive | Linux | warn, medium |
+
+Skipped under WSL.
+
+| Field | Default | |
+|---|---|---|
+| `sip` | `true` | Judge System Integrity Protection. |
+| `gatekeeper` | `true` | Judge Gatekeeper. |
+| `antivirus` | `true` | Judge Defender (or another antivirus) and tamper protection. |
+| `smartscreen` | `true` | Judge SmartScreen. |
+| `secure_boot` | `true` | Judge Secure Boot. |
+| `lsm` | `true` | Judge AppArmor / SELinux. |
+
+### sharing
+
+What the machine offers nearby devices and the local network, beyond what `remote-access` covers (remote
+login, screen sharing, Remote Apple Events and guest accounts are there). Each setting is read as one key; share
+names appear in the evidence, file contents never do.
+
+| Service (`allow` name) | OS | Result when on |
+|---|---|---|
+| AirDrop discoverable by Everyone (`airdrop`) | macOS | warn, medium |
+| File Sharing (`file-sharing`) | macOS | warn, medium |
+| Printer Sharing (`printer-sharing`) | macOS, Linux (CUPS) | warn, medium on macOS; low on Linux |
+| Internet Sharing (`internet-sharing`) | macOS | fail, high |
+| Media Sharing (`media-sharing`) | macOS | warn, medium when shared with guests; low for Home Sharing |
+| Bluetooth Sharing (`bluetooth-sharing`) | macOS | warn, medium |
+| Content Caching (`content-caching`) | macOS | warn, low |
+| Shared folders (`file-sharing`), excluding the hidden admin shares | Windows | warn, medium; fail, high when File and Printer Sharing is also allowed on public networks |
+| Network discovery or File and Printer Sharing allowed on public networks (`network-discovery`) | Windows | warn, medium |
+| Shared printers (`printer-sharing`) | Windows | warn, low |
+| Nearby sharing set to Everyone nearby (`nearby-sharing`) | Windows | warn, medium |
+| Samba (`file-sharing`) | Linux | warn, medium; fail, high when a share allows guests (`guest ok`/`public = yes`) |
+| NFS server (`nfs`) | Linux | warn, medium; fail, high when `/etc/exports` exports to any host |
+| GNOME File Sharing (`gnome-file-sharing`) | Linux | warn, medium |
+
+| Field | Default | |
+|---|---|---|
+| `allow` | `[]` | Services that may be on, by the names above. |
+
 ## A fuller example
 
 ```json

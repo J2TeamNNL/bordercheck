@@ -269,4 +269,92 @@ export const checksVi: CheckCatalog = {
     "Adobe: PhotoCraft thay cho Photoshop, VectorCraft thay cho Illustrator, FilmCraft thay cho Premiere Pro, LightCraft thay cho Lightroom, EffectCraft thay cho After Effects, DesignCraft thay cho InDesign, PdfCraft thay cho Acrobat.",
   "cracked.alt.office": "Microsoft Office: WordCraft thay cho Word, GridCraft thay cho Excel, DeckCraft thay cho PowerPoint.",
   "cracked.alt.autodesk": "Autodesk: CADCraft thay cho AutoCAD.",
+
+  "admin.pass.standard": "Tài khoản này là người dùng thường (standard user).",
+  "admin.pass.allowed": "Tài khoản này là quản trị viên, và chính sách cho phép điều đó.",
+  "admin.pass.sudo": "Không có quy tắc sudo nào chạy được mà không cần mật khẩu.",
+  "admin.isAdmin":
+    "Tài khoản này là quản trị viên ({groups}): mã độc bạn lỡ chạy chỉ cần bạn đồng ý một lần là chiếm được toàn bộ máy.",
+  "admin.nopasswd":
+    "sudo chạy mọi lệnh với quyền root mà không cần mật khẩu ({where}): bất kỳ chương trình nào bạn chạy cũng có thể âm thầm chiếm toàn bộ máy.",
+  "admin.nopasswdSome":
+    "sudo chạy một số lệnh với quyền root mà không cần mật khẩu ({where}); nhiều lệnh có thể bị lợi dụng để mở shell root.",
+  "admin.uacOff":
+    "User Account Control đang tắt (EnableLUA = 0): các chương trình chạy với toàn quyền quản trị mà không hỏi.",
+  "admin.uacNoPrompt":
+    "UAC nâng quyền cho quản trị viên mà không hỏi (ConsentPromptBehaviorAdmin = 0): bất kỳ chương trình nào cũng có thể âm thầm lấy quyền quản trị.",
+  "admin.builtinAdmin": "Tài khoản Administrator có sẵn của Windows đang bật.",
+  "admin.note.unknown": "Không xác định được tài khoản này có phải quản trị viên hay không.",
+  "admin.note.sudo": "Không hỏi được sudo những quy tắc nào áp dụng ({err}).",
+  "admin.note.uac": "Không đọc được thiết lập User Account Control.",
+  "admin.fix.mac":
+    "Tạo một tài khoản quản trị riêng (System Settings → Users & Groups → Add User…, loại Administrator), đăng nhập vào đó một lần, rồi tắt \"Allow this user to administer this computer\" cho tài khoản dùng hằng ngày. Từ đó, khi được hỏi quyền quản trị, hãy nhập tên và mật khẩu của tài khoản kia.",
+  "admin.fix.win":
+    "Tạo một tài khoản quản trị riêng (Settings → Accounts → Other users → Add account, rồi Change account type → Administrator), đăng nhập vào đó một lần, rồi đổi loại tài khoản dùng hằng ngày thành Standard User. Khi đó UAC sẽ hỏi mật khẩu của tài khoản quản trị.",
+  "admin.fix.linux":
+    "Làm việc quản trị từ một tài khoản riêng: từ tài khoản đó, gỡ tài khoản dùng hằng ngày khỏi nhóm bằng [code]sudo gpasswd -d NAME sudo[/code], với NAME là tài khoản dùng hằng ngày (trên Fedora/Arch dùng wheel thay cho sudo).",
+  "admin.fix.nopasswd":
+    "Bỏ NOPASSWD (và !authenticate) khỏi quy tắc bằng [code]sudo visudo[/code], hoặc [code]sudo visudo -f /etc/sudoers.d/FILE[/code].",
+  "admin.fix.uac":
+    "Mở Control Panel → User Accounts → Change User Account Control settings → chọn ít nhất \"Notify me only when apps try to make changes to my computer (default)\", rồi khởi động lại. Nếu do chính sách đặt, hãy liên hệ IT.",
+  "admin.fix.builtinAdmin":
+    "Với quyền quản trị: [code]Get-LocalUser | Where-Object SID -like '*-500' | Disable-LocalUser[/code].",
+
+  "prot.pass": "Đang bật: {list}.",
+  "prot.nothing": "Không có gì để kiểm tra: mọi phần của kiểm tra này đều bị tắt cho hệ điều hành này.",
+  "prot.wsl": "Windows Subsystem for Linux: các lớp bảo vệ của chính Windows được áp dụng.",
+  "prot.sipOff":
+    "System Integrity Protection đang tắt: mã độc có quyền quản trị có thể sửa chính macOS và ẩn náu trong đó.",
+  "prot.sipPartial": "System Integrity Protection chỉ bật một phần (cấu hình tuỳ chỉnh).",
+  "prot.gatekeeperOff":
+    "Gatekeeper đang tắt: ứng dụng tải về được mở mà không kiểm tra mã độc hay chữ ký nhà phát triển.",
+  "prot.avOff": "Tính năng bảo vệ thời gian thực của Microsoft Defender đang tắt và không có phần mềm diệt virus nào khác đang bật.",
+  "prot.tamperOff": "Tamper protection của Microsoft Defender đang tắt: mã độc có thể tắt Defender.",
+  "prot.smartscreenOff":
+    "SmartScreen cho ứng dụng và file đang tắt: chương trình tải về được chạy mà không kiểm tra độ tin cậy.",
+  "prot.secureBootOff": "Secure Boot đang tắt: mã độc có thể nạp trước khi hệ điều hành khởi động.",
+  "prot.selinuxPermissive": "SELinux đang ở chế độ permissive: chỉ ghi log vi phạm mà không chặn gì.",
+  "prot.noLSM": "Cả AppArmor lẫn SELinux đều không hoạt động.",
+  "prot.note.unknown": "Không xác định được {what} có đang bật hay không.",
+  "prot.note.noUEFI": "Máy này khởi động ở chế độ legacy BIOS, vốn không có Secure Boot.",
+  "prot.fix.sip":
+    "Khởi động vào macOS Recovery (Apple silicon: giữ nút nguồn; Intel: Command-R), mở Utilities → Terminal, chạy [code]csrutil enable[/code] rồi khởi động lại.",
+  "prot.fix.gatekeeper":
+    "[code]sudo spctl --global-enable[/code], rồi mở System Settings → Privacy & Security → Allow applications from → App Store & Known Developers.",
+  "prot.fix.av":
+    "Mở Windows Security → Virus & threat protection → Manage settings → bật Real-time protection. Nếu nó tự tắt lại, hãy liên hệ IT: có thể một chính sách hoặc mã độc đang tắt nó.",
+  "prot.fix.tamper": "Mở Windows Security → Virus & threat protection → Manage settings → bật Tamper Protection.",
+  "prot.fix.smartscreen":
+    "Mở Windows Security → App & browser control → Reputation-based protection settings → bật Check apps and files. Nếu do chính sách đặt, hãy liên hệ IT.",
+  "prot.fix.secureBoot.windows":
+    "Mở Settings → System → Recovery → Advanced startup → Restart now → Troubleshoot → Advanced options → UEFI Firmware Settings, rồi bật Secure Boot ở đó. Nếu BitLocker đang bật, hãy chuẩn bị sẵn recovery key trước.",
+  "prot.fix.secureBoot.linux":
+    "Bật Secure Boot trong phần cài đặt firmware ([code]systemctl reboot --firmware-setup[/code]). Các bản phân phối có shim đã ký (Ubuntu, Fedora, Debian…) vẫn khởi động như cũ; kernel tự build và module bổ sung (như của NVIDIA) phải được ký bằng MOK trước.",
+  "prot.fix.selinux":
+    "[code]sudo setenforce 1[/code], và đặt [code]SELINUX=enforcing[/code] trong /etc/selinux/config để giữ nguyên sau khi khởi động lại.",
+  "prot.fix.lsm":
+    "Ubuntu/Debian/openSUSE: [code]sudo systemctl enable --now apparmor[/code] (và bỏ apparmor=0 khỏi dòng lệnh kernel). Fedora/RHEL: đặt [code]SELINUX=enforcing[/code] trong /etc/selinux/config rồi khởi động lại.",
+
+  "sharing.on": "{service} đang bật.",
+  "sharing.onOpen": "{service} đang bật và cho bất kỳ ai trong mạng vào mà không cần mật khẩu.",
+  "sharing.off": "Đang tắt: {services}.",
+  "sharing.allowed": "Đang bật nhưng được chính sách cho phép: {services}.",
+  "sharing.note.unknown": "Không xác định được {what} có đang bật hay không.",
+  "sharing.note.noSystemd": "Không đọc được trạng thái các unit systemd; chỉ đánh giá dựa trên các cổng đang mở.",
+  "sharing.fix.macSharing": "Mở System Settings → General → Sharing rồi tắt {service}.",
+  "sharing.fix.macAirDrop":
+    "Control Center → AirDrop → Contacts Only (hoặc tắt AirDrop), hoặc trong Finder: Go → AirDrop → \"Allow me to be discovered by\" → Contacts Only.",
+  "sharing.fix.winShares":
+    "Ngừng chia sẻ những thư mục không cần: với quyền quản trị, mở Computer Management → Shared Folders → Shares → nhấp chuột phải → Stop Sharing, hoặc chạy [code]Remove-SmbShare -Name SHARE[/code].",
+  "sharing.fix.winPublic":
+    "Mở Settings → Network & internet → Advanced network settings → Advanced sharing settings → Public networks → tắt Network discovery và File and printer sharing; đồng thời đặt các mạng không phải của bạn thành Public.",
+  "sharing.fix.winPrinters":
+    "Mở Settings → Bluetooth & devices → Printers & scanners → chọn máy in → Printer properties → Sharing → bỏ chọn \"Share this printer\".",
+  "sharing.fix.winNearby": "Mở Settings → System → Nearby sharing → chọn My devices only, hoặc Off.",
+  "sharing.fix.linuxSamba":
+    "Dừng Samba nếu không cần: [code]sudo systemctl disable --now smbd[/code] (smb trên Fedora). Nếu cần, hãy bỏ [code]guest ok = yes[/code] và [code]public = yes[/code] khỏi /etc/samba/smb.conf.",
+  "sharing.fix.linuxNFS":
+    "[code]sudo systemctl disable --now nfs-server[/code] (nfs-kernel-server trên Debian/Ubuntu), hoặc giới hạn từng dòng trong /etc/exports cho các máy được nêu tên, rồi chạy [code]sudo exportfs -ra[/code].",
+  "sharing.fix.cups": "[code]sudo cupsctl --no-share-printers[/code]",
+  "sharing.fix.linuxGnome": "Mở Settings → Sharing → File Sharing → tắt.",
 };

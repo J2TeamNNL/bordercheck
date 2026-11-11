@@ -268,4 +268,85 @@ export const checksZh: CheckCatalog = {
     "Adobe：PhotoCraft 替代 Photoshop，VectorCraft 替代 Illustrator，FilmCraft 替代 Premiere Pro，LightCraft 替代 Lightroom，EffectCraft 替代 After Effects，DesignCraft 替代 InDesign，PdfCraft 替代 Acrobat。",
   "cracked.alt.office": "Microsoft Office：WordCraft 替代 Word，GridCraft 替代 Excel，DeckCraft 替代 PowerPoint。",
   "cracked.alt.autodesk": "Autodesk：CADCraft 替代 AutoCAD。",
+
+  "admin.pass.standard": "此帐户是标准用户。",
+  "admin.pass.allowed": "此帐户是管理员，策略允许这样做。",
+  "admin.pass.sudo": "没有免密码的 sudo 规则。",
+  "admin.isAdmin": "此帐户是管理员（{groups}）：你误运行的恶意软件只需你批准一次，就能控制整台电脑。",
+  "admin.nopasswd": "sudo 无需密码即可以 root 身份运行任何命令（{where}）：你运行的任何程序都能悄悄控制整台电脑。",
+  "admin.nopasswdSome": "sudo 无需密码即可以 root 身份运行部分命令（{where}）；许多命令可被利用来获得 root shell。",
+  "admin.uacOff": "用户帐户控制（UAC）已关闭（EnableLUA = 0）：程序无需询问即以完整管理员权限运行。",
+  "admin.uacNoPrompt":
+    "UAC 不经询问就为管理员提升权限（ConsentPromptBehaviorAdmin = 0）：任何程序都能悄悄获得管理员权限。",
+  "admin.builtinAdmin": "内置的 Administrator 帐户已启用。",
+  "admin.note.unknown": "无法判断此帐户是否为管理员。",
+  "admin.note.sudo": "无法向 sudo 查询适用的规则（{err}）。",
+  "admin.note.uac": "无法读取用户帐户控制（UAC）设置。",
+  "admin.fix.mac":
+    "另建一个管理员帐户（System Settings → Users & Groups → Add User…，类型选 Administrator），登录一次，然后为日常使用的帐户关闭 \"Allow this user to administer this computer\"。之后需要管理员权限时，输入另一个帐户的名称和密码。",
+  "admin.fix.win":
+    "另建一个管理员帐户（Settings → Accounts → Other users → Add account，然后 Change account type → Administrator），登录一次，然后把日常使用的帐户类型改为 Standard User。之后 UAC 会要求输入管理员密码。",
+  "admin.fix.linux":
+    "用单独的帐户做管理工作：在该帐户中用 [code]sudo gpasswd -d NAME sudo[/code] 把日常帐户移出该组，NAME 为日常帐户名（Fedora/Arch 上用 wheel 代替 sudo）。",
+  "admin.fix.nopasswd":
+    "用 [code]sudo visudo[/code] 或 [code]sudo visudo -f /etc/sudoers.d/FILE[/code] 从规则中删除 NOPASSWD（以及 !authenticate）。",
+  "admin.fix.uac":
+    "前往 Control Panel → User Accounts → Change User Account Control settings，至少选择 \"Notify me only when apps try to make changes to my computer (default)\"，然后重启。如果是策略设置的，请联系 IT。",
+  "admin.fix.builtinAdmin":
+    "以管理员身份运行：[code]Get-LocalUser | Where-Object SID -like '*-500' | Disable-LocalUser[/code]。",
+
+  "prot.pass": "已开启：{list}。",
+  "prot.nothing": "没有可检查的内容：此检查在该操作系统上的所有部分都已关闭。",
+  "prot.wsl": "适用于 Linux 的 Windows 子系统（WSL）：由 Windows 自身的防护负责。",
+  "prot.sipOff": "系统完整性保护（SIP）已关闭：拥有管理员权限的恶意软件可以修改 macOS 本身并藏身其中。",
+  "prot.sipPartial": "系统完整性保护（SIP）只部分开启（自定义配置）。",
+  "prot.gatekeeperOff": "Gatekeeper 已关闭：下载的应用打开前不会检查恶意软件或开发者签名。",
+  "prot.avOff": "Microsoft Defender 实时保护已关闭，且没有开启其他杀毒软件。",
+  "prot.tamperOff": "Microsoft Defender 防篡改保护已关闭：恶意软件可以关闭 Defender。",
+  "prot.smartscreenOff": "针对应用和文件的 SmartScreen 已关闭：下载的程序运行前不做信誉检查。",
+  "prot.secureBootOff": "安全启动（Secure Boot）已关闭：恶意软件可以在操作系统启动前加载。",
+  "prot.selinuxPermissive": "SELinux 处于 permissive 模式：只记录违规，不做任何拦截。",
+  "prot.noLSM": "AppArmor 和 SELinux 都未启用。",
+  "prot.note.unknown": "无法判断 {what} 是否开启。",
+  "prot.note.noUEFI": "此电脑以传统 BIOS 模式启动，没有安全启动。",
+  "prot.fix.sip":
+    "进入 macOS 恢复模式（Apple 芯片：按住电源键；Intel：Command-R），打开 Utilities → Terminal，运行 [code]csrutil enable[/code] 后重启。",
+  "prot.fix.gatekeeper":
+    "运行 [code]sudo spctl --global-enable[/code]，然后前往 System Settings → Privacy & Security → Allow applications from → App Store & Known Developers。",
+  "prot.fix.av":
+    "前往 Windows Security → Virus & threat protection → Manage settings，开启 Real-time protection。如果它又自行关闭，请联系 IT：可能是策略或恶意软件在关闭它。",
+  "prot.fix.tamper": "前往 Windows Security → Virus & threat protection → Manage settings，开启 Tamper Protection。",
+  "prot.fix.smartscreen":
+    "前往 Windows Security → App & browser control → Reputation-based protection settings，开启 Check apps and files。如果是策略设置的，请联系 IT。",
+  "prot.fix.secureBoot.windows":
+    "前往 Settings → System → Recovery → Advanced startup → Restart now → Troubleshoot → Advanced options → UEFI Firmware Settings，在其中启用 Secure Boot。如已开启 BitLocker，请先准备好恢复密钥。",
+  "prot.fix.secureBoot.linux":
+    "在固件设置中启用安全启动（[code]systemctl reboot --firmware-setup[/code]）。带有已签名 shim 的发行版（Ubuntu、Fedora、Debian…）照常启动；自行编译的内核和额外模块（如 NVIDIA 的）需先用 MOK 签名。",
+  "prot.fix.selinux":
+    "运行 [code]sudo setenforce 1[/code]，并在 /etc/selinux/config 中设置 [code]SELINUX=enforcing[/code]，使其重启后保持开启。",
+  "prot.fix.lsm":
+    "Ubuntu/Debian/openSUSE：[code]sudo systemctl enable --now apparmor[/code]（并从内核命令行中删除 apparmor=0）。Fedora/RHEL：在 /etc/selinux/config 中设置 [code]SELINUX=enforcing[/code] 后重启。",
+
+  "sharing.on": "{service} 已开启。",
+  "sharing.onOpen": "{service} 已开启，网络上的任何人无需密码即可进入。",
+  "sharing.off": "已关闭：{services}。",
+  "sharing.allowed": "已开启，但策略允许：{services}。",
+  "sharing.note.unknown": "无法判断 {what} 是否开启。",
+  "sharing.note.noSystemd": "无法读取 systemd 单元状态；仅根据开放端口判断。",
+  "sharing.fix.macSharing": "前往 系统设置 → 通用 → 共享（System Settings → General → Sharing），关闭 {service}。",
+  "sharing.fix.macAirDrop":
+    "前往 Control Center → AirDrop → Contacts Only（或关闭 AirDrop），或在访达中：Go → AirDrop → \"Allow me to be discovered by\" → Contacts Only。",
+  "sharing.fix.winShares":
+    "停止共享不需要的文件夹：以管理员身份打开 Computer Management → Shared Folders → Shares → 右键 → Stop Sharing，或运行 [code]Remove-SmbShare -Name SHARE[/code]。",
+  "sharing.fix.winPublic":
+    "前往 Settings → Network & internet → Advanced network settings → Advanced sharing settings → Public networks，关闭 Network discovery 和 File and printer sharing；并把不属于你的网络设为 Public。",
+  "sharing.fix.winPrinters":
+    "前往 Settings → Bluetooth & devices → Printers & scanners → 选择打印机 → Printer properties → Sharing，取消勾选 \"Share this printer\"。",
+  "sharing.fix.winNearby": "前往 Settings → System → Nearby sharing，选择 My devices only 或 Off。",
+  "sharing.fix.linuxSamba":
+    "如不需要 Samba 就停止它：[code]sudo systemctl disable --now smbd[/code]（Fedora 上为 smb）。否则请从 /etc/samba/smb.conf 中删除 [code]guest ok = yes[/code] 和 [code]public = yes[/code]。",
+  "sharing.fix.linuxNFS":
+    "[code]sudo systemctl disable --now nfs-server[/code]（Debian/Ubuntu 上为 nfs-kernel-server），或把 /etc/exports 的每一行限制为指定主机，然后运行 [code]sudo exportfs -ra[/code]。",
+  "sharing.fix.cups": "[code]sudo cupsctl --no-share-printers[/code]",
+  "sharing.fix.linuxGnome": "前往 Settings → Sharing → File Sharing，将其关闭。",
 };

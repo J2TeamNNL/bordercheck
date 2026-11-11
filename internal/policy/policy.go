@@ -100,6 +100,10 @@ type Checks struct {
 	OSUpdates    OSUpdates    `json:"os-updates"`
 	ScreenLock   ScreenLock   `json:"screen-lock"`
 	RemoteAccess RemoteAccess `json:"remote-access"`
+
+	AdminRights   AdminRights   `json:"admin-rights"`
+	OSProtections OSProtections `json:"os-protections"`
+	Sharing       Sharing       `json:"sharing"`
 }
 
 // Common is what every check accepts.
@@ -257,6 +261,33 @@ type RemoteAccess struct {
 	Allow []string `json:"allow"` // services from RemoteAccessServices that may be on
 }
 
+// AdminRights judges how much power the daily account has.
+type AdminRights struct {
+	Common
+	AllowAdmin bool `json:"allow_admin"` // the account may be an administrator (passwordless sudo and UAC are still judged)
+}
+
+// OSProtections judges the OS's own malware defences; each switch turns one part off.
+type OSProtections struct {
+	Common
+	SIP         bool `json:"sip"`         // macOS System Integrity Protection
+	Gatekeeper  bool `json:"gatekeeper"`  // macOS Gatekeeper
+	Antivirus   bool `json:"antivirus"`   // Windows: Defender real-time protection (or another antivirus) and tamper protection
+	SmartScreen bool `json:"smartscreen"` // Windows SmartScreen for apps and files
+	SecureBoot  bool `json:"secure_boot"` // Windows and Linux
+	LSM         bool `json:"lsm"`         // Linux: AppArmor or SELinux enforcing
+}
+
+// SharingServices are the names Sharing.Allow accepts.
+var SharingServices = []string{"airdrop", "file-sharing", "printer-sharing", "internet-sharing", "media-sharing",
+	"bluetooth-sharing", "content-caching", "network-discovery", "nearby-sharing", "nfs", "gnome-file-sharing"}
+
+// Sharing judges what the machine shares with nearby devices and the local network.
+type Sharing struct {
+	Common
+	Allow []string `json:"allow"` // services from SharingServices that may be on
+}
+
 func ptr[T any](v T) *T { return &v }
 
 // Default is the built-in policy.
@@ -299,6 +330,10 @@ func Default() Policy {
 				LowerSeverity: []string{"cloudflared"}},
 			AIAgents:        AIAgents{Tokens: true, Guardrails: true, ExtraPaths: []string{}, IgnorePaths: []string{}},
 			CrackedSoftware: CrackedSoftware{SuggestAlternatives: true},
+			AdminRights:     AdminRights{AllowAdmin: false},
+			OSProtections: OSProtections{SIP: true, Gatekeeper: true, Antivirus: true, SmartScreen: true, SecureBoot: true,
+				LSM: true},
+			Sharing: Sharing{Allow: []string{}},
 		},
 	}
 }
@@ -413,6 +448,7 @@ func (p Policy) validate() error {
 		"os-updates": c.OSUpdates.OnProblem, "screen-lock": c.ScreenLock.OnProblem, "remote-access": c.RemoteAccess.OnProblem,
 		"ssh-keys": c.SSHKeys.OnProblem, "tunnels": c.Tunnels.OnProblem, "ai-agents": c.AIAgents.OnProblem,
 		"cracked-software": c.CrackedSoftware.OnProblem,
+		"admin-rights":     c.AdminRights.OnProblem, "os-protections": c.OSProtections.OnProblem, "sharing": c.Sharing.OnProblem,
 	} {
 		if on != "" && on != check.Fail && on != check.Warn {
 			return fmt.Errorf("checks.%s.on_problem must be \"fail\" or \"warn\", not %q", id, on)
@@ -503,6 +539,11 @@ func (c Checks) validateNew() error {
 	for _, p := range c.AIAgents.ExtraPaths {
 		if strings.TrimSpace(p) == "" {
 			return errors.New("checks.ai-agents.extra_paths: empty path")
+		}
+	}
+	for _, s := range c.Sharing.Allow {
+		if !slices.Contains(SharingServices, s) {
+			return fmt.Errorf("checks.sharing.allow: unknown service %q (known: %s)", s, strings.Join(SharingServices, ", "))
 		}
 	}
 	return nil

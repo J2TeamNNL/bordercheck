@@ -146,6 +146,20 @@
     },
     "cracked-software": {
       "suggest_alternatives": true
+    },
+    "admin-rights": {
+      "allow_admin": false
+    },
+    "os-protections": {
+      "sip": true,
+      "gatekeeper": true,
+      "antivirus": true,
+      "smartscreen": true,
+      "secure_boot": true,
+      "lsm": true
+    },
+    "sharing": {
+      "allow": []
     }
   }
 }

@@ -20,6 +20,7 @@ type Obj = Record<string, unknown>;
 export const POLICY_CHECKS = [
   "firewall", "disk-encryption", "listeners", "tailscale", "docker", "secrets", "ssh-keys", "tunnels", "ai-agents",
   "os-updates", "screen-lock", "remote-access", "cracked-software",
+  "admin-rights", "os-protections", "sharing",
 ];
 
 export const MAX_WAIVER_DAYS = 365;

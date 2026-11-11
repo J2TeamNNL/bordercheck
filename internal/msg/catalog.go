@@ -320,4 +320,102 @@ var Catalog = map[string]Entry{
 		"LightCraft for Lightroom, EffectCraft for After Effects, DesignCraft for InDesign, PdfCraft for Acrobat."),
 	"cracked.alt.office":   s("Microsoft Office: WordCraft for Word, GridCraft for Excel, DeckCraft for PowerPoint."),
 	"cracked.alt.autodesk": s("Autodesk: CADCraft for AutoCAD."),
+
+	// ---- admin-rights ----
+	"admin.pass.standard": s("This account is a standard user."),
+	"admin.pass.allowed":  s("This account is an administrator, which the policy allows."),
+	"admin.pass.sudo":     s("No passwordless sudo rule."),
+	"admin.isAdmin": s("This account is an administrator ({groups}): malware you run by mistake needs only one " +
+		"approval to take over the whole machine."),
+	"admin.nopasswd": s("sudo runs every command as root without a password ({where}): any program you run can take " +
+		"over the machine silently."),
+	"admin.nopasswdSome": s("sudo runs some commands as root without a password ({where}); many commands can be " +
+		"abused to get a root shell."),
+	"admin.uacOff": s("User Account Control is turned off (EnableLUA = 0): programs run with full administrator " +
+		"rights without asking."),
+	"admin.uacNoPrompt": s("UAC elevates administrators without asking (ConsentPromptBehaviorAdmin = 0): any program " +
+		"can take administrator rights silently."),
+	"admin.builtinAdmin": s("The built-in Administrator account is enabled."),
+	"admin.note.unknown": s("Could not tell whether this account is an administrator."),
+	"admin.note.sudo":    s("Could not ask sudo which rules apply ({err})."),
+	"admin.note.uac":     s("Could not read the User Account Control settings."),
+	"admin.fix.mac": s("Create a separate administrator account (System Settings → Users & Groups → Add User…, " +
+		"type Administrator), log in to it once, then turn off \"Allow this user to administer this computer\" for " +
+		"your daily account. Admin prompts then take the other account's name and password."),
+	"admin.fix.win": s("Create a separate administrator account (Settings → Accounts → Other users → Add account, " +
+		"then Change account type → Administrator), sign in to it once, then change your daily account's type to " +
+		"Standard User. UAC then asks for the administrator's password."),
+	"admin.fix.linux": s("Do administration from a separate account: from it, remove your daily account from the " +
+		"group with [code]sudo gpasswd -d NAME sudo[/code], NAME being your daily account (wheel instead of sudo on Fedora/Arch)."),
+	"admin.fix.nopasswd": s("Remove NOPASSWD (and !authenticate) from the rule with [code]sudo visudo[/code], or " +
+		"[code]sudo visudo -f /etc/sudoers.d/FILE[/code]."),
+	"admin.fix.uac": s("Control Panel → User Accounts → Change User Account Control settings → at least \"Notify me " +
+		"only when apps try to make changes to my computer (default)\", then restart. If a policy sets it, ask IT."),
+	"admin.fix.builtinAdmin": s("As administrator: [code]Get-LocalUser | Where-Object SID -like '*-500' | " +
+		"Disable-LocalUser[/code]."),
+
+	// ---- os-protections ----
+	"prot.pass":    s("On: {list}."),
+	"prot.nothing": s("Nothing to check: every part of this check is turned off for this OS."),
+	"prot.wsl":     s("Windows Subsystem for Linux: Windows' own protections apply."),
+	"prot.sipOff": s("System Integrity Protection is off: malware with administrator rights can change macOS itself " +
+		"and hide there."),
+	"prot.sipPartial": s("System Integrity Protection is only partly on (custom configuration)."),
+	"prot.gatekeeperOff": s("Gatekeeper is off: downloaded apps open without being checked for malware or a " +
+		"developer signature."),
+	"prot.avOff":     s("Microsoft Defender real-time protection is off and no other antivirus is on."),
+	"prot.tamperOff": s("Microsoft Defender tamper protection is off: malware can switch Defender off."),
+	"prot.smartscreenOff": s("SmartScreen for apps and files is off: downloaded programs run without a reputation " +
+		"check."),
+	"prot.secureBootOff":     s("Secure Boot is off: malware can load before the OS starts."),
+	"prot.selinuxPermissive": s("SELinux is in permissive mode: it logs violations but blocks nothing."),
+	"prot.noLSM":             s("Neither AppArmor nor SELinux is active."),
+	"prot.note.unknown":      s("Could not tell whether {what} is on."),
+	"prot.note.noUEFI":       s("This machine boots in legacy BIOS mode, which has no Secure Boot."),
+	"prot.fix.sip": s("Start up in macOS Recovery (Apple silicon: hold the power button; Intel: Command-R), open " +
+		"Utilities → Terminal, run [code]csrutil enable[/code] and restart."),
+	"prot.fix.gatekeeper": s("[code]sudo spctl --global-enable[/code], then System Settings → Privacy & Security → " +
+		"Allow applications from → App Store & Known Developers."),
+	"prot.fix.av": s("Windows Security → Virus & threat protection → Manage settings → turn on Real-time protection. " +
+		"If it turns itself off again, ask IT: a policy or malware may be switching it off."),
+	"prot.fix.tamper": s("Windows Security → Virus & threat protection → Manage settings → turn on Tamper Protection."),
+	"prot.fix.smartscreen": s("Windows Security → App & browser control → Reputation-based protection settings → " +
+		"turn on Check apps and files. If a policy sets it, ask IT."),
+	"prot.fix.secureBoot.windows": s("Settings → System → Recovery → Advanced startup → Restart now → Troubleshoot → " +
+		"Advanced options → UEFI Firmware Settings, and enable Secure Boot there. With BitLocker on, have the " +
+		"recovery key at hand first."),
+	"prot.fix.secureBoot.linux": s("Enable Secure Boot in the firmware settings ([code]systemctl reboot " +
+		"--firmware-setup[/code]). Distributions with a signed shim (Ubuntu, Fedora, Debian…) boot as before; " +
+		"self-built kernels and extra modules (such as NVIDIA's) must be signed with a MOK first."),
+	"prot.fix.selinux": s("[code]sudo setenforce 1[/code], and set [code]SELINUX=enforcing[/code] in " +
+		"/etc/selinux/config so it stays on after a restart."),
+	"prot.fix.lsm": s("Ubuntu/Debian/openSUSE: [code]sudo systemctl enable --now apparmor[/code] (and remove " +
+		"apparmor=0 from the kernel command line). Fedora/RHEL: set [code]SELINUX=enforcing[/code] in " +
+		"/etc/selinux/config and restart."),
+
+	// ---- sharing ----
+	"sharing.on":             s("{service} is on."),
+	"sharing.onOpen":         s("{service} is on and lets anyone on the network in without a password."),
+	"sharing.off":            s("Off: {services}."),
+	"sharing.allowed":        s("On but allowed by policy: {services}."),
+	"sharing.note.unknown":   s("Could not tell whether {what} is on."),
+	"sharing.note.noSystemd": s("Could not read systemd unit states; judged from open ports only."),
+	"sharing.fix.macSharing": s("System Settings → General → Sharing → turn off {service}."),
+	"sharing.fix.macAirDrop": s("Control Center → AirDrop → Contacts Only (or turn AirDrop off), or in Finder: Go → " +
+		"AirDrop → \"Allow me to be discovered by\" → Contacts Only."),
+	"sharing.fix.winShares": s("Stop sharing folders you don't need: as administrator, Computer Management → Shared " +
+		"Folders → Shares → right-click → Stop Sharing, or [code]Remove-SmbShare -Name SHARE[/code]."),
+	"sharing.fix.winPublic": s("Settings → Network & internet → Advanced network settings → Advanced sharing " +
+		"settings → Public networks → turn off Network discovery and File and printer sharing; and set networks you " +
+		"don't own to Public."),
+	"sharing.fix.winPrinters": s("Settings → Bluetooth & devices → Printers & scanners → the printer → Printer " +
+		"properties → Sharing → untick \"Share this printer\"."),
+	"sharing.fix.winNearby": s("Settings → System → Nearby sharing → My devices only, or Off."),
+	"sharing.fix.linuxSamba": s("Stop Samba if you don't need it: [code]sudo systemctl disable --now smbd[/code] " +
+		"(smb on Fedora). Otherwise remove [code]guest ok = yes[/code] and [code]public = yes[/code] from " +
+		"/etc/samba/smb.conf."),
+	"sharing.fix.linuxNFS": s("[code]sudo systemctl disable --now nfs-server[/code] (nfs-kernel-server on " +
+		"Debian/Ubuntu), or limit each line of /etc/exports to named hosts, then [code]sudo exportfs -ra[/code]."),
+	"sharing.fix.cups":       s("[code]sudo cupsctl --no-share-printers[/code]"),
+	"sharing.fix.linuxGnome": s("Settings → Sharing → File Sharing → off."),
 }
