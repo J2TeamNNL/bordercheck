@@ -151,6 +151,25 @@ func newReport(env Env, pol policy.Policy, results []check.Result) report.Report
 	return rep
 }
 
+// compromiseWatch runs only the checks that can show a sign of compromise
+// (checks.CompromiseCheckIDs: a second or less together) and reports whether
+// the signs differ from those the last full check found. The service calls it
+// on every wake when nothing else is due, so a compromise is noticed within
+// the hour whatever report.check_interval says.
+func compromiseWatch(ctx context.Context, env Env, cfg Config, pol policy.Policy, st State, now time.Time) bool {
+	var watch []check.Check
+	for _, c := range allChecks(pol, Local(env.Dir)) {
+		if slices.Contains(checks.CompromiseCheckIDs, c.ID) {
+			watch = append(watch, c)
+		}
+	}
+	if len(watch) == 0 {
+		return false
+	}
+	rep := newReport(env, pol, pol.Waive(check.RunAll(ctx, watch), identity(cfg), now))
+	return !slices.Equal(rep.CompromiseLines(), st.CompromiseFound)
+}
+
 // allChecks is checks.AllWith; tests replace it so a run does not depend on
 // the machine it runs on.
 var allChecks = checks.AllWith
@@ -391,6 +410,12 @@ func Send(ctx context.Context, env Env, force bool) error {
 		// Between reports: check, and tell the person at the machine about
 		// anything new. Nothing is sent, unless the signs of compromise changed.
 		err = checkOnly(ctx, env, cfg, pol, &st, now, tok)
+	case pol.Report.CompromiseAlert && compromiseWatch(ctx, env, cfg, pol, st, now):
+		// Nothing is due, but the few checks that can show a compromise run
+		// on every wake, and what they found differs from the last check:
+		// run everything now, which sends the report at once.
+		fmt.Fprintf(env.Out, "%s signs of compromise changed since the last check: checking now\n", now.Format(time.RFC3339))
+		err = checkOnly(ctx, env, cfg, pol, &st, now, tok)
 	default:
 		fmt.Fprintf(env.Out, "%s nothing due: next check %s, next report %s\n", now.Format(time.RFC3339),
 			st.LastCheck.Add(pol.Report.CheckEvery()).Format(time.RFC3339), st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339))
@@ -588,7 +613,7 @@ func Status(env Env) (string, error) {
 	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results, and anything you ignored with your reason; %s\nService:    %s\n",
 		pol.Report.CheckEvery(), pol.Report.Interval, hostOf(pol.Report.URL), sends(pol.Report), services.status())
 	if pol.Report.CompromiseAlert {
-		fmt.Fprintf(&b, "Compromise: a sign of compromise is reported as soon as a check finds it (checks run every %s)\n", pol.Report.CheckEvery())
+		fmt.Fprintf(&b, "Compromise: looked for every hour, and reported as soon as a sign is found (the other checks run every %s)\n", pol.Report.CheckEvery())
 	} else {
 		b.WriteString("Compromise: not flagged (the policy turns report.compromise_alert off)\n")
 	}

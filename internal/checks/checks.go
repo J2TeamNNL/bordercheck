@@ -24,6 +24,11 @@ type Local struct {
 	IgnoreErr error          // the list of ignored secrets could not be read
 }
 
+// CompromiseCheckIDs are the checks whose findings can be a sign of compromise
+// (check.Result.Compromise). The installed service runs just these on every
+// wake, so they must stay quick.
+var CompromiseCheckIDs = []string{"startup-items", "extensions", "cracked-software"}
+
 // All returns every check the policy enables, in report order, without
 // anything set locally.
 func All(p policy.Policy) []check.Check { return AllWith(p, Local{}) }

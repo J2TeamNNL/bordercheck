@@ -85,9 +85,10 @@ When a report carries a sign:
   `include_evidence` says.
 - **It goes at once.** The service sends a report as soon as a scheduled check finds the signs changed (new, a
   different one, or gone), instead of waiting for `interval`, and tries again every hour until it gets through.
-  The same signs are not sent again until the next ordinary report. How soon a sign is noticed depends on how
-  often the checks run: every `check_interval`, or every `interval` when it is `""` (with the default policy,
-  once a day, at the daily report). Set `check_interval` (e.g. `"6h"`) to notice sooner.
+  The same signs are not sent again until the next ordinary report. A sign is noticed within about an hour
+  whatever `check_interval` says: on every hourly wake the service runs just the checks that can show one
+  (`startup-items`, `extensions`, `cracked-software`; under a second together), and when what they find differs
+  from the last check, it runs every check and sends the report.
 - **The person at the machine** sees it first in `bordercheck`, `bordercheck status` and the desktop notification:
   stop using the computer for work, tell IT, do not just delete the item. `bordercheck fix` tells the AI assistant
   to stop and send the person to IT instead of fixing anything; this is the one case where it advises changing

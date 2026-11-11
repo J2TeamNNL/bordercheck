@@ -147,7 +147,8 @@ a line in the user's crontab instead; `bordercheck status` says which.
 
 When a check finds [signs of compromise](policies.md#signs-of-compromise) that differ from those last reported (new
 ones, or the old ones gone), the service sends a report at once instead of waiting for `report.interval`, and
-retries hourly until it gets through. `bordercheck status` then starts with "Signs that this computer may be
+retries hourly until it gets through. It looks for them on every hourly wake, whatever `report.check_interval`
+says, by running only the few checks that can show one. `bordercheck status` then starts with "Signs that this computer may be
 compromised", lists them, says whether IT has been sent them, and what to do: stop using the computer for work,
 tell IT, and do not just delete the item. Checks run every `report.check_interval` (or, when it is not set, only
 when a report is due), so that is how soon a sign is noticed.

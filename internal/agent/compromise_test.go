@@ -161,8 +161,39 @@ func TestCompromiseIsSentAtOnce(t *testing.T) {
 	if err := Send(t.Context(), env, false); err != nil || len(rig.reports()) != 4 || rig.reports()[3]["compromised"] != nil {
 		t.Fatalf("cleared: %v, %d reports", err, len(rig.reports()))
 	}
-	if s, _ := Status(env); strings.Contains(s, "compromised") || !strings.Contains(s, "Compromise: a sign of compromise is reported as soon as a check finds it (checks run every 1h0m0s)") {
+	if s, _ := Status(env); strings.Contains(s, "compromised") || !strings.Contains(s, "Compromise: looked for every hour, and reported as soon as a sign is found (the other checks run every 1h0m0s)") {
 		t.Errorf("status after clearing:\n%s", s)
+	}
+}
+
+// The checks that can show a compromise run on every wake, so a sign is
+// reported within the hour even when neither a check nor a report is due.
+func TestCompromiseIsWatchedBetweenChecks(t *testing.T) {
+	rig := newCompromiseRig(t, false, "")
+	env := rig.env
+	if err := Send(t.Context(), env, false); err != nil || len(rig.reports()) != 1 {
+		t.Fatalf("first report: %v %v", err, rig.reports())
+	}
+	// Nothing due and no sign: nothing happens.
+	if err := Send(t.Context(), env, false); err != nil || len(rig.reports()) != 1 || !strings.Contains(rig.out.String(), "nothing due") {
+		t.Fatalf("idle wake: %v, %d reports\n%s", err, len(rig.reports()), rig.out)
+	}
+	// A sign appears; the next wake reports it though no check is due.
+	rig.set("LaunchAgent com.x", false)
+	if err := Send(t.Context(), env, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := rig.reports(); len(got) != 2 || got[1]["compromised"] != true {
+		t.Fatalf("not reported on the next wake: %d reports\n%s", len(got), rig.out)
+	}
+	// Unchanged on the wake after: not sent again.
+	if err := Send(t.Context(), env, false); err != nil || len(rig.reports()) != 2 {
+		t.Fatalf("resent while unchanged: %v, %d reports", err, len(rig.reports()))
+	}
+	// Gone: reported at once too.
+	rig.set("", false)
+	if err := Send(t.Context(), env, false); err != nil || len(rig.reports()) != 3 || rig.reports()[2]["compromised"] != nil {
+		t.Fatalf("cleared: %v, %d reports", err, len(rig.reports()))
 	}
 }
 
