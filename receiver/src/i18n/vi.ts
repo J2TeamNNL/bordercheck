@@ -421,6 +421,9 @@ export const vi: Catalog = {
   "checkTitle.tunnels": "Không có tunnel nào mở ra internet",
   "checkTitle.ai-agents": "AI agent giữ nguyên các rào chắn an toàn",
   "checkTitle.cracked-software": "Không có phần mềm bẻ khoá",
+  "checkTitle.package-managers": "Trình quản lý gói chặn được gói độc hại",
+  "checkTitle.startup-items": "Không có gì lạ tự chạy khi đăng nhập",
+  "checkTitle.backup": "Laptop bị mất vẫn tìm được và khôi phục được",
   "rep.prodSecrets": "{n} secret production dạng văn bản thuần",
   "rep.prodSecretsNote": "Chỉ có tên và file; giá trị không bao giờ được gửi đi.",
 };

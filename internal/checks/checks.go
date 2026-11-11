@@ -47,6 +47,9 @@ func All(p policy.Policy) []check.Check {
 		{check.Check{ID: "tunnels", Title: "Nothing is tunnelled to the internet", Run: tunnels(c.Tunnels)}, c.Tunnels.Common},
 		{check.Check{ID: "ai-agents", Title: "AI agents keep their guardrails", Run: aiAgents(c.AIAgents, c.Secrets)}, c.AIAgents.Common},
 		{check.Check{ID: "cracked-software", Title: "No cracked software", Run: crackedSoftware(c.CrackedSoftware)}, c.CrackedSoftware.Common},
+		{check.Check{ID: "package-managers", Title: "Package managers guard against bad packages", Run: packageManagers(c.PackageManagers)}, c.PackageManagers.Common},
+		{check.Check{ID: "startup-items", Title: "Nothing unexpected starts at login", Run: startupItems(c.StartupItems)}, c.StartupItems.Common},
+		{check.Check{ID: "backup", Title: "A lost laptop can be found and restored", Run: backup(c.Backup)}, c.Backup.Common},
 	}
 	var out []check.Check
 	for _, a := range all {

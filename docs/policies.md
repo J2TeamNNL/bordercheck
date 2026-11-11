@@ -243,6 +243,7 @@ private key, matches a `high` extra pattern, or is marked production. Values are
 | `terraform` | `~/.terraform.d/credentials.tfrc.json` | |
 | `pgpass` | `~/.pgpass` | |
 | `mysql` | `~/.my.cnf` | |
+| `git_remotes` | Passwords and tokens in git URLs: `url`/`pushurl` in the `.git/config` of repositories the walk above reaches (same `walk_depth`, `ignore_paths` and skipped folders), and `url.<base>.insteadOf` rules in `~/.gitconfig` | a plain user name (`git@`, `alice@`); `${VAR}` placeholders |
 
 On Windows gcloud, `gh`, Terraform and pgpass are read from their `%APPDATA%` paths.
 
@@ -306,6 +307,7 @@ is never shown, only type, fingerprint and comment. Hardware (FIDO) keys pass.
 | `loose_permissions` | `true` | Flag private keys other users can read (macOS and Linux; Windows ACLs aren't read yet). |
 | `authorized_keys` | `true` | List the keys in `authorized_keys` that can log in to this machine. |
 | `allow_keys` | `[]` | Globs of keys exempt from every rule, e.g. `"~/.ssh/ci_deploy"`. |
+| `client_config` | `true` | Read `~/.ssh/config` and the files it `Include`s under `~/.ssh` for `ForwardAgent` (other than `no`), `StrictHostKeyChecking no`/`off` and `UserKnownHostsFile /dev/null`. At the top level, under `Host *` (even with `!` exceptions) or `Match all`: warn medium; under other `Host`/`Match` lines: low. Evidence: file, line and the `Host` line. |
 
 ### tunnels
 
@@ -353,6 +355,83 @@ and never goes online.
 
 The fix always says to remove the crack and its hosts entries, run a full malware scan, change the passwords and
 tokens used on the machine, and ask IT for a licensed copy.
+
+### package-managers
+
+How the package managers on the machine are configured to fetch packages. Only tools that are installed (their
+command is found, or they have a config file) are judged, and the check skips when there are none. It reads
+config files only: it never runs the tools, never reads `node_modules` and never goes online. Evidence shows the
+file, line, setting and at most a host name, never a whole URL (URLs can hold tokens).
+
+| Tool | Files | Flagged |
+|---|---|---|
+| npm | `~/.npmrc` | `registry` or `@scope:registry` over `http://` and `strict-ssl=false` (fail, medium); `ignore-scripts` not `true` on npm 11 and older (warn, low; npm 12 runs dependencies' install scripts only once approved, so there only `dangerously-allow-all-scripts=true` is flagged); with `require_release_age`, no `min-release-age` (low) |
+| pnpm | `config.yaml` and the older `rc` in `~/Library/Preferences/pnpm`, `~/.config/pnpm`, `%LOCALAPPDATA%\pnpm\config` | `dangerouslyAllowAllBuilds: true` (low); `minimumReleaseAge: 0` (low; pnpm 11 waits a day by default); `registry` over http, `strictSsl: false` (fail) |
+| Yarn (Berry) | `~/.yarnrc.yml` | `enableScripts: true` (low); `npmMinimalAgeGate: 0` (low); `npmRegistryServer` over http, `enableStrictSsl: false` (fail) |
+| Bun | `~/.bunfig.toml` (or `$XDG_CONFIG_HOME/.bunfig.toml`) | `[install]` `registry` or scoped registries over http (fail); with `require_release_age`, no `minimumReleaseAge` (low). Bun runs only trusted dependencies' scripts by default. |
+| pip | `pip.conf` / `pip.ini` (user, legacy `~/.pip`, and site-wide) | `index-url`, `extra-index-url`, `find-links` over http; `trusted-host` (fail, medium) |
+| uv | `uv.toml` (user and `/etc/uv`) | `index-url`, `extra-index-url`, `[[index]] url` over http; `allow-insecure-host` (fail, medium) |
+| Go | the `go env -w` file (`go env GOENV`) | `GOINSECURE` and `GOPROXY` over http (fail, medium); `GOSUMDB=off`, `GONOSUMDB=*` or `GOPRIVATE=*` (warn, medium) |
+| Cargo | `$CARGO_HOME/config.toml` (`~/.cargo`) | a registry `index` or source `registry` over `http://` or `sparse+http://` (fail, medium) |
+
+Addresses on the machine itself (`localhost`, `127.0.0.1`, `::1`) are always fine. `GOFLAGS=-insecure` is not
+flagged: Go removed that flag in 1.17.
+
+| Field | Default | |
+|---|---|---|
+| `tools` | all: `["npm", "pnpm", "yarn", "bun", "pip", "uv", "go", "cargo"]` | Which tools to judge. |
+| `require_ignore_scripts` | `true` | Warn (low) when a package manager runs every dependency's install scripts: npm 11 and older without `ignore-scripts=true`, `dangerously-allow-all-scripts`, pnpm `dangerouslyAllowAllBuilds`, Yarn `enableScripts: true`. |
+| `require_release_age` | `false` | Also warn (low) when npm or Bun has no minimum release age, so a version published minutes ago is installed. pnpm and Yarn are flagged only when their default gate is set to 0. |
+| `allow_hosts` | `[]` | Globs of host names that may be used over http or as a trusted host, e.g. `"*.corp.example"` for an internal registry. Also matched against `GOINSECURE` patterns. |
+
+### startup-items
+
+What starts at login or on a schedule, as an inventory with a light touch: not an antivirus. Most items are only
+counted ("28 items start at login or on a schedule; nothing unusual"). Commands are judged but never shown, since
+they can hold tokens; evidence shows the source, file, label and program path. bordercheck's own service is never
+counted or flagged.
+
+| OS | Read |
+|---|---|
+| macOS | `~/Library/LaunchAgents`, `/Library/LaunchAgents`, `/Library/LaunchDaemons` (label and program; disabled ones are left out). Login Items are not read: listing them needs root. |
+| Linux | `~/.config/autostart/*.desktop`, systemd user units enabled in `~/.config/systemd/user`, `crontab -l` |
+| Windows | `HKCU` and `HKLM` `Run` / `RunOnce`, the user's and the common Startup folder (shortcuts resolved), enabled scheduled tasks outside `\Microsoft\` |
+
+| Flagged | |
+|---|---|
+| A command that downloads code and runs it (`curl … \| sh`, `sh -c "$(curl …)"`, `base64 -d \| sh`, `powershell -enc …`, `iex (… DownloadString …)`, `mshta http…`, `certutil -urlcache`) | fail, high |
+| A program (or the script an interpreter runs) in `/tmp`, `/var/tmp`, `/private/tmp`, `/Users/Shared`, `~/Downloads`, `%TEMP%`, `C:\Windows\Temp`, or a hidden folder directly in home that developer tools don't use (`~/.local`, `~/.cargo`, `~/.nvm`… are fine) | warn, medium |
+| A program, or its folder, that every user can write to (macOS, Linux) | warn, medium |
+| A program that no longer exists | warn, low |
+
+On macOS, programs under `~/Desktop`, `~/Documents`, `~/Downloads`, other apps' containers and `/Volumes` are
+not looked at on disk (that could raise a privacy prompt), so they are never reported missing.
+
+| Field | Default | |
+|---|---|---|
+| `allow` | `[]` | Globs on an item's label or program path (`~` allowed) to leave out, e.g. `"com.acme.*"`, `"~/.acme/bin/*"`. |
+| `extra_suspicious_paths` | `[]` | More folders a program should not start from, e.g. `"~/Public"`. |
+
+### backup
+
+Can a lost or stolen laptop be found, and its files restored? Severities stay low, except for an unencrypted
+backup: a backup disk is a copy of the whole disk, so an unencrypted one undoes FileVault. Nothing needs admin
+rights or prompts; what cannot be read is said in a note.
+
+- macOS: Time Machine destinations from `tmutil destinationinfo`, and their encryption and last backup from
+  `/Library/Preferences/com.apple.TimeMachine.plist` (if reading them needs Full Disk Access, the check says it
+  could not tell). Find My Mac is taken as on when NVRAM holds its token (`fmm-mobileme-token-FMM`; only the
+  name is looked at).
+- Windows: Find my device (`LocationSyncEnabled`, and the `AllowFindMyDevice` policy). File History, Windows
+  Backup and OneDrive backups are not read.
+- Linux: skipped; there is no standard backup or device-finding service to read.
+
+| Field | Default | |
+|---|---|---|
+| `require_backup` | `false` | Warn (low) when no Time Machine backup is set up. Off by default because many organisations back up another way. |
+| `require_encrypted` | `true` | Warn (medium) for a Time Machine backup that is not encrypted. |
+| `require_find_my` | `true` | Warn (low) when Find My Mac / Find my device is off. |
+| `max_backup_age_days` | `0` | Warn (low) when the last backup to a destination is older than this, 0–3650; `0` = don't check. |
 
 ## A fuller example
 

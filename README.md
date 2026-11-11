@@ -37,6 +37,9 @@ Companies can install it on every laptop, and each one then reports to the IT te
 | `tunnels` | ngrok, cloudflared, `tailscale funnel`/`serve`, VS Code tunnels, `ssh -R` and others |
 | `ai-agents` | Plain-text tokens in MCP and agent configs, and settings that skip approvals or the sandbox |
 | `cracked-software` | Traces of cracked Adobe, Autodesk, Windows or Office (blocked licensing servers, KMS emulators, KMSpico); suggests free alternatives |
+| `package-managers` | npm, pnpm, Yarn, Bun, pip, uv, Go and Cargo settings: registries over plain http, certificate or checksum checks off, every package's install scripts allowed to run |
+| `startup-items` | What starts at login or on a schedule (LaunchAgents, autostart, systemd user units, crontab, Run keys, scheduled tasks): download-and-run commands, programs in temporary, download or hidden folders, programs anyone can change |
+| `backup` | Time Machine encrypted (and, if the policy asks, set up and recent); Find My Mac or Find my device on |
 
 `os-updates`, `screen-lock` and `remote-access` never go online: they judge what the machine already knows.
 Details and options for each: [Policies](docs/policies.md#checks).

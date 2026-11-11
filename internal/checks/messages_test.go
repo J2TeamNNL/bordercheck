@@ -60,6 +60,14 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 			{path: "~/.claude/settings.json", where: "permissions.defaultMode = bypassPermissions", what: "every tool runs without asking", sev: check.High}}, 4)),
 		id("cracked-software", evalCracked(crackFacts{HostsPath: "/etc/hosts", Hosts: "127.0.0.1 lmlicensing.adobe.com\n0.0.0.0 genuine.autodesk.com\n"},
 			def.CrackedSoftware)),
+		id("package-managers", evalPackageManagers(pmFacts{Present: map[string]bool{"npm": true, "pip": true}, Configs: []pmConfig{
+			{Tool: "pip", Kind: "pip", Path: "~/Library/Application Support/pip/pip.conf", Body: "[global]\ntrusted-host = pypi.demo.example\n"}}},
+			def.PackageManagers)),
+		id("startup-items", evalStartup([]startupItem{{Source: "LaunchAgent", Where: "~/Library/LaunchAgents/com.demo.update.plist",
+			Label: "com.demo.update", Program: "/Users/demo/.demo/update"}, {Source: "LaunchAgent", Label: "com.demo.app",
+			Program: "/Applications/Demo.app/Contents/MacOS/demo"}}, nil, startupEnv{home: "/Users/demo", goos: "darwin"}, startupFix("darwin"))),
+		id("backup", evalBackup(backupFacts{OS: "macos", BackupKnown: true, Dests: []backupDest{{Name: "Backup Disk", Encrypted: ptrBool(false)}},
+			FindMyKnown: true}, def.Backup, now)),
 	}
 
 	winAuto := winUpdateFacts(kvLines("build=19045\nubr=6093\ndisplay_version=22H2\nno_auto_update=1\nwuauserv_start=Disabled\n" +
@@ -82,6 +90,11 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 		id("ai-agents", evalAIAgents([]aiFinding{{path: `~\AppData\Roaming\Code\User\mcp.json`, what: "Token in an HTTP header in plain text", sev: check.Medium}}, 2)),
 		id("cracked-software", evalCracked(crackFacts{HostsPath: `C:\Windows\System32\drivers\etc\hosts`,
 			KMS: map[string]string{"Windows": "127.0.0.2:1688"}, Tools: []string{`KMSpico (C:\Program Files\KMSpico)`}}, def.CrackedSoftware)),
+		id("package-managers", evalPackageManagers(pmFacts{Present: map[string]bool{"npm": true}, Configs: []pmConfig{
+			{Tool: "npm", Kind: "npmrc", Path: `~\.npmrc`, Body: "registry=http://npm.demo.example/\n"}}}, def.PackageManagers)),
+		id("startup-items", evalStartup(winStartupItems("task\t\\\tDemoUpdate\t\"powershell.exe\" -NoP -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQA\n",
+			func(string) string { return "" }), nil, startupEnv{home: `C:\Users\demo`, goos: "windows"}, startupFix("windows"))),
+		id("backup", evalBackup(backupFacts{OS: "windows", FindMyKnown: true, Notes: msg.Of("backup.win.notRead")}, def.Backup, now)),
 	}
 
 	linux := []check.Result{
@@ -102,6 +115,10 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 		id("tunnels", evalTunnels(nil, def.Tunnels, nil)),
 		id("ai-agents", evalAIAgents(nil, 3)),
 		id("cracked-software", evalCracked(crackFacts{HostsPath: "/etc/hosts"}, def.CrackedSoftware)),
+		id("package-managers", evalPackageManagers(pmFacts{Present: map[string]bool{"go": true}, Configs: []pmConfig{
+			{Tool: "go", Kind: "goenv", Path: "~/.config/go/env", Body: "GOSUMDB=off\n"}}}, def.PackageManagers)),
+		id("startup-items", evalStartup(cronItems("@reboot /home/demo/bin/sync\n"), nil, startupEnv{home: "/home/demo", goos: "linux"}, startupFix("linux"))),
+		id("backup", check.SkippedMsg(msg.Of("backup.unsupported", "os", "linux"))),
 	}
 	return map[string][]check.Result{"mac": mac, "windows": win, "linux": linux}
 }

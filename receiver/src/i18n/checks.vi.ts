@@ -244,6 +244,10 @@ export const checksVi: CheckCatalog = {
   "sshkeys.fix.win": "Để service ssh-agent của Windows giữ key đã mở khoá: [code]ssh-add <key>[/code].",
   "sshkeys.fix.rest":
     "Chỉ cho chủ sở hữu đọc key: [code]chmod 600 <key>[/code]. Xoá những dòng trong authorized_keys mà bạn không nhận ra, và tắt SSH server (Remote Login) nếu không dùng.",
+  "sshkeys.config.all": "{n} thiết lập trong cấu hình SSH client làm yếu mọi kết nối.",
+  "sshkeys.config.some": "{n} thiết lập trong cấu hình SSH client làm yếu kết nối tới một số host.",
+  "sshkeys.fix.config":
+    "Trong ~/.ssh/config, bỏ [code]ForwardAgent yes[/code] (chỉ dùng [code]ssh -A[/code] hoặc [code]ProxyJump[/code] khi thật cần: server nhận agent của bạn có thể dùng key của bạn trong lúc bạn đăng nhập), và bỏ [code]StrictHostKeyChecking no[/code] cùng [code]UserKnownHostsFile /dev/null[/code] (dùng [code]StrictHostKeyChecking accept-new[/code] thay thế), để nhận ra khi một server bỗng đổi sang key khác.",
 
   "tunnels.pass": "Không có tunnel nào đưa máy này ra internet hay tailnet.",
   "tunnels.found": "{n} tunnel đang đưa máy này ra ngoài mạng nội bộ.",
@@ -269,4 +273,53 @@ export const checksVi: CheckCatalog = {
     "Adobe: PhotoCraft thay cho Photoshop, VectorCraft thay cho Illustrator, FilmCraft thay cho Premiere Pro, LightCraft thay cho Lightroom, EffectCraft thay cho After Effects, DesignCraft thay cho InDesign, PdfCraft thay cho Acrobat.",
   "cracked.alt.office": "Microsoft Office: WordCraft thay cho Word, GridCraft thay cho Excel, DeckCraft thay cho PowerPoint.",
   "cracked.alt.autodesk": "Autodesk: CADCraft thay cho AutoCAD.",
+
+  "pm.none": "Không tìm thấy npm, pnpm, Yarn, Bun, pip, uv, Go hay Cargo.",
+  "pm.pass": "Đã kiểm tra {n} trình quản lý gói ({tools}): không có thiết lập nào làm yếu cách tải gói.",
+  "pm.insecure": "{n} thiết lập tải gói qua http thường hoặc bỏ qua lỗi chứng chỉ.",
+  "pm.checksum": "{n} thiết lập tắt checksum database của Go.",
+  "pm.scripts": "{n} trình quản lý gói chạy script cài đặt của mọi gói.",
+  "pm.releaseAge": "{n} trình quản lý gói cài cả phiên bản vừa phát hành được vài phút.",
+  "pm.fix.insecure":
+    "Dùng registry và index https://, và bỏ các thiết lập bỏ qua lỗi chứng chỉ: [code]strict-ssl=false[/code] trong ~/.npmrc, [code]trusted-host[/code] trong pip.conf, [code]allow-insecure-host[/code] trong uv.toml, [code]enableStrictSsl: false[/code] trong ~/.yarnrc.yml; với Go chạy [code]go env -u GOINSECURE[/code]. Nếu registry nội bộ của công ty chỉ chạy http, hãy đề nghị IT thêm nó vào allow_hosts của policy.",
+  "pm.fix.checksum":
+    "Bật lại checksum database của Go: [code]go env -u GOSUMDB GONOSUMDB[/code], và trong GOPRIVATE chỉ liệt kê đường dẫn module của công ty ([code]go env -w GOPRIVATE=git.example.com/*[/code]), không dùng [code]*[/code].",
+  "pm.fix.scripts":
+    "Mặc định không cho gói chạy script cài đặt: [code]npm config set ignore-scripts true[/code] (chạy [code]npm rebuild PACKAGE[/code] cho gói nào thật sự cần script); pnpm: bỏ [code]dangerouslyAllowAllBuilds[/code]; Yarn: bỏ [code]enableScripts: true[/code] khỏi ~/.yarnrc.yml.",
+  "pm.fix.releaseAge":
+    "Đợi vài ngày rồi mới cài phiên bản mới, để bản phát hành bị chiếm quyền được phát hiện trước: npm 11.10+: [code]npm config set min-release-age 3[/code] (ngày); Bun: [code]minimumReleaseAge = 259200[/code] (giây) trong mục [install] của ~/.bunfig.toml; pnpm và Yarn: xoá dòng đặt [code]minimumReleaseAge[/code] hoặc [code]npmMinimalAgeGate[/code] bằng 0.",
+
+  "startup.pass": "{n} mục tự chạy khi đăng nhập hoặc theo lịch; không có gì bất thường.",
+  "startup.total": "Tổng cộng {n} mục tự chạy khi đăng nhập hoặc theo lịch.",
+  "startup.downloadRun": "{n} mục tải code về và chạy mỗi lần khởi động.",
+  "startup.suspicious": "{n} mục chạy chương trình từ thư mục tạm, thư mục tải về hoặc thư mục ẩn.",
+  "startup.writable": "{n} mục chạy chương trình mà người dùng nào cũng sửa được.",
+  "startup.missing": "{n} mục trỏ tới chương trình không còn tồn tại.",
+  "startup.fix.mac":
+    "Tra cứu từng mục được liệt kê. Nếu không nhận ra, hãy gỡ nó: [code]launchctl bootout gui/$(id -u)/LABEL[/code] rồi xoá file .plist của nó trong ~/Library/LaunchAgents (mục trong /Library cần quyền administrator); System Settings → General → Login Items & Extensions cũng liệt kê chúng. Nếu có mục tải code về và chạy, hãy quét mã độc và đổi các mật khẩu đã dùng trên máy Mac này. Mục có chương trình đã mất là phần sót lại của app đã gỡ, cứ xoá đi.",
+  "startup.fix.win":
+    "Tra cứu từng mục được liệt kê. Nếu không nhận ra, hãy tắt nó: Task Manager → Startup apps → Disable, Task Scheduler → chọn task → Disable, hoặc xoá shortcut của nó khỏi thư mục Startup ([code]shell:startup[/code]). Nếu có mục tải code về và chạy, hãy quét toàn bộ máy bằng Windows Security và đổi các mật khẩu đã dùng trên máy này. Mục có chương trình đã mất là phần sót lại của app đã gỡ.",
+  "startup.fix.linux":
+    "Tra cứu từng mục được liệt kê. Nếu không nhận ra, hãy gỡ nó: xoá file .desktop của nó trong ~/.config/autostart, [code]systemctl --user disable --now UNIT[/code], hoặc [code]crontab -e[/code]. Nếu có mục tải code về và chạy, hãy kiểm tra mã độc trên máy và đổi các mật khẩu đã dùng trên đó.",
+
+  "backup.unsupported": "Không kiểm tra trên {os}: không có dịch vụ sao lưu hay định vị thiết bị chuẩn nào để đọc.",
+  "backup.unencrypted": "{n} bản sao lưu Time Machine không được mã hoá: ai lấy được ổ đĩa đều đọc được file của bạn.",
+  "backup.stale": "{n} bản sao lưu cũ hơn {max} ngày.",
+  "backup.none": "Chưa thiết lập sao lưu: laptop mất hoặc hỏng là mất luôn file.",
+  "backup.findMyOff.mac": "Find My Mac đang tắt: máy Mac bị mất không thể định vị, khoá hay xoá từ xa.",
+  "backup.findMyOff.win": "Find my device đang tắt: PC bị mất không thể định vị hay khoá từ xa.",
+  "backup.on": "Dữ liệu được sao lưu tới {n} nơi.",
+  "backup.noneAllowed": "Chưa thiết lập sao lưu Time Machine (policy không bắt buộc).",
+  "backup.findMyOn.mac": "Find My Mac đang bật.",
+  "backup.findMyOn.win": "Find my device đang bật.",
+  "backup.unknown.mac": "Không xác định được Time Machine đã được thiết lập chưa (đọc thiết lập của nó có thể cần Full Disk Access).",
+  "backup.findMyUnknown": "Không xác định được thiết bị có định vị từ xa được hay không.",
+  "backup.win.notRead": "Không kiểm tra sao lưu của Windows (File History, Windows Backup, OneDrive).",
+  "backup.fix.mac.encrypt":
+    "Mở System Settings → General → Time Machine → chọn ổ đĩa → Remove Disk, rồi Add Backup Disk lại với \"Encrypt backup\" được bật (trên macOS gần đây không thể mã hoá một bản sao lưu đang có, nên ổ đĩa sẽ bị xoá).",
+  "backup.fix.mac.stale": "Cắm ổ sao lưu, rồi chọn Time Machine trên thanh menu → Back Up Now.",
+  "backup.fix.mac.setup":
+    "Mở System Settings → General → Time Machine → Add Backup Disk, với \"Encrypt backup\" được bật, hoặc hỏi IT máy Mac này nên được sao lưu thế nào.",
+  "backup.fix.mac.findMy": "Mở System Settings → tên của bạn (Apple Account) → iCloud → Find My Mac rồi bật lên.",
+  "backup.fix.win.findMy": "Mở Settings → Privacy & security → Find my device rồi bật lên (cần tài khoản Microsoft và location services).",
 };

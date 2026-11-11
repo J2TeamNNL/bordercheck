@@ -54,6 +54,9 @@
       "max_browser_age_days": 60
     },
     "screen-lock": { "require_password": true, "max_lock_minutes": 10 },
-    "remote-access": { "allow": ["guest"] }
+    "remote-access": { "allow": ["guest"] },
+    "package-managers": { "require_ignore_scripts": true, "require_release_age": false, "allow_hosts": [] },
+    "startup-items": { "allow": [], "extra_suspicious_paths": [] },
+    "backup": { "require_backup": false, "require_encrypted": true, "require_find_my": true, "max_backup_age_days": 0 }
   }
 }

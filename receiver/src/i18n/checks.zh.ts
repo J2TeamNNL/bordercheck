@@ -244,6 +244,10 @@ export const checksZh: CheckCatalog = {
   "sshkeys.fix.win": "让 Windows 的 ssh-agent 服务保存已解锁的密钥：[code]ssh-add <key>[/code]。",
   "sshkeys.fix.rest":
     "将密钥设为仅本人可读：[code]chmod 600 <key>[/code]。删除 authorized_keys 中你不认识的条目；如果不使用 SSH 服务器（远程登录），请将其关闭。",
+  "sshkeys.config.all": "SSH 客户端配置中有 {n} 项设置削弱了所有连接的安全性。",
+  "sshkeys.config.some": "SSH 客户端配置中有 {n} 项设置削弱了与部分主机连接的安全性。",
+  "sshkeys.fix.config":
+    "在 ~/.ssh/config 中删除 [code]ForwardAgent yes[/code]（只在确实需要时使用 [code]ssh -A[/code] 或 [code]ProxyJump[/code]：接收你 agent 转发的服务器在你登录期间可以使用你的密钥），并删除 [code]StrictHostKeyChecking no[/code] 和 [code]UserKnownHostsFile /dev/null[/code]（改用 [code]StrictHostKeyChecking accept-new[/code]），这样服务器的密钥突然变化时才能被发现。",
 
   "tunnels.pass": "没有隧道把这台电脑暴露到互联网或 tailnet。",
   "tunnels.found": "{n} 条隧道把这台电脑暴露到本地网络之外。",
@@ -268,4 +272,52 @@ export const checksZh: CheckCatalog = {
     "Adobe：PhotoCraft 替代 Photoshop，VectorCraft 替代 Illustrator，FilmCraft 替代 Premiere Pro，LightCraft 替代 Lightroom，EffectCraft 替代 After Effects，DesignCraft 替代 InDesign，PdfCraft 替代 Acrobat。",
   "cracked.alt.office": "Microsoft Office：WordCraft 替代 Word，GridCraft 替代 Excel，DeckCraft 替代 PowerPoint。",
   "cracked.alt.autodesk": "Autodesk：CADCraft 替代 AutoCAD。",
+
+  "pm.none": "未找到 npm、pnpm、Yarn、Bun、pip、uv、Go 或 Cargo。",
+  "pm.pass": "已检查 {n} 个包管理器（{tools}）：没有削弱软件包获取方式的设置。",
+  "pm.insecure": "{n} 项设置通过明文 http 获取软件包或忽略证书错误。",
+  "pm.checksum": "{n} 项设置关闭了 Go 的校验和数据库。",
+  "pm.scripts": "{n} 个包管理器会运行每个软件包的安装脚本。",
+  "pm.releaseAge": "{n} 个包管理器会安装刚发布几分钟的版本。",
+  "pm.fix.insecure":
+    "使用 https:// 的仓库和索引，并删除忽略证书错误的设置：~/.npmrc 中的 [code]strict-ssl=false[/code]、pip.conf 中的 [code]trusted-host[/code]、uv.toml 中的 [code]allow-insecure-host[/code]、~/.yarnrc.yml 中的 [code]enableStrictSsl: false[/code]；Go 请运行 [code]go env -u GOINSECURE[/code]。如果公司内部仓库只支持 http，请让 IT 将其加入 policy 的 allow_hosts。",
+  "pm.fix.checksum":
+    "重新启用 Go 的校验和数据库：[code]go env -u GOSUMDB GONOSUMDB[/code]，并且 GOPRIVATE 中只列出公司自己的模块路径（[code]go env -w GOPRIVATE=git.example.com/*[/code]），不要用 [code]*[/code]。",
+  "pm.fix.scripts":
+    "默认禁止软件包运行安装脚本：[code]npm config set ignore-scripts true[/code]（确实需要脚本的包可运行 [code]npm rebuild PACKAGE[/code]）；pnpm：删除 [code]dangerouslyAllowAllBuilds[/code]；Yarn：从 ~/.yarnrc.yml 删除 [code]enableScripts: true[/code]。",
+  "pm.fix.releaseAge":
+    "新版本发布几天后再安装，让被劫持的版本先被发现：npm 11.10+：[code]npm config set min-release-age 3[/code]（天）；Bun：在 ~/.bunfig.toml 的 [install] 下设置 [code]minimumReleaseAge = 259200[/code]（秒）；pnpm 和 Yarn：删除把 [code]minimumReleaseAge[/code] 或 [code]npmMinimalAgeGate[/code] 设为 0 的那一行。",
+
+  "startup.pass": "{n} 个项目在登录时或按计划自动运行；没有异常。",
+  "startup.total": "共有 {n} 个项目在登录时或按计划自动运行。",
+  "startup.downloadRun": "{n} 个项目每次启动都会下载代码并运行。",
+  "startup.suspicious": "{n} 个项目从临时、下载或隐藏文件夹启动程序。",
+  "startup.writable": "{n} 个项目启动的程序任何用户都能修改。",
+  "startup.missing": "{n} 个项目指向已不存在的程序。",
+  "startup.fix.mac":
+    "逐一查明列出的项目。如果不认识，就将其移除：[code]launchctl bootout gui/$(id -u)/LABEL[/code]，然后从 ~/Library/LaunchAgents 删除其 .plist（/Library 中的项目需要管理员权限）；System Settings → General → Login Items & Extensions 中也能看到它们。如果有项目会下载并运行代码，请进行恶意软件扫描，并更改在这台 Mac 上使用过的密码。程序已不存在的项目是已卸载应用的残留，直接删除即可。",
+  "startup.fix.win":
+    "逐一查明列出的项目。如果不认识，就将其关闭：Task Manager → Startup apps → Disable，Task Scheduler → 该任务 → Disable，或从 Startup 文件夹（[code]shell:startup[/code]）删除其快捷方式。如果有项目会下载并运行代码，请用 Windows Security 进行完整扫描，并更改在这台电脑上使用过的密码。程序已不存在的项目是已卸载应用的残留。",
+  "startup.fix.linux":
+    "逐一查明列出的项目。如果不认识，就将其移除：删除 ~/.config/autostart 中对应的 .desktop 文件、[code]systemctl --user disable --now UNIT[/code]，或 [code]crontab -e[/code]。如果有项目会下载并运行代码，请检查机器上的恶意软件，并更改在这台机器上使用过的密码。",
+
+  "backup.unsupported": "未在 {os} 上检查：没有可读取的标准备份或设备查找服务。",
+  "backup.unencrypted": "{n} 个 Time Machine 备份未加密：拿到磁盘的人都能读取你的文件。",
+  "backup.stale": "{n} 个备份已超过 {max} 天。",
+  "backup.none": "尚未设置备份：笔记本电脑丢失或损坏时，文件也会随之丢失。",
+  "backup.findMyOff.mac": "Find My Mac 已关闭：丢失的 Mac 无法远程定位、锁定或抹掉。",
+  "backup.findMyOff.win": "Find my device 已关闭：丢失的电脑无法远程定位或锁定。",
+  "backup.on": "备份保存到 {n} 个位置。",
+  "backup.noneAllowed": "尚未设置 Time Machine 备份（policy 不要求）。",
+  "backup.findMyOn.mac": "Find My Mac 已开启。",
+  "backup.findMyOn.win": "Find my device 已开启。",
+  "backup.unknown.mac": "无法确定是否已设置 Time Machine（读取其设置可能需要 Full Disk Access）。",
+  "backup.findMyUnknown": "无法确定设备能否被远程定位。",
+  "backup.win.notRead": "未检查 Windows 备份（File History、Windows Backup、OneDrive）。",
+  "backup.fix.mac.encrypt":
+    "System Settings → General → Time Machine → 选择该磁盘 → Remove Disk，然后重新 Add Backup Disk 并开启 \"Encrypt backup\"（在较新的 macOS 上无法直接加密已有备份，因此磁盘会被抹掉）。",
+  "backup.fix.mac.stale": "连接备份磁盘，然后在菜单栏中选择 Time Machine → Back Up Now。",
+  "backup.fix.mac.setup": "System Settings → General → Time Machine → Add Backup Disk，并开启 \"Encrypt backup\"；或询问 IT 这台 Mac 应如何备份。",
+  "backup.fix.mac.findMy": "System Settings → 你的名字（Apple Account）→ iCloud → Find My Mac → 开启。",
+  "backup.fix.win.findMy": "Settings → Privacy & security → Find my device → 开启（需要 Microsoft 账户和定位服务）。",
 };

@@ -284,6 +284,14 @@ var Catalog = map[string]Entry{
 	"sshkeys.fix.win": s("Let the Windows ssh-agent service hold the unlocked key: [code]ssh-add <key>[/code]."),
 	"sshkeys.fix.rest": s("Make keys private: [code]chmod 600 <key>[/code]. Remove authorized_keys lines you don't " +
 		"recognise, and turn off the SSH server (Remote Login) if you don't use it."),
+	"sshkeys.config.all": pl("1 setting in the SSH client config weakens every connection.",
+		"{n} settings in the SSH client config weaken every connection."),
+	"sshkeys.config.some": pl("1 setting in the SSH client config weakens connections to particular hosts.",
+		"{n} settings in the SSH client config weaken connections to particular hosts."),
+	"sshkeys.fix.config": s("In ~/.ssh/config, remove [code]ForwardAgent yes[/code] (use [code]ssh -A[/code] or " +
+		"[code]ProxyJump[/code] only where you need it: a server you forward your agent to can use your keys while you " +
+		"are logged in), and remove [code]StrictHostKeyChecking no[/code] and [code]UserKnownHostsFile /dev/null[/code] " +
+		"(use [code]StrictHostKeyChecking accept-new[/code] instead), so a server that suddenly has another key is noticed."),
 
 	// ---- tunnels ----
 	"tunnels.pass":    s("No tunnels publish this machine to the internet or the tailnet."),
@@ -320,4 +328,82 @@ var Catalog = map[string]Entry{
 		"LightCraft for Lightroom, EffectCraft for After Effects, DesignCraft for InDesign, PdfCraft for Acrobat."),
 	"cracked.alt.office":   s("Microsoft Office: WordCraft for Word, GridCraft for Excel, DeckCraft for PowerPoint."),
 	"cracked.alt.autodesk": s("Autodesk: CADCraft for AutoCAD."),
+
+	// ---- package-managers ----
+	"pm.none": s("No npm, pnpm, Yarn, Bun, pip, uv, Go or Cargo found."),
+	"pm.pass": pl("1 package manager checked ({tools}): nothing weakens how packages are fetched.",
+		"{n} package managers checked ({tools}): nothing weakens how packages are fetched."),
+	"pm.insecure": pl("1 setting fetches packages over plain http or ignores certificate errors.",
+		"{n} settings fetch packages over plain http or ignore certificate errors."),
+	"pm.checksum": pl("1 setting turns off Go's checksum database.", "{n} settings turn off Go's checksum database."),
+	"pm.scripts": pl("1 package manager runs every package's install scripts.",
+		"{n} package managers run every package's install scripts."),
+	"pm.releaseAge": pl("1 package manager installs versions published minutes ago.",
+		"{n} package managers install versions published minutes ago."),
+	"pm.fix.insecure": s("Use https:// registries and indexes, and remove settings that ignore certificate errors: " +
+		"[code]strict-ssl=false[/code] in ~/.npmrc, [code]trusted-host[/code] in pip.conf, " +
+		"[code]allow-insecure-host[/code] in uv.toml, [code]enableStrictSsl: false[/code] in ~/.yarnrc.yml; for Go run " +
+		"[code]go env -u GOINSECURE[/code]. If your company's own registry only speaks http, ask IT to add it to the " +
+		"policy's allow_hosts."),
+	"pm.fix.checksum": s("Turn Go's checksum database back on: [code]go env -u GOSUMDB GONOSUMDB[/code], and list only " +
+		"your company's module paths in GOPRIVATE ([code]go env -w GOPRIVATE=git.example.com/*[/code]), not [code]*[/code]."),
+	"pm.fix.scripts": s("Stop packages from running install scripts by default: [code]npm config set ignore-scripts " +
+		"true[/code] (run [code]npm rebuild PACKAGE[/code] for one that needs its script); pnpm: remove " +
+		"[code]dangerouslyAllowAllBuilds[/code]; Yarn: remove [code]enableScripts: true[/code] from ~/.yarnrc.yml."),
+	"pm.fix.releaseAge": s("Wait a few days before installing a new version, so a hijacked release is caught first: " +
+		"npm 11.10+: [code]npm config set min-release-age 3[/code] (days); Bun: [code]minimumReleaseAge = 259200[/code] " +
+		"(seconds) under [install] in ~/.bunfig.toml; pnpm and Yarn: remove the line that sets " +
+		"[code]minimumReleaseAge[/code] or [code]npmMinimalAgeGate[/code] to 0."),
+
+	// ---- startup-items ----
+	"startup.pass": pl("1 item starts at login or on a schedule; nothing unusual.",
+		"{n} items start at login or on a schedule; nothing unusual."),
+	"startup.total": pl("1 item starts at login or on a schedule in all.",
+		"{n} items start at login or on a schedule in all."),
+	"startup.downloadRun": pl("1 item downloads code and runs it each time it starts.",
+		"{n} items download code and run it each time they start."),
+	"startup.suspicious": pl("1 item starts a program from a temporary, download or hidden folder.",
+		"{n} items start programs from temporary, download or hidden folders."),
+	"startup.writable": pl("1 item starts a program that any user can change.",
+		"{n} items start programs that any user can change."),
+	"startup.missing": pl("1 item points to a program that no longer exists.",
+		"{n} items point to programs that no longer exist."),
+	"startup.fix.mac": s("Look up each item listed. If you don't recognise it, remove it: " +
+		"[code]launchctl bootout gui/$(id -u)/LABEL[/code] and delete its .plist from ~/Library/LaunchAgents (items in " +
+		"/Library need an administrator); System Settings → General → Login Items & Extensions shows them too. If one " +
+		"downloads and runs code, run a malware scan and change the passwords used on this Mac. Items whose program is " +
+		"gone are leftovers of uninstalled apps and can simply be removed."),
+	"startup.fix.win": s("Look up each item listed. If you don't recognise it, turn it off: Task Manager → Startup apps " +
+		"→ Disable, Task Scheduler → the task → Disable, or delete its shortcut from the Startup folder " +
+		"([code]shell:startup[/code]). If one downloads and runs code, run a full scan in Windows Security and change " +
+		"the passwords used on this PC. Items whose program is gone are leftovers of uninstalled apps."),
+	"startup.fix.linux": s("Look up each item listed. If you don't recognise it, remove it: delete its .desktop file " +
+		"from ~/.config/autostart, [code]systemctl --user disable --now UNIT[/code], or [code]crontab -e[/code]. If " +
+		"one downloads and runs code, check the machine for malware and change the passwords used on it."),
+
+	// ---- backup ----
+	"backup.unsupported": s("Not checked on {os}: there is no standard backup or device-finding service to read."),
+	"backup.unencrypted": pl("1 Time Machine backup is not encrypted: whoever takes the disk can read your files.",
+		"{n} Time Machine backups are not encrypted: whoever takes a disk can read your files."),
+	"backup.stale":         pl("1 backup is older than {max} days.", "{n} backups are older than {max} days."),
+	"backup.none":          s("No backup is set up: a lost or broken laptop takes its files with it."),
+	"backup.findMyOff.mac": s("Find My Mac is off: a lost Mac cannot be located, locked or erased remotely."),
+	"backup.findMyOff.win": s("Find my device is off: a lost PC cannot be located or locked remotely."),
+	"backup.on":            pl("Backups go to 1 destination.", "Backups go to {n} destinations."),
+	"backup.noneAllowed":   s("No Time Machine backup is set up (the policy does not require one)."),
+	"backup.findMyOn.mac":  s("Find My Mac is on."),
+	"backup.findMyOn.win":  s("Find my device is on."),
+	"backup.unknown.mac": s("Could not tell whether Time Machine is set up (reading its settings may need Full Disk " +
+		"Access)."),
+	"backup.findMyUnknown": s("Could not tell whether the device can be located remotely."),
+	"backup.win.notRead":   s("Windows backups (File History, Windows Backup, OneDrive) are not checked."),
+	"backup.fix.mac.encrypt": s("System Settings → General → Time Machine → select the disk → Remove Disk, then Add " +
+		"Backup Disk again with \"Encrypt backup\" turned on (on recent macOS an existing backup cannot be encrypted " +
+		"in place, so the disk is erased)."),
+	"backup.fix.mac.stale": s("Connect the backup disk, then Time Machine in the menu bar → Back Up Now."),
+	"backup.fix.mac.setup": s("System Settings → General → Time Machine → Add Backup Disk, with \"Encrypt backup\" " +
+		"turned on, or ask IT how this Mac should be backed up."),
+	"backup.fix.mac.findMy": s("System Settings → your name (Apple Account) → iCloud → Find My Mac → turn it on."),
+	"backup.fix.win.findMy": s("Settings → Privacy & security → Find my device → turn it on (it needs a Microsoft " +
+		"account and location services)."),
 }
