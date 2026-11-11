@@ -71,6 +71,14 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 			CN: "mkcert demo@demo-mac (Demo)", SHA256: "AB12", Where: "user trust settings"}},
 			Proxies: []trustProxy{{Kind: "HTTP proxy", Host: "proxy.acme.example", Shown: "proxy.acme.example:3128", Where: "system settings"}}},
 			def.TrustStore)),
+		id("package-managers", evalPackageManagers(pmFacts{Present: map[string]bool{"npm": true, "pip": true}, Configs: []pmConfig{
+			{Tool: "pip", Kind: "pip", Path: "~/Library/Application Support/pip/pip.conf", Body: "[global]\ntrusted-host = pypi.demo.example\n"}}},
+			def.PackageManagers)),
+		id("startup-items", evalStartup([]startupItem{{Source: "LaunchAgent", Where: "~/Library/LaunchAgents/com.demo.update.plist",
+			Label: "com.demo.update", Program: "/Users/demo/.demo/update"}, {Source: "LaunchAgent", Label: "com.demo.app",
+			Program: "/Applications/Demo.app/Contents/MacOS/demo"}}, nil, startupEnv{home: "/Users/demo", goos: "darwin"}, startupFix("darwin"))),
+		id("backup", evalBackup(backupFacts{OS: "macos", BackupKnown: true, Dests: []backupDest{{Name: "Backup Disk", Encrypted: ptrBool(false)}},
+			FindMyKnown: true}, def.Backup, now)),
 	}
 
 	winAuto := winUpdateFacts(kvLines("build=19045\nubr=6093\ndisplay_version=22H2\nno_auto_update=1\nwuauserv_start=Disabled\n" +
@@ -106,6 +114,11 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 		id("trust-store", evalTrustStore(trustFacts{OS: "windows", Certs: []trustCert{{Name: "Acme TLS CA", CN: "Acme TLS CA",
 			Where: "current user's Root store"}}, Proxies: []trustProxy{{Kind: "PAC file", Host: "wpad.acme.example",
 			Shown: "http://wpad.acme.example/proxy.pac", Where: "system settings"}}}, policy.TrustStore{CAs: true, Proxies: true, CASeverity: check.High})),
+		id("package-managers", evalPackageManagers(pmFacts{Present: map[string]bool{"npm": true}, Configs: []pmConfig{
+			{Tool: "npm", Kind: "npmrc", Path: `~\.npmrc`, Body: "registry=http://npm.demo.example/\n"}}}, def.PackageManagers)),
+		id("startup-items", evalStartup(winStartupItems("task\t\\\tDemoUpdate\t\"powershell.exe\" -NoP -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQA\n",
+			func(string) string { return "" }), nil, startupEnv{home: `C:\Users\demo`, goos: "windows"}, startupFix("windows"))),
+		id("backup", evalBackup(backupFacts{OS: "windows", FindMyKnown: true, Notes: msg.Of("backup.win.notRead")}, def.Backup, now)),
 	}
 
 	linux := []check.Result{
@@ -136,6 +149,10 @@ func sampleResults(t *testing.T) map[string][]check.Result {
 		id("trust-store", evalTrustStore(trustFacts{OS: "linux", HostOnly: 0, Proxies: []trustProxy{{Kind: "https_proxy", Host: "127.0.0.1",
 			Shown: "127.0.0.1:8080", Where: "environment"}, {Kind: "http_proxy", Host: "proxy.acme.example", Shown: "proxy.acme.example:3128",
 			Where: "environment"}}, CAErr: "x"}, def.TrustStore)),
+		id("package-managers", evalPackageManagers(pmFacts{Present: map[string]bool{"go": true}, Configs: []pmConfig{
+			{Tool: "go", Kind: "goenv", Path: "~/.config/go/env", Body: "GOSUMDB=off\n"}}}, def.PackageManagers)),
+		id("startup-items", evalStartup(cronItems("@reboot /home/demo/bin/sync\n"), nil, startupEnv{home: "/home/demo", goos: "linux"}, startupFix("linux"))),
+		id("backup", check.SkippedMsg(msg.Of("backup.unsupported", "os", "linux"))),
 	}
 	return map[string][]check.Result{"mac": mac, "windows": win, "linux": linux}
 }

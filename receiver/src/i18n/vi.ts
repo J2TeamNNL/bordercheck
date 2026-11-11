@@ -427,6 +427,9 @@ export const vi: Catalog = {
   "checkTitle.extensions": "Tiện ích trình duyệt và trình soạn thảo đáng tin cậy",
   "checkTitle.browser-passwords": "Mật khẩu không được lưu trong trình duyệt",
   "checkTitle.trust-store": "Không có chứng chỉ gốc hay proxy lạ",
+  "checkTitle.package-managers": "Trình quản lý gói chặn được gói độc hại",
+  "checkTitle.startup-items": "Không có gì lạ tự chạy khi đăng nhập",
+  "checkTitle.backup": "Laptop bị mất vẫn tìm được và khôi phục được",
   "rep.prodSecrets": "{n} secret production dạng văn bản thuần",
   "rep.prodSecretsNote": "Chỉ có tên và file; giá trị không bao giờ được gửi đi.",
 };

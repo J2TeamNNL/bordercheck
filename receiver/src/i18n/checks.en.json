@@ -30,6 +30,33 @@
     "one": "1 plain-text token in AI agent / MCP configs.",
     "other": "{n} plain-text tokens in AI agent / MCP configs."
   },
+  "backup.findMyOff.mac": "Find My Mac is off: a lost Mac cannot be located, locked or erased remotely.",
+  "backup.findMyOff.win": "Find my device is off: a lost PC cannot be located or locked remotely.",
+  "backup.findMyOn.mac": "Find My Mac is on.",
+  "backup.findMyOn.win": "Find my device is on.",
+  "backup.findMyUnknown": "Could not tell whether the device can be located remotely.",
+  "backup.fix.mac.encrypt": "System Settings → General → Time Machine → select the disk → Remove Disk, then Add Backup Disk again with \"Encrypt backup\" turned on (on recent macOS an existing backup cannot be encrypted in place, so the disk is erased).",
+  "backup.fix.mac.findMy": "System Settings → your name (Apple Account) → iCloud → Find My Mac → turn it on.",
+  "backup.fix.mac.setup": "System Settings → General → Time Machine → Add Backup Disk, with \"Encrypt backup\" turned on, or ask IT how this Mac should be backed up.",
+  "backup.fix.mac.stale": "Connect the backup disk, then Time Machine in the menu bar → Back Up Now.",
+  "backup.fix.win.findMy": "Settings → Privacy & security → Find my device → turn it on (it needs a Microsoft account and location services).",
+  "backup.none": "No backup is set up: a lost or broken laptop takes its files with it.",
+  "backup.noneAllowed": "No Time Machine backup is set up (the policy does not require one).",
+  "backup.on": {
+    "one": "Backups go to 1 destination.",
+    "other": "Backups go to {n} destinations."
+  },
+  "backup.stale": {
+    "one": "1 backup is older than {max} days.",
+    "other": "{n} backups are older than {max} days."
+  },
+  "backup.unencrypted": {
+    "one": "1 Time Machine backup is not encrypted: whoever takes the disk can read your files.",
+    "other": "{n} Time Machine backups are not encrypted: whoever takes a disk can read your files."
+  },
+  "backup.unknown.mac": "Could not tell whether Time Machine is set up (reading its settings may need Full Disk Access).",
+  "backup.unsupported": "Not checked on {os}: there is no standard backup or device-finding service to read.",
+  "backup.win.notRead": "Windows backups (File History, Windows Backup, OneDrive) are not checked.",
   "check.interrupted": "Interrupted before it finished.",
   "check.moreAllowed": "{n} more allowed by policy.",
   "check.timeout": "Did not finish within {after:dur} and was stopped; the other checks are unaffected.",
@@ -154,6 +181,31 @@
   "passwords.pass": "No passwords are saved in the browsers, and they do not offer to save them.",
   "passwords.passSavingOn": "No passwords are saved in the browsers, but {browsers} still offers to save them: consider turning that off.",
   "passwords.stored": "Passwords are saved in {browsers}. Information-stealing malware takes a browser's saved passwords first.",
+  "pm.checksum": {
+    "one": "1 setting turns off Go's checksum database.",
+    "other": "{n} settings turn off Go's checksum database."
+  },
+  "pm.fix.checksum": "Turn Go's checksum database back on: [code]go env -u GOSUMDB GONOSUMDB[/code], and list only your company's module paths in GOPRIVATE ([code]go env -w GOPRIVATE=git.example.com/*[/code]), not [code]*[/code].",
+  "pm.fix.insecure": "Use https:// registries and indexes, and remove settings that ignore certificate errors: [code]strict-ssl=false[/code] in ~/.npmrc, [code]trusted-host[/code] in pip.conf, [code]allow-insecure-host[/code] in uv.toml, [code]enableStrictSsl: false[/code] in ~/.yarnrc.yml; for Go run [code]go env -u GOINSECURE[/code]. If your company's own registry only speaks http, ask IT to add it to the policy's allow_hosts.",
+  "pm.fix.releaseAge": "Wait a few days before installing a new version, so a hijacked release is caught first: npm 11.10+: [code]npm config set min-release-age 3[/code] (days); Bun: [code]minimumReleaseAge = 259200[/code] (seconds) under [install] in ~/.bunfig.toml; pnpm and Yarn: remove the line that sets [code]minimumReleaseAge[/code] or [code]npmMinimalAgeGate[/code] to 0.",
+  "pm.fix.scripts": "Stop packages from running install scripts by default: [code]npm config set ignore-scripts true[/code] (run [code]npm rebuild PACKAGE[/code] for one that needs its script); pnpm: remove [code]dangerouslyAllowAllBuilds[/code]; Yarn: remove [code]enableScripts: true[/code] from ~/.yarnrc.yml.",
+  "pm.insecure": {
+    "one": "1 setting fetches packages over plain http or ignores certificate errors.",
+    "other": "{n} settings fetch packages over plain http or ignore certificate errors."
+  },
+  "pm.none": "No npm, pnpm, Yarn, Bun, pip, uv, Go or Cargo found.",
+  "pm.pass": {
+    "one": "1 package manager checked ({tools}): nothing weakens how packages are fetched.",
+    "other": "{n} package managers checked ({tools}): nothing weakens how packages are fetched."
+  },
+  "pm.releaseAge": {
+    "one": "1 package manager installs versions published minutes ago.",
+    "other": "{n} package managers install versions published minutes ago."
+  },
+  "pm.scripts": {
+    "one": "1 package manager runs every package's install scripts.",
+    "other": "{n} package managers run every package's install scripts."
+  },
   "prot.avOff": "Microsoft Defender real-time protection is off and no other antivirus is on.",
   "prot.fix.av": "Windows Security → Virus & threat protection → Manage settings → turn on Real-time protection. If it turns itself off again, ask IT: a policy or malware may be switching it off.",
   "prot.fix.gatekeeper": "[code]sudo spctl --global-enable[/code], then System Settings → Privacy & Security → Allow applications from → App Store & Known Developers.",
@@ -244,6 +296,15 @@
     "one": "1 key in authorized_keys can log in to this machine.",
     "other": "{n} keys in authorized_keys can log in to this machine."
   },
+  "sshkeys.config.all": {
+    "one": "1 setting in the SSH client config weakens every connection.",
+    "other": "{n} settings in the SSH client config weaken every connection."
+  },
+  "sshkeys.config.some": {
+    "one": "1 setting in the SSH client config weakens connections to particular hosts.",
+    "other": "{n} settings in the SSH client config weaken connections to particular hosts."
+  },
+  "sshkeys.fix.config": "In ~/.ssh/config, remove [code]ForwardAgent yes[/code] (use [code]ssh -A[/code] or [code]ProxyJump[/code] only where you need it: a server you forward your agent to can use your keys while you are logged in), and remove [code]StrictHostKeyChecking no[/code] and [code]UserKnownHostsFile /dev/null[/code] (use [code]StrictHostKeyChecking accept-new[/code] instead), so a server that suddenly has another key is noticed.",
   "sshkeys.fix.mac": "Let the Keychain remember the passphrase: [code]ssh-add --apple-use-keychain <key>[/code].",
   "sshkeys.fix.passphrase": "Add a passphrase: [code]ssh-keygen -p -f <key>[/code] (the key stays the same, nothing to re-upload), or move to a hardware key ([code]ssh-keygen -t ed25519-sk[/code]) or a password manager's SSH agent.",
   "sshkeys.fix.rest": "Make keys private: [code]chmod 600 <key>[/code]. Remove authorized_keys lines you don't recognise, and turn off the SSH server (Remote Login) if you don't use it.",
@@ -263,6 +324,33 @@
   "sshkeys.readable": {
     "one": "1 key is readable by other users.",
     "other": "{n} keys are readable by other users."
+  },
+  "startup.downloadRun": {
+    "one": "1 item downloads code and runs it each time it starts.",
+    "other": "{n} items download code and run it each time they start."
+  },
+  "startup.fix.linux": "Look up each item listed. If you don't recognise it, remove it: delete its .desktop file from ~/.config/autostart, [code]systemctl --user disable --now UNIT[/code], or [code]crontab -e[/code]. If one downloads and runs code, check the machine for malware and change the passwords used on it.",
+  "startup.fix.mac": "Look up each item listed. If you don't recognise it, remove it: [code]launchctl bootout gui/$(id -u)/LABEL[/code] and delete its .plist from ~/Library/LaunchAgents (items in /Library need an administrator); System Settings → General → Login Items & Extensions shows them too. If one downloads and runs code, run a malware scan and change the passwords used on this Mac. Items whose program is gone are leftovers of uninstalled apps and can simply be removed.",
+  "startup.fix.win": "Look up each item listed. If you don't recognise it, turn it off: Task Manager → Startup apps → Disable, Task Scheduler → the task → Disable, or delete its shortcut from the Startup folder ([code]shell:startup[/code]). If one downloads and runs code, run a full scan in Windows Security and change the passwords used on this PC. Items whose program is gone are leftovers of uninstalled apps.",
+  "startup.missing": {
+    "one": "1 item points to a program that no longer exists.",
+    "other": "{n} items point to programs that no longer exist."
+  },
+  "startup.pass": {
+    "one": "1 item starts at login or on a schedule; nothing unusual.",
+    "other": "{n} items start at login or on a schedule; nothing unusual."
+  },
+  "startup.suspicious": {
+    "one": "1 item starts a program from a temporary, download or hidden folder.",
+    "other": "{n} items start programs from temporary, download or hidden folders."
+  },
+  "startup.total": {
+    "one": "1 item starts at login or on a schedule in all.",
+    "other": "{n} items start at login or on a schedule in all."
+  },
+  "startup.writable": {
+    "one": "1 item starts a program that any user can change.",
+    "other": "{n} items start programs that any user can change."
   },
   "tailscale.badPrefs": "unexpected output from `tailscale debug prefs`",
   "tailscale.denied": "Only root or the Tailscale operator may read Tailscale's settings here. Run [code]sudo tailscale set --operator=$USER[/code] once, or [code]sudo bordercheck -only tailscale[/code]. ({err})",

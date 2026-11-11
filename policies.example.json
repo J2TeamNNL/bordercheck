@@ -95,14 +95,16 @@
         "gh": true,
         "terraform": true,
         "pgpass": true,
-        "mysql": true
+        "mysql": true,
+        "git_remotes": true
       }
     },
     "ssh-keys": {
       "no_passphrase": true,
       "loose_permissions": true,
       "authorized_keys": true,
-      "allow_keys": []
+      "allow_keys": [],
+      "client_config": true
     },
     "tunnels": {
       "processes": true,
@@ -178,6 +180,31 @@
       "allow_cas": [],
       "allow_proxies": [],
       "ca_severity": "medium"
+    },
+    "package-managers": {
+      "tools": [
+        "npm",
+        "pnpm",
+        "yarn",
+        "bun",
+        "pip",
+        "uv",
+        "go",
+        "cargo"
+      ],
+      "require_ignore_scripts": true,
+      "require_release_age": false,
+      "allow_hosts": []
+    },
+    "startup-items": {
+      "allow": [],
+      "extra_suspicious_paths": []
+    },
+    "backup": {
+      "require_backup": false,
+      "require_encrypted": true,
+      "require_find_my": true,
+      "max_backup_age_days": 0
     }
   }
 }

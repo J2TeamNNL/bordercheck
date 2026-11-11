@@ -107,6 +107,9 @@ type Checks struct {
 	Extensions       Extensions       `json:"extensions"`
 	BrowserPasswords BrowserPasswords `json:"browser-passwords"`
 	TrustStore       TrustStore       `json:"trust-store"`
+	PackageManagers  PackageManagers  `json:"package-managers"`
+	StartupItems     StartupItems     `json:"startup-items"`
+	Backup           Backup           `json:"backup"`
 }
 
 // Common is what every check accepts.
@@ -185,6 +188,7 @@ type SecretLocations struct {
 	Terraform      bool `json:"terraform"`       // ~/.terraform.d/credentials.tfrc.json
 	PgPass         bool `json:"pgpass"`          // ~/.pgpass
 	MySQL          bool `json:"mysql"`           // ~/.my.cnf
+	GitRemotes     bool `json:"git_remotes"`     // tokens in git remote URLs (.git/config of repositories the walk finds, ~/.gitconfig)
 }
 
 // SSHKeys judges the SSH keys in ~/.ssh and those named by ~/.ssh/config.
@@ -194,6 +198,7 @@ type SSHKeys struct {
 	LoosePermissions bool     `json:"loose_permissions"` // private keys other users can read (macOS, Linux)
 	AuthorizedKeys   bool     `json:"authorized_keys"`   // keys that can log in to this machine
 	AllowKeys        []string `json:"allow_keys"`        // globs on the shown path (~/.ssh/deploy_key) exempt from every rule
+	ClientConfig     bool     `json:"client_config"`     // ~/.ssh/config: ForwardAgent, StrictHostKeyChecking, UserKnownHostsFile /dev/null
 }
 
 // TunnelTools are the names tunnels.allow and tunnels.lower_severity accept.
@@ -291,6 +296,35 @@ type Sharing struct {
 	Allow []string `json:"allow"` // services from SharingServices that may be on
 }
 
+// PackageManagerTools are the names package-managers.tools accepts.
+var PackageManagerTools = []string{"npm", "pnpm", "yarn", "bun", "pip", "uv", "go", "cargo"}
+
+// PackageManagers judges how npm, pnpm, Yarn, Bun, pip, uv, Go and Cargo are
+// configured to fetch packages. It reads config files only, never the network.
+type PackageManagers struct {
+	Common
+	Tools                []string `json:"tools"`                  // which of PackageManagerTools to judge
+	RequireIgnoreScripts bool     `json:"require_ignore_scripts"` // dependencies' install scripts must not run by default
+	RequireReleaseAge    bool     `json:"require_release_age"`    // npm and Bun must wait before installing brand-new versions
+	AllowHosts           []string `json:"allow_hosts"`            // host globs that may be used over http or without TLS checks
+}
+
+// StartupItems inventories what starts at login and flags only solid signals.
+type StartupItems struct {
+	Common
+	Allow                []string `json:"allow"`                  // globs on an item's label or program path
+	ExtraSuspiciousPaths []string `json:"extra_suspicious_paths"` // more folders a program should not start from, ~ allowed
+}
+
+// Backup judges whether a lost laptop can be found and its files restored.
+type Backup struct {
+	Common
+	RequireBackup    bool `json:"require_backup"`      // warn (low) when no backup is set up
+	RequireEncrypted bool `json:"require_encrypted"`   // warn (medium) when a backup is not encrypted
+	RequireFindMy    bool `json:"require_find_my"`     // warn (low) when Find My / Find my device is off
+	MaxBackupAgeDays int  `json:"max_backup_age_days"` // warn (low) when the last backup is older; 0 = don't check
+}
+
 func ptr[T any](v T) *T { return &v }
 
 // Default is the built-in policy.
@@ -317,7 +351,7 @@ func Default() Policy {
 				ShowTail:           ptr(true),
 				WalkDepth:          5,
 				Locations: SecretLocations{Docker: true, Kube: true, Netrc: true, GitCredentials: true, GCloud: true,
-					Azure: true, PyPI: true, GitHubCLI: true, Terraform: true, PgPass: true, MySQL: true},
+					Azure: true, PyPI: true, GitHubCLI: true, Terraform: true, PgPass: true, MySQL: true, GitRemotes: true},
 			},
 			OSUpdates: OSUpdates{
 				MinOSVersions:     map[string]string{"macos": "15", "windows": "26100", "ubuntu": "22.04", "debian": "12", "fedora": "43"},
@@ -328,7 +362,7 @@ func Default() Policy {
 			// A guest account is accepted unless a policy says otherwise: on macOS it
 			// is a sandboxed, throw-away session.
 			RemoteAccess: RemoteAccess{Allow: []string{"guest"}},
-			SSHKeys:      SSHKeys{NoPassphrase: true, LoosePermissions: true, AuthorizedKeys: true, AllowKeys: []string{}},
+			SSHKeys:      SSHKeys{NoPassphrase: true, LoosePermissions: true, AuthorizedKeys: true, AllowKeys: []string{}, ClientConfig: true},
 			Tunnels: Tunnels{Processes: true, TailscaleFunnel: true, TailscaleServe: true, Allow: []string{},
 				LowerSeverity: []string{"cloudflared"}},
 			AIAgents:        AIAgents{Tokens: true, Guardrails: true, ExtraPaths: []string{}, IgnorePaths: []string{}},
@@ -342,6 +376,9 @@ func Default() Policy {
 			BrowserPasswords: BrowserPasswords{AllowBrowsers: []string{}},
 			TrustStore: TrustStore{CAs: true, Proxies: true, AllowCAs: []string{}, AllowProxies: []string{},
 				CASeverity: check.Medium},
+			PackageManagers: PackageManagers{Tools: slices.Clone(PackageManagerTools), RequireIgnoreScripts: true, AllowHosts: []string{}},
+			StartupItems:    StartupItems{Allow: []string{}, ExtraSuspiciousPaths: []string{}},
+			Backup:          Backup{RequireEncrypted: true, RequireFindMy: true},
 		},
 	}
 }
@@ -458,6 +495,7 @@ func (p Policy) validate() error {
 		"cracked-software": c.CrackedSoftware.OnProblem,
 		"admin-rights":     c.AdminRights.OnProblem, "os-protections": c.OSProtections.OnProblem, "sharing": c.Sharing.OnProblem,
 		"extensions": c.Extensions.OnProblem, "browser-passwords": c.BrowserPasswords.OnProblem, "trust-store": c.TrustStore.OnProblem,
+		"package-managers": c.PackageManagers.OnProblem, "startup-items": c.StartupItems.OnProblem, "backup": c.Backup.OnProblem,
 	} {
 		if on != "" && on != check.Fail && on != check.Warn {
 			return fmt.Errorf("checks.%s.on_problem must be \"fail\" or \"warn\", not %q", id, on)
@@ -557,6 +595,36 @@ func (c Checks) validateNew() error {
 	}
 	if err := c.validateBrowserChecks(); err != nil {
 		return err
+	}
+	return c.validateMore()
+}
+
+// validateMore checks the options of package-managers, startup-items and backup.
+func (c Checks) validateMore() error {
+	for _, t := range c.PackageManagers.Tools {
+		if !slices.Contains(PackageManagerTools, t) {
+			return fmt.Errorf("checks.package-managers.tools: unknown tool %q, expected one of %s", t, strings.Join(PackageManagerTools, ", "))
+		}
+	}
+	for field, globs := range map[string][]string{
+		"package-managers.allow_hosts": c.PackageManagers.AllowHosts, "startup-items.allow": c.StartupItems.Allow,
+	} {
+		for _, g := range globs {
+			if strings.TrimSpace(g) == "" {
+				return fmt.Errorf("checks.%s: empty pattern", field)
+			}
+			if _, err := Glob(g); err != nil {
+				return fmt.Errorf("checks.%s %q: %w", field, g, err)
+			}
+		}
+	}
+	for _, p := range c.StartupItems.ExtraSuspiciousPaths {
+		if strings.TrimSpace(p) == "" {
+			return errors.New("checks.startup-items.extra_suspicious_paths: empty path")
+		}
+	}
+	if d := c.Backup.MaxBackupAgeDays; d < 0 || d > 3650 {
+		return errors.New("checks.backup.max_backup_age_days must be between 0 and 3650")
 	}
 	return nil
 }

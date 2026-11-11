@@ -117,6 +117,7 @@ type secretScanner struct {
 	depth    int
 	ignore   []*regexp.Regexp
 	extra    []string
+	gitCfgs  []string // .git/config of repositories the walk passed; see secrets_gitremotes.go
 }
 
 func newSecretScanner(p policy.Secrets, home string) (*secretScanner, error) {
@@ -170,6 +171,7 @@ func secrets(p policy.Secrets) func(context.Context) check.Result {
 			}
 		}
 		found = append(found, s.scanLocations(home, runtime.GOOS, p.Locations)...)
+		found = append(found, s.scanGitRemotes(home, p.Locations)...)
 		var shownBundles []string
 		for _, b := range bundles {
 			if shown := tildePath(home, b); !s.ignored(shown) {
@@ -240,6 +242,7 @@ func (s *secretScanner) find(ctx context.Context, home string) (scan, bundles []
 		}
 		if d.IsDir() {
 			rel, _ := filepath.Rel(home, p)
+			s.noteGitDir(name, p, rel)
 			if secretSkipDirs[name] || strings.Count(rel, string(filepath.Separator)) >= s.depth || isPackageDir(name) {
 				return filepath.SkipDir
 			}

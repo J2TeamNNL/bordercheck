@@ -426,6 +426,9 @@ export const zh: Catalog = {
   "checkTitle.extensions": "浏览器和编辑器扩展可信",
   "checkTitle.browser-passwords": "密码没有保存在浏览器中",
   "checkTitle.trust-store": "没有意外的根证书或代理",
+  "checkTitle.package-managers": "包管理器能防范恶意软件包",
+  "checkTitle.startup-items": "登录时没有可疑程序自动启动",
+  "checkTitle.backup": "丢失的笔记本电脑可以找回并恢复数据",
   "rep.prodSecrets": "{n} 个生产环境明文密钥",
   "rep.prodSecretsNote": "仅显示名称和文件；密钥的值从不发送。",
 };

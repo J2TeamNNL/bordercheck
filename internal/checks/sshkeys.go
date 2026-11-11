@@ -56,7 +56,7 @@ func sshKeys(p policy.SSHKeys) func(context.Context) check.Result {
 			return check.Errored(err)
 		}
 		keys, auth := gatherSSH(home, runtime.GOOS != "windows")
-		return evalSSHKeys(keys, auth, p)
+		return sshClientConfigResult(evalSSHKeys(keys, auth, p), home, p) // client config: sshconfig.go
 	}
 }
 

@@ -60,6 +60,9 @@
     "sharing": { "allow": [] },
     "extensions": { "browsers": true, "editors": true, "block": [], "allow": [], "warn_all_sites": false },
     "browser-passwords": { "allow_browsers": [] },
-    "trust-store": { "cas": true, "proxies": true, "allow_cas": [], "allow_proxies": [], "ca_severity": "medium" }
+    "trust-store": { "cas": true, "proxies": true, "allow_cas": [], "allow_proxies": [], "ca_severity": "medium" },
+    "package-managers": { "require_ignore_scripts": true, "require_release_age": false, "allow_hosts": [] },
+    "startup-items": { "allow": [], "extra_suspicious_paths": [] },
+    "backup": { "require_backup": false, "require_encrypted": true, "require_find_my": true, "max_backup_age_days": 0 }
   }
 }

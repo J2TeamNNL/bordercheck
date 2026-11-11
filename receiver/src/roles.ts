@@ -22,6 +22,7 @@ export const POLICY_CHECKS = [
   "os-updates", "screen-lock", "remote-access", "cracked-software",
   "admin-rights", "os-protections", "sharing",
   "extensions", "browser-passwords", "trust-store",
+  "package-managers", "startup-items", "backup",
 ];
 
 export const MAX_WAIVER_DAYS = 365;
