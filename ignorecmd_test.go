@@ -57,6 +57,9 @@ func TestIgnoreByFileAndByName(t *testing.T) {
 	if err := ignoreAdd(env, "", "~/app/.env", "POSTGRES_PASSWORD", "  local docker\ndatabase "); err != nil {
 		t.Fatal(err)
 	}
+	if got := plural(2, "it", "them") + " " + plural(2, "1 entry", "%d entries"); got != "them 2 entries" {
+		t.Errorf("plural: %q", got)
+	}
 	if s := out.String(); !strings.Contains(s, "for the secrets check: 1 finding no longer counts") || !strings.Contains(s, "IT will see it in the report") {
 		t.Errorf("output: %s", s)
 	}

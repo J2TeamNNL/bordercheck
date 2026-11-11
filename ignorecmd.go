@@ -323,6 +323,9 @@ func plural(n int, one, other string) string {
 	if n == 1 {
 		return one
 	}
+	if !strings.Contains(other, "%d") {
+		return other
+	}
 	return fmt.Sprintf(other, n)
 }
 
