@@ -364,6 +364,9 @@ The report is the same JSON as `bordercheck -json`, plus `email` and `install_id
   variable", "reason": "local Docker database", "since": "2026-11-11"}]`, at most 200, never a value or its last
   characters. It is the record of what was set aside, so it does not depend on `report.include_evidence`.
   `bordercheck status` says so. Receivers that do not know the field ignore it.
+- Secrets set aside as likely sample keys are always sent too, in the `secrets` result's `likely_samples`:
+  `[{"path": "~/forks/app/config/default.pem", "kind": "Private key", "rule": "git-tracked"}]`, at most 200, never a
+  value or its last characters, whatever `report.include_evidence` says ([Sample keys](#sample-keys)).
 - The machine's IP addresses leave it only when the policy sets `report.include_ips`. Whatever the policy says,
   the receiver sees the public IP address the report arrives from, as every web server does, and may store it or
   look up a rough location from it.
@@ -426,3 +429,32 @@ under its check with its path, name, kind, reason and date, also when `report.in
 each entry naming its check), readable by this user only; a plain `bordercheck` run reads it too, installed or
 not, and `bordercheck uninstall` removes it. An entry that no longer matches anything is kept (the finding may
 come back) until `unignore` removes it. A list that cannot be read counts as empty, and the checks say so.
+
+### Sample keys
+
+Many keys on a developer's laptop are not real: a project's default key in a fork, a dummy `.env` for CI, the
+certificates an SDK ships to everyone, a demo app's signing key. The `secrets` check sets those aside on its own,
+so nobody has to ignore them one by one. A finding is a likely sample when one of these rules matches (the
+policy's `checks.secrets.sample_rules` picks which; [policies](policies.md#secrets)):
+
+| Rule | When |
+|---|---|
+| `git-tracked` | The file is tracked by a git repository below your home folder and is exactly what the repository's index records (unchanged since it was checked out or added). A file git ignores, an untracked file, or a changed one does not match. |
+| `sdk` | A file an SDK ships identically to every user: Tizen Studio's (or the older Tizen SDK's) `…/certificates/…` folders, which hold the public developer CA and the default distributor signer. Keys an SDK generates for you, such as Android's `debug.keystore` or your Tizen author certificate, do not count. |
+| `sample-dir` | A folder between your home folder and the file is named with one of the words `demo(s)`, `sample(s)`, `example(s)`, `fixture(s)`, `testdata`, `mock(s)` (split on `-`, `_` and `.`, any case), such as `demo-apps/` or `test_fixtures/`. `test` and `tests` do not count: real projects keep real keys for test servers there. The file's own name does not count. |
+
+Never set aside: a finding marked `[production]`, anything inside a `.git` folder, and, by `sample-dir` alone,
+a provider token that looks live (the kinds whose last 4 characters are shown: GitHub, OpenAI, AWS…). Something
+you ignored with `bordercheck ignore` stays in your list, with your reason.
+
+To read git's records bordercheck does not run git (a repository's own settings can make git run programs): it
+reads the index file itself. When it cannot be sure, the rule does not match and the finding counts as usual: a
+split or sparse index, an index format it does not know, a damaged index, a file over 10 MB, a repository whose
+top is your home folder itself (a dotfiles repository), a symlinked file or folder, or a file whose line endings
+or other git filters make it differ from what git stores.
+
+Likely samples do not count toward the check's status or counts; the summary says how many there are ("3 more
+look like sample keys."), and if nothing else is left the check passes. The terminal report shows one line with
+the count per rule; `bordercheck -json` lists each one (path, name or kind, rule). Every report sends that list
+to IT, who see it on the machine's page. A real key committed to a repository matches `git-tracked` too, which is
+why the list is not hidden.

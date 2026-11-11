@@ -410,7 +410,9 @@ every check" must not work. What the server does about it:
   instructions. Check IDs bordercheck doesn't know, unknown statuses and severities go there too. Tool
   descriptions and error messages never contain report text.
 - Evidence is only in `get_machine`, and only with `include_evidence`; so are the findings the person marked as
-  not sensitive (`user_ignored`, under `untrusted`), while `user_ignored_count` is always there. IPs and locations only with
+  not sensitive (`user_ignored`, under `untrusted`), while `user_ignored_count` is always there, and the secrets set
+  aside as likely sample keys (`likely_samples`, the rule outside and path/name/kind under `untrusted`), while
+  `likely_samples_count` is always there. IPs and locations only with
   `include_location`, and never when `STORE_PUBLIC_IP` / `STORE_GEO` are off (even if older values are still
   stored).
 - Write tools take explicit ids (install_id, role_id, invite_id, waiver_id); nothing matches "the machine

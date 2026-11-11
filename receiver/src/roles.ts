@@ -12,6 +12,7 @@
 
 import { DAY } from "./env";
 import { type Msg, msg } from "./i18n";
+import { SAMPLE_RULES } from "./samples";
 
 type Obj = Record<string, unknown>;
 
@@ -198,6 +199,8 @@ export function validateRolePolicy(p: unknown, now: Date): Msg[] {
         // Whether the person at the machine may mark secrets as not sensitive
         // (bordercheck ignore); needs a client that knows the field.
         if (USER_IGNORE_CHECKS.includes(id) && c.user_ignore !== undefined && typeof c.user_ignore !== "boolean") must("v.mustBool", `checks.${id}.user_ignore`);
+        // Which rules set a secret aside as a likely sample key; needs a client that knows the field.
+        if (id === "secrets" && c.sample_rules !== undefined) strList(c.sample_rules, "checks.secrets.sample_rules", errs, SAMPLE_RULES);
       }
   }
   return errs;

@@ -39,6 +39,9 @@ func (r Report) WriteFix(w io.Writer, exe string, send bool) {
 	if n := r.UserIgnored(); n > 0 {
 		ignoredLine = fmt.Sprintf("Ignored by you: %d (marked as not sensitive; IT sees each one with its reason; list: %s)\n", n, run("ignore -list"))
 	}
+	if n := r.LikelySamples(); n > 0 {
+		ignoredLine += fmt.Sprintf("Look like sample keys: %d (not counted, nothing to do; IT sees the list)\n", n)
+	}
 	if len(todo) == 0 {
 		fmt.Fprintln(w, "\nNothing to fix: no check fails or warns.")
 		fmt.Fprint(w, ignoredLine)

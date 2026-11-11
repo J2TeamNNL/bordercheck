@@ -455,7 +455,7 @@ export const ROUTES: Route[] = [
     summary: "One machine: enrollment, waivers, checks needing attention with since when, passing checks, history; evidence and location only when asked for.",
     params: { install_id: installIdP },
     query: {
-      include: { type: "string", pattern: "^(evidence|location)(,(evidence|location))?$", description: "Comma-separated: evidence (evidence lines of checks not passing, and user_ignored: the findings the person at the machine marked as not sensitive, with their reasons; user_ignored_count is always there), location (public IP, IP location, device position, local addresses, where stored)." },
+      include: { type: "string", pattern: "^(evidence|location)(,(evidence|location))?$", description: "Comma-separated: evidence (evidence lines of checks not passing, and user_ignored: the findings the person at the machine marked as not sensitive, with their reasons; user_ignored_count is always there; and likely_samples: secrets set aside as likely sample keys, with the rule; likely_samples_count is always there), location (public IP, IP location, device position, local addresses, where stored)." },
       history: { type: "integer", minimum: 0, maximum: 60, default: 10, description: "How many recent reports to summarise." },
     },
     ok: 200, okText: "The machine.", errors: [400, 401, 404],

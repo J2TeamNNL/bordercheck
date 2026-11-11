@@ -440,4 +440,12 @@ export const vi: Catalog = {
   "checkTitle.backup": "Laptop bị mất vẫn tìm được và khôi phục được",
   "rep.prodSecrets": "{n} secret production dạng văn bản thuần",
   "rep.prodSecretsNote": "Chỉ có tên và file; giá trị không bao giờ được gửi đi.",
+
+  "machine.likelySamples": "Có vẻ là khoá mẫu ({n})",
+  "machine.likelySamplesNote": "Được để riêng ngay trên máy vì trông giống khoá mẫu chứ không phải khoá thật: các mục này không được tính vào mục kiểm tra này. Một khoá thật đã commit vào repository cũng được tính là không đổi trong git, nên hãy xem qua danh sách.",
+  "machine.likelySamplesShow": "Xem cả {n} mục",
+  "machine.sampleRuleGit": "không đổi trong git",
+  "machine.sampleRuleSdk": "đi kèm một SDK",
+  "machine.sampleRuleDir": "trong thư mục demo hoặc ví dụ",
+  "rep.likelySamples": "[b]{n}[/b] mục có vẻ là khoá mẫu",
 };

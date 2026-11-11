@@ -461,4 +461,6 @@ export const checksZh: CheckCatalog = {
   "backup.fix.mac.setup": "System Settings → General → Time Machine → Add Backup Disk，并开启 \"Encrypt backup\"；或询问 IT 这台 Mac 应如何备份。",
   "backup.fix.mac.findMy": "System Settings → 你的名字（Apple Account）→ iCloud → Find My Mac → 开启。",
   "backup.fix.win.findMy": "Settings → Privacy & security → Find my device → 开启（需要 Microsoft 账户和定位服务）。",
+  "samples.more": "另有 {n} 项看起来是示例密钥。",
+  "samples.all": "发现的只有 {n} 项看起来是示例密钥，而非真实密钥。",
 };

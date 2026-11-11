@@ -58,6 +58,9 @@ type Result struct {
 	// Unlike Evidence it is always sent, so IT can see what was set aside.
 	// Never holds a value.
 	UserIgnored []Ignored `json:"user_ignored,omitempty"`
+	// LikelySamples lists findings set aside as sample keys (see samples.go).
+	// Always sent, like UserIgnored; never holds a value.
+	LikelySamples []LikelySample `json:"likely_samples,omitempty"`
 }
 
 // Ignored is one finding the person at the machine set aside, with their reason.

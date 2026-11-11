@@ -479,4 +479,6 @@ export const checksVi: CheckCatalog = {
     "Mở System Settings → General → Time Machine → Add Backup Disk, với \"Encrypt backup\" được bật, hoặc hỏi IT máy Mac này nên được sao lưu thế nào.",
   "backup.fix.mac.findMy": "Mở System Settings → tên của bạn (Apple Account) → iCloud → Find My Mac rồi bật lên.",
   "backup.fix.win.findMy": "Mở Settings → Privacy & security → Find my device rồi bật lên (cần tài khoản Microsoft và location services).",
+  "samples.more": "Ngoài ra còn {n} mục có vẻ là khoá mẫu.",
+  "samples.all": "Các mục tìm thấy đều là {n} mục có vẻ là khoá mẫu, không phải khoá thật.",
 };

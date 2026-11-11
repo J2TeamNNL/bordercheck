@@ -35,6 +35,7 @@ const GLYPH_ATTENTION = new Html(
 );
 import { hit } from "./ratelimit";
 import { parseReport, type Result, statusRank } from "./report";
+import { countLikelySamples } from "./samples";
 import { LINK_RE, sha256hex } from "./tokens";
 
 // fixCommand is how to run the installed bordercheck's `fix` on that OS: the
@@ -112,6 +113,8 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   // Only how many the person marked as not sensitive: like the rest of the
   // evidence, which files and why stay off a page reached by link alone.
   const userIgnored = results.reduce((n, r) => n + (r.user_ignored?.length ?? 0), 0);
+  // Likewise only how many were set aside as likely sample keys.
+  const likelySamples = countLikelySamples(results);
 
   const failing = problems.some((r) => r.status === "fail");
   const tone = problems.length === 0 ? "s-pass" : failing ? "s-fail" : "s-warn";
@@ -123,7 +126,7 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   const body = html`<div class="status-mark ${tone}">${problems.length === 0 ? GLYPH_OK : GLYPH_ATTENTION}</div>
 <p class="eyebrow">${L.t("rep.eyebrow")}</p><h1>${headline}</h1>
 <p class="lead">${L.t("rep.for", { email: row.email || L.s("common.noEmail"), host: row.hostname || L.s("common.noHostname"), when: L.when(row.last_seen) })}${L.lang === "zh" ? "" : " "}${problems.length === 0 ? L.t("rep.okText") : L.t("rep.fixText")}</p>
-<div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}${userIgnored ? html`<span class="chip">${L.t("rep.userIgnored", { n: userIgnored })}</span>` : ""}${version ? html`<span class="chip">bordercheck <b>${version}</b></span>` : ""}</div>
+<div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}${userIgnored ? html`<span class="chip">${L.t("rep.userIgnored", { n: userIgnored })}</span>` : ""}${likelySamples ? html`<span class="chip">${L.t("rep.likelySamples", { n: likelySamples })}</span>` : ""}${version ? html`<span class="chip">bordercheck <b>${version}</b></span>` : ""}</div>
 ${fixPrompt}
 ${problems.length === 0
     ? ""
@@ -133,6 +136,7 @@ ${problems.length === 0
 ${r.summary ? html`<div class="body">${summaryHtml(L, r)}</div>` : ""}
 ${prodSecrets(L, r)}
 ${r.user_ignored?.length ? html`<p class="dim">${L.t("rep.userIgnored", { n: r.user_ignored.length })}</p>` : ""}
+${r.likely_samples?.length ? html`<p class="dim">${L.t("rep.likelySamples", { n: r.likely_samples.length })}</p>` : ""}
 ${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}</div>`,
       )}`}
 ${waived.length

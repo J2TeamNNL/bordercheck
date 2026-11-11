@@ -166,6 +166,9 @@ func (r Report) WriteText(w io.Writer, color bool) {
 				fmt.Fprintln(w, "        · "+IgnoredLine(ig))
 			}
 		}
+		if line := SamplesLine(res.LikelySamples); line != "" {
+			fmt.Fprintf(w, "      %s %s\n", paint("\x1b[1m", "Look like sample keys:"), line)
+		}
 		fmt.Fprintln(w)
 	}
 	c := r.Counts

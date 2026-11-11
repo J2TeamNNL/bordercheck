@@ -466,6 +466,15 @@ export const en = {
   "checkTitle.backup": "A lost laptop can be found and restored",
   "rep.prodSecrets": { one: "{n} production secret in plain text", other: "{n} production secrets in plain text" },
   "rep.prodSecretsNote": "Names and files only; the values are never sent.",
+
+  // Likely sample keys (checks.secrets.sample_rules)
+  "machine.likelySamples": "Look like sample keys ({n})",
+  "machine.likelySamplesNote": "Set aside at the machine because they look like samples, not real keys: they do not count toward this check. A real key committed to a repository also counts as unchanged in git, so skim the list.",
+  "machine.likelySamplesShow": "Show all {n}",
+  "machine.sampleRuleGit": "unchanged in git",
+  "machine.sampleRuleSdk": "shipped with an SDK",
+  "machine.sampleRuleDir": "in a demo or example folder",
+  "rep.likelySamples": "[b]{n}[/b] look like sample keys",
 } satisfies Record<string, Entry>;
 
 export type Key = keyof typeof en;

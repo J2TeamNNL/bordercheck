@@ -512,7 +512,7 @@ func Status(env Env) (string, error) {
 	if refreshedFrom != "" {
 		fmt.Fprintf(&b, " (refreshed from %s)", refreshedFrom)
 	}
-	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results, and anything you ignored with your reason; %s\nService:    %s\n",
+	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results, anything you ignored with your reason, and files set aside as likely sample keys; %s\nService:    %s\n",
 		pol.Report.CheckEvery(), pol.Report.Interval, hostOf(pol.Report.URL), sends(pol.Report), services.status())
 	if entries, err := ignore.Load(env.Dir); err != nil {
 		fmt.Fprintf(&b, "Ignored:    your list cannot be read (%v), so nothing is ignored\n", err)

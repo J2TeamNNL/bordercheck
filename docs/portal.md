@@ -83,6 +83,15 @@ agent guardrails, readable key files, `authorized_keys` and SSH client settings 
 role can turn the command off per check with `user_ignore` ([secrets](policies.md#secrets),
 [ai-agents](policies.md#ai-agents), [ssh-keys](policies.md#ssh-keys)).
 
+The `secrets` check also sets aside findings that look like sample keys on its own: a file a git repository
+records unchanged, a certificate an SDK ships to everyone, a key in a `demo`/`examples`/`fixtures` folder
+([rules](install.md#sample-keys)). They stop counting too, and every report lists them: the machine's page shows
+**Look like sample keys (N)** under the `secrets` check, with the file, the name or kind and the rule that matched
+(folded when the list is long); the report page shows only the count. Skim the list now and then: a real key
+committed to a repository matches the git rule as well. A role picks the rules, or turns them off, with
+`sample_rules` ([secrets](policies.md#secrets)); MCP `get_machine` and the REST machine detail give
+`likely_samples_count` always and the list (`likely_samples`, under `untrusted`) with evidence.
+
 The person runs the command (or opens the link, which shows the same instructions without using it up). Their
 machine gets its own token and the role's policy, and sends a first report straight away. What happens on the laptop:
 [Installing bordercheck](install.md#with-an-invite-link).

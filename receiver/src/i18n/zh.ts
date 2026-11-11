@@ -439,4 +439,12 @@ export const zh: Catalog = {
   "checkTitle.backup": "丢失的笔记本电脑可以找回并恢复数据",
   "rep.prodSecrets": "{n} 个生产环境明文密钥",
   "rep.prodSecretsNote": "仅显示名称和文件；密钥的值从不发送。",
+
+  "machine.likelySamples": "看起来是示例密钥（{n}）",
+  "machine.likelySamplesNote": "在这台机器上因看起来是示例而非真实密钥而被搁置：这些项不计入本项检查。提交到仓库中的真实密钥也会被算作 git 中未改动，因此请浏览一下列表。",
+  "machine.likelySamplesShow": "显示全部 {n} 项",
+  "machine.sampleRuleGit": "git 中未改动",
+  "machine.sampleRuleSdk": "随 SDK 提供",
+  "machine.sampleRuleDir": "在演示或示例文件夹中",
+  "rep.likelySamples": "[b]{n}[/b] 项看起来是示例密钥",
 };
