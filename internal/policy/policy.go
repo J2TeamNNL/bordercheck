@@ -101,9 +101,12 @@ type Checks struct {
 	ScreenLock   ScreenLock   `json:"screen-lock"`
 	RemoteAccess RemoteAccess `json:"remote-access"`
 
-	AdminRights   AdminRights   `json:"admin-rights"`
-	OSProtections OSProtections `json:"os-protections"`
-	Sharing       Sharing       `json:"sharing"`
+	AdminRights      AdminRights      `json:"admin-rights"`
+	OSProtections    OSProtections    `json:"os-protections"`
+	Sharing          Sharing          `json:"sharing"`
+	Extensions       Extensions       `json:"extensions"`
+	BrowserPasswords BrowserPasswords `json:"browser-passwords"`
+	TrustStore       TrustStore       `json:"trust-store"`
 }
 
 // Common is what every check accepts.
@@ -334,6 +337,11 @@ func Default() Policy {
 			OSProtections: OSProtections{SIP: true, Gatekeeper: true, Antivirus: true, SmartScreen: true, SecureBoot: true,
 				LSM: true},
 			Sharing: Sharing{Allow: []string{}},
+			Extensions: Extensions{Browsers: true, Editors: true, Block: []string{}, Allow: []string{},
+				AllowUnpacked: []string{}},
+			BrowserPasswords: BrowserPasswords{AllowBrowsers: []string{}},
+			TrustStore: TrustStore{CAs: true, Proxies: true, AllowCAs: []string{}, AllowProxies: []string{},
+				CASeverity: check.Medium},
 		},
 	}
 }
@@ -449,6 +457,7 @@ func (p Policy) validate() error {
 		"ssh-keys": c.SSHKeys.OnProblem, "tunnels": c.Tunnels.OnProblem, "ai-agents": c.AIAgents.OnProblem,
 		"cracked-software": c.CrackedSoftware.OnProblem,
 		"admin-rights":     c.AdminRights.OnProblem, "os-protections": c.OSProtections.OnProblem, "sharing": c.Sharing.OnProblem,
+		"extensions": c.Extensions.OnProblem, "browser-passwords": c.BrowserPasswords.OnProblem, "trust-store": c.TrustStore.OnProblem,
 	} {
 		if on != "" && on != check.Fail && on != check.Warn {
 			return fmt.Errorf("checks.%s.on_problem must be \"fail\" or \"warn\", not %q", id, on)
@@ -545,6 +554,9 @@ func (c Checks) validateNew() error {
 		if !slices.Contains(SharingServices, s) {
 			return fmt.Errorf("checks.sharing.allow: unknown service %q (known: %s)", s, strings.Join(SharingServices, ", "))
 		}
+	}
+	if err := c.validateBrowserChecks(); err != nil {
+		return err
 	}
 	return nil
 }

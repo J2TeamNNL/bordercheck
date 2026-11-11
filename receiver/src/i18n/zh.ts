@@ -423,6 +423,9 @@ export const zh: Catalog = {
   "checkTitle.admin-rights": "日常帐户权限受限",
   "checkTitle.os-protections": "系统内置防护已开启",
   "checkTitle.sharing": "没有与附近设备共享任何内容",
+  "checkTitle.extensions": "浏览器和编辑器扩展可信",
+  "checkTitle.browser-passwords": "密码没有保存在浏览器中",
+  "checkTitle.trust-store": "没有意外的根证书或代理",
   "rep.prodSecrets": "{n} 个生产环境明文密钥",
   "rep.prodSecretsNote": "仅显示名称和文件；密钥的值从不发送。",
 };

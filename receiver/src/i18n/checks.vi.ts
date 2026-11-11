@@ -357,4 +357,67 @@ export const checksVi: CheckCatalog = {
     "[code]sudo systemctl disable --now nfs-server[/code] (nfs-kernel-server trên Debian/Ubuntu), hoặc giới hạn từng dòng trong /etc/exports cho các máy được nêu tên, rồi chạy [code]sudo exportfs -ra[/code].",
   "sharing.fix.cups": "[code]sudo cupsctl --no-share-printers[/code]",
   "sharing.fix.linuxGnome": "Mở Settings → Sharing → File Sharing → tắt.",
+  "extensions.notFound": "Không tìm thấy hồ sơ của trình duyệt hay trình soạn thảo code nào được hỗ trợ.",
+  "extensions.found": "Tiện ích tìm thấy: {counts}.",
+  "extensions.pass": "Không có tiện ích nào bị chặn hay được cài từ ngoài cửa hàng.",
+  "extensions.blocked": "{n} tiện ích nằm trong danh sách chặn của tổ chức: {names}.",
+  "extensions.outside":
+    "{n} tiện ích được cài từ ngoài cửa hàng (nạp dạng unpacked, từ file hoặc do chương trình khác cài): {names}.",
+  "extensions.notAllowed": "{n} tiện ích không nằm trong danh sách được phép của tổ chức: {names}.",
+  "extensions.allSites": "{n} tiện ích trong số đó có thể đọc và thay đổi mọi trang web bạn truy cập.",
+  "extensions.allSitesWarn": "{n} tiện ích có thể đọc và thay đổi mọi trang web bạn truy cập: {names}.",
+  "extensions.fix.blocked":
+    "Gỡ ngay: trong trình duyệt, mở trang tiện ích ([code]chrome://extensions[/code], [code]edge://extensions[/code], [code]brave://extensions[/code], hoặc [code]about:addons[/code] trong Firefox) → Remove; trong trình soạn thảo, mở Extensions view → chọn tiện ích → Uninstall. Sau đó đổi các mật khẩu đã dùng trong trình duyệt hoặc trình soạn thảo đó, và báo cho IT.",
+  "extensions.fix.outside":
+    "Gỡ những tiện ích bạn không chủ động cài (trang tiện ích của trình duyệt → Remove, hoặc Extensions view của trình soạn thảo → Uninstall), rồi cài những tiện ích cần dùng từ Chrome Web Store, Microsoft Edge Add-ons, addons.mozilla.org hoặc marketplace của trình soạn thảo. Nếu IT duyệt một tiện ích, có thể thêm nó vào allow_unpacked trong chính sách.",
+  "extensions.fix.notAllowed":
+    "Gỡ những tiện ích tổ chức chưa duyệt, hoặc đề nghị IT thêm chúng vào danh sách được phép.",
+  "extensions.fix.allSites":
+    "Gỡ những tiện ích không còn dùng. Trong Chrome, Edge hoặc Brave, giới hạn các tiện ích còn lại: trang tiện ích → Details → Site access → On click hoặc On specific sites.",
+  "passwords.notFound": "Không tìm thấy hồ sơ trình duyệt nào được hỗ trợ.",
+  "passwords.pass": "Trình duyệt không lưu mật khẩu nào, và cũng không đề nghị lưu mật khẩu.",
+  "passwords.passSavingOn":
+    "Trình duyệt không lưu mật khẩu nào, nhưng {browsers} vẫn đề nghị lưu mật khẩu: nên tắt tính năng này.",
+  "passwords.stored":
+    "Có mật khẩu được lưu trong {browsers}. Mã độc đánh cắp thông tin lấy mật khẩu đã lưu trong trình duyệt trước tiên.",
+  "passwords.allowed": "Được chính sách cho phép: {browsers}.",
+  "passwords.fix":
+    "Chuyển các mật khẩu này sang một trình quản lý mật khẩu (phần cài đặt mật khẩu của trình duyệt có thể xuất chúng ra), xoá chúng khỏi trình duyệt, rồi tắt tính năng lưu mật khẩu.",
+  "passwords.fix.chrome":
+    "Chrome: Settings → Autofill and passwords → Google Password Manager → Settings → tắt Offer to save passwords.",
+  "passwords.fix.edge":
+    "Edge: Settings → Passwords and autofill (bản cũ: Profiles → Passwords) → tắt Offer to save passwords.",
+  "passwords.fix.brave":
+    "Brave: Settings → Autofill and passwords → Password Manager → Settings → tắt Offer to save passwords.",
+  "passwords.fix.firefox": "Firefox: Settings → Privacy & Security → Passwords → bỏ chọn Ask to save passwords.",
+  "passwords.fix.other": "Trình duyệt khác: phần cài đặt mật khẩu → tắt Offer to save passwords.",
+  "trust.pass": "Không có chứng chỉ gốc nào được thêm vào kho tin cậy, và không đặt proxy nào.",
+  "trust.pass.ca": "Không có chứng chỉ gốc nào được thêm vào kho tin cậy.",
+  "trust.pass.proxy": "Không đặt proxy nào.",
+  "trust.unknown": "Không đọc được kho tin cậy hay cài đặt proxy: {err}",
+  "trust.ca.found":
+    "{n} chứng chỉ gốc đã được thêm vào kho tin cậy: {names}. Ai giữ khoá của chứng chỉ đó có thể đọc lưu lượng HTTPS của máy này khi nó đi qua họ. Hệ thống kiểm tra TLS của công ty và công cụ lập trình như mkcert cũng thêm loại chứng chỉ này.",
+  "trust.ca.devTool":
+    "Trong đó có chứng chỉ của công cụ lập trình hoặc gỡ lỗi ({tools}): chỉ giữ lại khi bạn còn dùng công cụ đó.",
+  "trust.ca.hostOnly": "{n} chứng chỉ chỉ được tin cậy cho một tên máy (ví dụ của remote desktop); không tính.",
+  "trust.ca.unknown": "Không đọc được kho tin cậy: {err}",
+  "trust.proxy.found":
+    "Lưu lượng web đang đi qua proxy: {proxies}. Một proxy bạn không tự cài có thể thấy mọi trang bạn truy cập và đọc lưu lượng không mã hoá.",
+  "trust.proxy.local":
+    "Có đặt proxy trên chính máy này ({proxies}), thường là công cụ cục bộ như VPN client hoặc proxy gỡ lỗi.",
+  "trust.proxy.unknown": "Không đọc được cài đặt proxy: {err}",
+  "trust.fix.ca.mac":
+    "Keychain Access → keychain login hoặc System → Certificates → nhấp đúp vào chứng chỉ → Trust → When using this certificate: Use System Defaults, hoặc xoá nó. Với mkcert: [code]mkcert -uninstall[/code].",
+  "trust.fix.ca.win":
+    "Chạy [code]certmgr.msc[/code] → Trusted Root Certification Authorities → Certificates → nhấp chuột phải vào chứng chỉ → Delete. Với mkcert: [code]mkcert -uninstall[/code].",
+  "trust.fix.ca.linux":
+    "Xoá file rồi dựng lại kho: [code]sudo update-ca-certificates --fresh[/code] (Debian, Ubuntu) hoặc [code]sudo update-ca-trust[/code] (Fedora, RHEL). Với mkcert: [code]mkcert -uninstall[/code].",
+  "trust.fix.proxy.mac":
+    "System Settings → Network → mạng đang dùng → Details → Proxies → tắt những proxy bạn không tự cài.",
+  "trust.fix.proxy.win":
+    "Settings → Network & internet → Proxy → tắt Use a proxy server và Use setup script nếu không phải bạn tự cài.",
+  "trust.fix.proxy.linux": "Settings → Network → Network Proxy → tắt đi, nếu không phải bạn tự cài.",
+  "trust.fix.proxy.env":
+    "Xoá http_proxy, https_proxy và all_proxy khỏi các file khởi động shell hoặc biến môi trường nếu không phải bạn tự đặt.",
+  "trust.fix.allow": "Nếu IT cài đặt điều này, hãy đề nghị họ thêm nó vào chính sách (allow_cas, allow_proxies).",
 };

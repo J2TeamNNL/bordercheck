@@ -450,6 +450,9 @@ export const en = {
   "checkTitle.admin-rights": "Daily account has limited rights",
   "checkTitle.os-protections": "Built-in OS protections are on",
   "checkTitle.sharing": "Nothing is shared with nearby devices",
+  "checkTitle.extensions": "Browser and editor extensions are trusted",
+  "checkTitle.browser-passwords": "Passwords are not saved in the browser",
+  "checkTitle.trust-store": "No unexpected root certificates or proxies",
   "rep.prodSecrets": { one: "{n} production secret in plain text", other: "{n} production secrets in plain text" },
   "rep.prodSecretsNote": "Names and files only; the values are never sent.",
 } satisfies Record<string, Entry>;

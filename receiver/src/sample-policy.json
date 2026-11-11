@@ -57,6 +57,9 @@
     "remote-access": { "allow": ["guest"] },
     "admin-rights": { "allow_admin": false },
     "os-protections": { "sip": true, "gatekeeper": true, "antivirus": true, "smartscreen": true, "secure_boot": true, "lsm": true },
-    "sharing": { "allow": [] }
+    "sharing": { "allow": [] },
+    "extensions": { "browsers": true, "editors": true, "block": [], "allow": [], "warn_all_sites": false },
+    "browser-passwords": { "allow_browsers": [] },
+    "trust-store": { "cas": true, "proxies": true, "allow_cas": [], "allow_proxies": [], "ca_severity": "medium" }
   }
 }

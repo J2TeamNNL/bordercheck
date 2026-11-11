@@ -424,6 +424,9 @@ export const vi: Catalog = {
   "checkTitle.admin-rights": "Tài khoản dùng hằng ngày có quyền hạn chế",
   "checkTitle.os-protections": "Các lớp bảo vệ có sẵn của hệ điều hành đang bật",
   "checkTitle.sharing": "Không chia sẻ gì với thiết bị ở gần",
+  "checkTitle.extensions": "Tiện ích trình duyệt và trình soạn thảo đáng tin cậy",
+  "checkTitle.browser-passwords": "Mật khẩu không được lưu trong trình duyệt",
+  "checkTitle.trust-store": "Không có chứng chỉ gốc hay proxy lạ",
   "rep.prodSecrets": "{n} secret production dạng văn bản thuần",
   "rep.prodSecretsNote": "Chỉ có tên và file; giá trị không bao giờ được gửi đi.",
 };

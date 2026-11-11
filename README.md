@@ -40,6 +40,9 @@ Companies can install it on every laptop, and each one then reports to the IT te
 | `admin-rights` | The daily account is not an administrator; no passwordless `sudo`; Windows UAC on and asking, built-in Administrator off |
 | `os-protections` | SIP and Gatekeeper (macOS); Defender or another antivirus, tamper protection, SmartScreen, Secure Boot (Windows); Secure Boot, AppArmor or SELinux enforcing (Linux) |
 | `sharing` | AirDrop for Everyone, File, Printer, Internet, Media and Bluetooth Sharing, Content Caching (macOS); shared folders, network discovery on public networks, Nearby sharing (Windows); Samba, NFS, CUPS and GNOME file sharing (Linux) |
+| `extensions` | Browser (Chrome, Edge, Brave, Firefox…) and VS Code-family editor extensions on your block list, outside your allow list, or loaded from outside a store |
+| `browser-passwords` | Passwords saved in the browser's own password manager, which information stealers take first |
+| `trust-store` | Root certificates added to the trust store, and a system proxy, PAC file or proxy variable |
 
 `os-updates`, `screen-lock` and `remote-access` never go online: they judge what the machine already knows.
 Details and options for each: [Policies](docs/policies.md#checks).

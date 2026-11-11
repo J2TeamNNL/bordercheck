@@ -430,6 +430,83 @@ names appear in the evidence, file contents never do.
 | Field | Default | |
 |---|---|---|
 | `allow` | `[]` | Services that may be on, by the names above. |
+### extensions
+
+Browser and code-editor extensions. A malicious or hijacked extension sees everything you do in the browser or the
+editor. The check reads each profile's own files and nothing else (an unpacked extension's folder is not opened),
+and never goes online.
+
+| Reads | Where |
+|---|---|
+| Chrome, Edge, Brave, Chromium, Vivaldi, Arc (macOS): `extensions.settings` in each profile's `Preferences` and `Secure Preferences` (install location, enabled state), and `Extensions/<id>/<version>/manifest.json` (name, version, update URL, permissions) | every OS |
+| Firefox: each profile's `extensions.json` (location, signed state, source, granted origins); add-ons that ship with Firefox are skipped | every OS |
+| VS Code, VS Code Insiders, Cursor, Windsurf, VSCodium: `~/.vscode/extensions/extensions.json` and the equivalents (`publisher.name`, version, whether it was installed from a VSIX file) | every OS |
+
+Safari is not covered: its data is in a container macOS guards with a privacy prompt. Extensions forced by the
+browser's enterprise policy and those built into the browser are not counted.
+
+| Finding | Result |
+|---|---|
+| On `block` (even when disabled) | fail, high |
+| Not on `allow`, when `allow` is set | warn, medium |
+| From outside a store: loaded unpacked or with `--load-extension`, installed from a file, put in place by another program with a non-store update URL; in Firefox loaded temporarily, unsigned or sideloaded; in an editor installed from a VSIX file | warn, medium |
+| Can read and change every website (`<all_urls>`, `*://*/*`…) | counted in the summary; warn, medium with `warn_all_sites` |
+
+| Field | Default | |
+|---|---|---|
+| `browsers` | `true` | Check browser extensions. |
+| `editors` | `true` | Check editor extensions. |
+| `block` | `[]` | Extensions that fail the check: a browser extension ID (Chrome's 32-letter ID, Firefox's add-on ID) or `publisher.name` for editors. `*` matches any characters; case does not matter. |
+| `allow` | `[]` | When not empty, every enabled extension not on it warns (allowlist mode). Same syntax as `block`. |
+| `warn_all_sites` | `false` | Warn on extensions that can read and change every website. |
+| `allow_unpacked` | `[]` | Extensions that may come from outside a store, e.g. your own internal ones. |
+
+### browser-passwords
+
+Passwords saved in the browser's own password manager: information stealers take them first. The check never
+opens a login database: Chromium's `Login Data` and `Login Data For Account` are only measured (a file larger than
+an empty one, 40 KB, almost always holds saved logins; a few logins may still fit in an empty-sized file), and from
+Firefox's `logins.json` only the number of entries is kept. No site, user name or password is ever read into the
+result.
+
+| Reads | |
+|---|---|
+| Chromium browsers | `credentials_enable_service` in `Preferences` ("Offer to save passwords", on unless false); the size of the login databases |
+| Firefox | `signon.rememberSignons` in `prefs.js` ("Ask to save passwords"); the number of entries in `logins.json` |
+
+Saved passwords warn with medium severity; saving on with nothing saved passes with a note. A setting forced by
+the browser's enterprise policy is not read. Whether Firefox has a primary password is not checked: that needs
+`key4.db`, which the check does not open.
+
+| Field | Default | |
+|---|---|---|
+| `allow_browsers` | `[]` | Browsers whose password manager you use on purpose: `chrome`, `edge`, `brave`, `chromium`, `vivaldi`, `arc`, `firefox`. |
+
+### trust-store
+
+Root certificates added to the trust store, and a proxy. Whoever holds an added root's key can read this machine's
+HTTPS traffic that passes through them, and a proxy sees every site visited. Company TLS inspection and developer
+tools (mkcert, mitmproxy, Charles, Fiddler, Burp) add them too, so the default is a warning that says so, naming the
+tool when the certificate's name matches.
+
+| Reads | |
+|---|---|
+| macOS | `security dump-trust-settings` for the user and admin domains (Apple's roots are not listed), `security find-certificate` for the fingerprint and expiry, `scutil --proxy`. None of these shows a dialog. Certificates trusted for one host name only (for example a remote desktop's) are counted in a note, not flagged. |
+| Windows | The current user's own Root store (`HKCU\Software\Microsoft\SystemCertificates\Root`; Windows asks before a root is added there), and `ProxyEnable`, `ProxyServer`, `AutoConfigURL` under Internet Settings |
+| Linux | `/usr/local/share/ca-certificates`, `/etc/pki/ca-trust/source/anchors`, `/etc/ca-certificates/trust-source/anchors`; GNOME's proxy settings (`gsettings`). Browsers' own NSS databases are not read. |
+| Every OS | `http_proxy`, `https_proxy`, `all_proxy` (either case) in bordercheck's environment |
+
+A proxy on the machine itself (`127.0.0.1`, `localhost`) is usually a local tool such as a VPN client and is only
+noted. Evidence shows the certificate's common name, SHA-256 fingerprint and expiry, and the proxy's host and port
+(or the PAC URL without user name, password or query).
+
+| Field | Default | |
+|---|---|---|
+| `cas` | `true` | Check added root certificates. |
+| `proxies` | `true` | Check the proxy settings. |
+| `allow_cas` | `[]` | Certificates that may be trusted: a SHA-256 fingerprint (hex, colons optional) or a glob on the subject common name (`Acme Corp *`). |
+| `allow_proxies` | `[]` | Globs on the proxy or PAC host (`*.acme.example`). |
+| `ca_severity` | `"medium"` | `low`, `medium` or `high` for an added root; `high` makes it fail. |
 
 ## A fuller example
 

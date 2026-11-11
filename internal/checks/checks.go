@@ -50,6 +50,9 @@ func All(p policy.Policy) []check.Check {
 		{check.Check{ID: "admin-rights", Title: "Daily account has limited rights", Run: adminRights(c.AdminRights)}, c.AdminRights.Common},
 		{check.Check{ID: "os-protections", Title: "Built-in OS protections are on", Run: osProtections(c.OSProtections)}, c.OSProtections.Common},
 		{check.Check{ID: "sharing", Title: "Nothing is shared with nearby devices", Run: sharing(c.Sharing)}, c.Sharing.Common},
+		{check.Check{ID: "extensions", Title: "Browser and editor extensions are trusted", Run: extensions(c.Extensions)}, c.Extensions.Common},
+		{check.Check{ID: "browser-passwords", Title: "Passwords are not saved in the browser", Run: browserPasswords(c.BrowserPasswords)}, c.BrowserPasswords.Common},
+		{check.Check{ID: "trust-store", Title: "No unexpected root certificates or proxies", Run: trustStore(c.TrustStore)}, c.TrustStore.Common},
 	}
 	var out []check.Check
 	for _, a := range all {

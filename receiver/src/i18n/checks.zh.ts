@@ -349,4 +349,58 @@ export const checksZh: CheckCatalog = {
     "[code]sudo systemctl disable --now nfs-server[/code]（Debian/Ubuntu 上为 nfs-kernel-server），或把 /etc/exports 的每一行限制为指定主机，然后运行 [code]sudo exportfs -ra[/code]。",
   "sharing.fix.cups": "[code]sudo cupsctl --no-share-printers[/code]",
   "sharing.fix.linuxGnome": "前往 Settings → Sharing → File Sharing，将其关闭。",
+  "extensions.notFound": "未找到受支持的浏览器或代码编辑器配置文件。",
+  "extensions.found": "发现的扩展：{counts}。",
+  "extensions.pass": "没有扩展被列入阻止列表或来自应用商店以外。",
+  "extensions.blocked": "{n} 个扩展在组织的阻止列表中：{names}。",
+  "extensions.outside": "{n} 个扩展来自应用商店以外（以未打包方式加载、从文件安装或由其他程序安装）：{names}。",
+  "extensions.notAllowed": "{n} 个扩展不在组织的允许列表中：{names}。",
+  "extensions.allSites": "其中 {n} 个可以读取和更改你访问的所有网站。",
+  "extensions.allSitesWarn": "{n} 个扩展可以读取和更改你访问的所有网站：{names}。",
+  "extensions.fix.blocked":
+    "立即移除：在浏览器中打开扩展页面（[code]chrome://extensions[/code]、[code]edge://extensions[/code]、[code]brave://extensions[/code]，Firefox 中为 [code]about:addons[/code]）→ 移除（Remove）；在编辑器中打开扩展视图（Extensions view）→ 该扩展 → 卸载（Uninstall）。然后更改在该浏览器或编辑器中使用过的密码，并通知 IT。",
+  "extensions.fix.outside":
+    "移除不是你有意安装的扩展（浏览器扩展页面 → 移除（Remove），或编辑器扩展视图 → 卸载（Uninstall）），需要的扩展请从 Chrome Web Store、Microsoft Edge Add-ons、addons.mozilla.org 或编辑器的扩展市场安装。如果 IT 批准了某个扩展，可以将其加入策略的 allow_unpacked。",
+  "extensions.fix.notAllowed": "移除组织未批准的扩展，或请 IT 将其加入允许列表。",
+  "extensions.fix.allSites":
+    "移除不再使用的扩展。在 Chrome、Edge 或 Brave 中限制其余扩展：扩展页面 → 详情 → 网站访问权限（Details → Site access）→ 点击时（On click）或在特定网站上（On specific sites）。",
+  "passwords.notFound": "未找到受支持的浏览器配置文件。",
+  "passwords.pass": "浏览器中没有保存密码，也不会提示保存密码。",
+  "passwords.passSavingOn": "浏览器中没有保存密码，但 {browsers} 仍会提示保存密码：建议关闭此功能。",
+  "passwords.stored": "{browsers} 中保存了密码。信息窃取类恶意软件会首先窃取浏览器中保存的密码。",
+  "passwords.allowed": "策略允许：{browsers}。",
+  "passwords.fix": "将这些密码迁移到密码管理器（浏览器的密码设置可以导出密码），从浏览器中删除它们，并关闭密码保存功能。",
+  "passwords.fix.chrome":
+    "Chrome：设置 → 自动填充和密码 → Google 密码管理工具 → 设置（Settings → Autofill and passwords → Google Password Manager → Settings），关闭“提示保存密码”（Offer to save passwords）。",
+  "passwords.fix.edge":
+    "Edge：设置 → 密码和自动填充（旧版本为 个人资料 → 密码）（Settings → Passwords and autofill / Profiles → Passwords），关闭“提示保存密码”（Offer to save passwords）。",
+  "passwords.fix.brave":
+    "Brave：设置 → 自动填充和密码 → 密码管理器 → 设置（Settings → Autofill and passwords → Password Manager → Settings），关闭“提示保存密码”（Offer to save passwords）。",
+  "passwords.fix.firefox":
+    "Firefox：设置 → 隐私与安全 → 密码（Settings → Privacy & Security → Passwords），取消勾选“询问是否保存密码”（Ask to save passwords）。",
+  "passwords.fix.other": "其他浏览器：在密码设置中关闭“提示保存密码”（Offer to save passwords）。",
+  "trust.pass": "信任存储中没有添加根证书，也没有设置代理。",
+  "trust.pass.ca": "信任存储中没有添加根证书。",
+  "trust.pass.proxy": "没有设置代理。",
+  "trust.unknown": "无法读取信任存储或代理设置（{err}）。",
+  "trust.ca.found": "信任存储中添加了 {n} 个根证书：{names}。持有其私钥的人可以读取经过他们的本机 HTTPS 流量。公司的 TLS 检查和 mkcert 等开发工具也会添加此类证书。",
+  "trust.ca.devTool": "其中包括开发或调试工具的证书（{tools}）：仅在使用该工具期间保留。",
+  "trust.ca.hostOnly": "{n} 个证书仅对单个主机名受信任（例如远程桌面的证书）；不计入。",
+  "trust.ca.unknown": "无法读取信任存储（{err}）。",
+  "trust.proxy.found": "网络流量经过代理：{proxies}。不是你自己设置的代理可以看到你访问的每个网站，并读取未加密的流量。",
+  "trust.proxy.local": "本机设置了一个本地代理（{proxies}），通常是 VPN 客户端或调试代理等本地工具。",
+  "trust.proxy.unknown": "无法读取代理设置（{err}）。",
+  "trust.fix.ca.mac":
+    "打开 钥匙串访问 → 登录或系统钥匙串 → 证书（Keychain Access → login / System → Certificates），双击该证书 → 信任 → 使用此证书时：使用系统默认（Trust → When using this certificate: Use System Defaults），或将其删除。mkcert：[code]mkcert -uninstall[/code]。",
+  "trust.fix.ca.win":
+    "运行 [code]certmgr.msc[/code] → 受信任的根证书颁发机构 → 证书（Trusted Root Certification Authorities → Certificates），右键单击该证书 → 删除（Delete）。mkcert：[code]mkcert -uninstall[/code]。",
+  "trust.fix.ca.linux":
+    "删除该文件并重建证书存储：[code]sudo update-ca-certificates --fresh[/code]（Debian、Ubuntu）或 [code]sudo update-ca-trust[/code]（Fedora、RHEL）。mkcert：[code]mkcert -uninstall[/code]。",
+  "trust.fix.proxy.mac":
+    "前往 系统设置 → 网络 → 当前网络 → 详细信息 → 代理（System Settings → Network → your network → Details → Proxies），关闭不是你自己设置的代理。",
+  "trust.fix.proxy.win":
+    "前往 设置 → 网络和 Internet → 代理（Settings → Network & internet → Proxy），除非是你自己设置的，否则关闭“使用代理服务器”（Use a proxy server）和“使用设置脚本”（Use setup script）。",
+  "trust.fix.proxy.linux": "前往 设置 → 网络 → 网络代理（Settings → Network → Network Proxy），除非是你自己设置的，否则将其关闭。",
+  "trust.fix.proxy.env": "除非是你自己设置的，否则从 shell 启动文件或环境变量中删除 http_proxy、https_proxy 和 all_proxy。",
+  "trust.fix.allow": "如果这是 IT 设置的，请让他们将其加入策略（allow_cas、allow_proxies）。",
 };
