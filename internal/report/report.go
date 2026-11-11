@@ -159,6 +159,13 @@ func (r Report) WriteText(w io.Writer, color bool) {
 		if res.Fix != "" {
 			fmt.Fprintln(w, "      "+paint("\x1b[1m", "Fix:")+" "+res.Fix)
 		}
+		if len(res.UserIgnored) > 0 {
+			fmt.Fprintf(w, "      %s %d (sent to IT with your reasons; bordercheck unignore puts one back)\n",
+				paint("\x1b[1m", "Ignored by you:"), len(res.UserIgnored))
+			for _, ig := range res.UserIgnored {
+				fmt.Fprintln(w, "        · "+IgnoredLine(ig))
+			}
+		}
 		fmt.Fprintln(w)
 	}
 	c := r.Counts
@@ -173,6 +180,28 @@ func (r Report) WriteText(w io.Writer, color bool) {
 	}
 	fmt.Fprintln(w, strings.Join(parts, " · "))
 	fmt.Fprintln(w, paint("\x1b[90m", r.Tool+" "+r.Version+" · "+Credit))
+}
+
+// IgnoredLine shows one ignored finding: file, what it is, the reason and since when.
+func IgnoredLine(ig check.Ignored) string {
+	s := ig.Path + "  " + ig.Kind
+	if ig.Name != "" {
+		s += " (" + ig.Name + ")"
+	}
+	s += ": " + ig.Reason
+	if ig.Since != "" {
+		s += " (since " + ig.Since + ")"
+	}
+	return s
+}
+
+// UserIgnored counts the findings set aside by the person at the machine, across all results.
+func (r Report) UserIgnored() int {
+	n := 0
+	for _, res := range r.Results {
+		n += len(res.UserIgnored)
+	}
+	return n
 }
 
 // waiverNote says until when a result is waived, warning when that is soon, or

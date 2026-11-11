@@ -53,6 +53,20 @@ type Result struct {
 	// WaiverEnded is the end date (YYYY-MM-DD) of a waiver that matched this
 	// fail or warn but has expired. Shown in the text report only.
 	WaiverEnded string `json:"-"`
+	// UserIgnored lists findings the person at the machine marked as not
+	// sensitive (`bordercheck ignore`): they do not count toward the status.
+	// Unlike Evidence it is always sent, so IT can see what was set aside.
+	// Never holds a value.
+	UserIgnored []Ignored `json:"user_ignored,omitempty"`
+}
+
+// Ignored is one finding the person at the machine set aside, with their reason.
+type Ignored struct {
+	Path   string `json:"path"`
+	Name   string `json:"name,omitempty"` // the variable name, if the finding has one
+	Kind   string `json:"kind"`
+	Reason string `json:"reason"`
+	Since  string `json:"since,omitempty"` // YYYY-MM-DD
 }
 
 // Waiver says until when, and why, a result is waived.

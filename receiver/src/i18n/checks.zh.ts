@@ -119,6 +119,10 @@ export const checksZh: CheckCatalog = {
   "secrets.found": "{files} 个文件中共有 {n} 个明文密钥。",
   "secrets.foundProd": "{files} 个文件中共有 {n} 个明文密钥，其中 {prod} 个标记为生产环境。",
   "secrets.incomplete": "扫描达到时间上限，部分文件夹未检查。",
+  "ignore.more": "另有 {n} 项已被你忽略。",
+  "ignore.all": "发现的只有你标记为不敏感的 {n} 项。",
+  "ignore.off": "这台电脑的 policy 不允许忽略本项检查的发现，因此你的列表不适用于它。",
+  "ignore.unreadable": "无法读取你忽略的项目列表，因此没有忽略任何项目；请运行 [code]bordercheck ignore -list[/code]。",
   "secrets.fix.mac":
     "用 touchenv（https://github.com/ptrinh/touch-env）把每个密钥移入受 Touch ID 保护的钥匙串：[code]touchenv set NAME[/code]，然后删除那一行或那个文件。",
   "secrets.fix.win":

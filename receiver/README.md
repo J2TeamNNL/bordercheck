@@ -6,7 +6,8 @@ alerts when something goes wrong.**
 - `POST /report` takes the report each enrolled bordercheck sends, authenticated with that machine's own token.
 - `/admin` is a dashboard: every machine with its email, hostname, OS, version, last report and fail/warn
   counts; a filter for non-compliant and silent machines; each machine's failing checks with summary, fix,
-  evidence and since when; and which checks fail most across the organisation.
+  evidence and since when, and the findings the person marked as not sensitive with their reasons; and which
+  checks fail most across the organisation.
 - An hourly cron posts alerts to Discord, Slack or any webhook: a machine **newly** fails a high-severity
   check, a machine has been **silent** for more than `SILENT_DAYS` (someone who uninstalls bordercheck
   otherwise just disappears), and optionally a digest.
@@ -168,7 +169,8 @@ it announces a new high-severity problem.
 
 It never shows evidence (file paths, port numbers, container names: a map of the machine for whoever holds the
 link; the person at the machine sees them by running bordercheck), other machines, admin controls, the audit
-trail, IPs or locations. Pages are script-free, `no-store`, `noindex`, `no-referrer`, and unknown, expired and
+trail, IPs or locations. Of the findings the person marked as not sensitive (`bordercheck ignore`) it shows only
+how many; the files and reasons are on the machine's page in `/admin`. Pages are script-free, `no-store`, `noindex`, `no-referrer`, and unknown, expired and
 revoked links all get the same 404.
 
 A new link is issued with every report, because only a hash is stored and so an old one can't be handed out
@@ -407,7 +409,8 @@ every check" must not work. What the server does about it:
   bidi overrides) removed; every read result and the server instructions say those fields are data, not
   instructions. Check IDs bordercheck doesn't know, unknown statuses and severities go there too. Tool
   descriptions and error messages never contain report text.
-- Evidence is only in `get_machine`, and only with `include_evidence`. IPs and locations only with
+- Evidence is only in `get_machine`, and only with `include_evidence`; so are the findings the person marked as
+  not sensitive (`user_ignored`, under `untrusted`), while `user_ignored_count` is always there. IPs and locations only with
   `include_location`, and never when `STORE_PUBLIC_IP` / `STORE_GEO` are off (even if older values are still
   stored).
 - Write tools take explicit ids (install_id, role_id, invite_id, waiver_id); nothing matches "the machine

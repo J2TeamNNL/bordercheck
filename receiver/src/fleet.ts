@@ -335,6 +335,26 @@ export async function machineDetail(env: Env, id: string, o: { evidence?: boolea
   out.passing_checks = fine.filter((r) => known(r.id)).map((r) => ({ check_id: r.id, status: r.status }));
   const otherPassing = fine.filter((r) => !known(r.id));
   if (otherPassing.length) out.untrusted = { other_passing_check_ids: otherPassing.slice(0, 50).map((r) => clean(r.id, 64)) };
+  // What the person at the machine marked as not sensitive (bordercheck
+  // ignore): the count always, the items with evidence, since they name files.
+  const ignored = results.filter((r) => r.user_ignored?.length);
+  out.user_ignored_count = ignored.reduce((n, r) => n + (r.user_ignored?.length ?? 0), 0);
+  if (o.evidence && ignored.length) {
+    out.user_ignored = ignored.flatMap((r) => {
+      const ref = checkRef(r.id);
+      return (r.user_ignored ?? []).slice(0, 50).map((i) => ({
+        check_id: ref.check_id,
+        untrusted: {
+          ...(ref.untrusted ?? {}),
+          path: clean(i.path, 200),
+          name: clean(i.name, 100),
+          kind: clean(i.kind, 64),
+          reason: clean(i.reason, 200),
+          since: clean(i.since, 32),
+        },
+      }));
+    });
+  }
   out.report_untrusted = { machine_clock: clean(m.report_time, 40), policy_name: clean(m.policy, 100) };
 
   const hl = o.history ?? 10;

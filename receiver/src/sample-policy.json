@@ -29,13 +29,15 @@
       "production_keywords": ["prod", "production", "live"],
       "show_tail": true,
       "walk_depth": 5,
-      "ignore_paths": []
+      "ignore_paths": [],
+      "user_ignore": true
     },
     "ssh-keys": {
       "no_passphrase": true,
       "loose_permissions": true,
       "authorized_keys": true,
-      "allow_keys": []
+      "allow_keys": [],
+      "user_ignore": true
     },
     "tunnels": {
       "processes": true,
@@ -44,7 +46,7 @@
       "allow": [],
       "lower_severity": ["cloudflared"]
     },
-    "ai-agents": { "tokens": true, "guardrails": true },
+    "ai-agents": { "tokens": true, "guardrails": true, "user_ignore": true },
     "os-updates": {
       "min_os_versions": { "macos": "15", "windows": "26100", "ubuntu": "22.04" },
       "require_auto_update": true,

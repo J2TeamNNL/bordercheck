@@ -19,9 +19,41 @@ export interface Result {
   fix: string;
   evidence: string[];
   waived?: Waiver;
+  // Findings the person at the machine marked as not sensitive (bordercheck
+  // ignore): they do not count toward the status, and the client sends them
+  // even without evidence. Absent from older clients.
+  user_ignored?: UserIgnored[];
   // summary and fix as message keys, for showing them translated (checktext.ts).
   summary_parts?: Part[];
   fix_parts?: Part[];
+}
+
+export interface UserIgnored {
+  path: string;
+  name: string;
+  kind: string;
+  reason: string;
+  since: string;
+}
+
+export const MAX_USER_IGNORED = 200;
+
+// parseUserIgnored keeps well-formed entries (a path and a reason, every field
+// a string if present), capped in number and length; anything else is dropped.
+export function parseUserIgnored(v: unknown): UserIgnored[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: UserIgnored[] = [];
+  for (const x of v.slice(0, MAX_USER_IGNORED * 2)) {
+    const o = obj(x);
+    const fields = ["path", "name", "kind", "reason", "since"];
+    if (fields.some((f) => o[f] !== undefined && typeof o[f] !== "string")) continue;
+    const one = (f: string, max: number) => str(o[f], max).replace(/[\n\t]/g, " ").trim();
+    const e = { path: one("path", 500), name: one("name", 128), kind: one("kind", 64), reason: one("reason", 200), since: one("since", 32) };
+    if (!e.path || !e.reason) continue;
+    out.push(e);
+    if (out.length >= MAX_USER_IGNORED) break;
+  }
+  return out;
 }
 
 export interface Report {
@@ -155,6 +187,8 @@ export function parseReport(raw: unknown): Report {
     if (sp) res.summary_parts = sp;
     const fp = parseParts(o.fix_parts);
     if (fp) res.fix_parts = fp;
+    const ui = parseUserIgnored(o.user_ignored);
+    if (ui?.length) res.user_ignored = ui;
     const w = obj(o.waived);
     if (o.waived !== undefined && (w.until !== undefined || w.reason !== undefined)) {
       res.waived = { until: str(w.until, 32), reason: str(w.reason, 500) };

@@ -12,12 +12,24 @@ import (
 	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/check"
+	"github.com/ptrinh/bordercheck/internal/ignore"
 	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
-// All returns every check the policy enables, in report order.
-func All(p policy.Policy) []check.Check {
+// Local is what the person at this computer has set for the checks, kept in
+// the install folder rather than the policy.
+type Local struct {
+	Ignored   []ignore.Entry // secrets marked as not sensitive (bordercheck ignore)
+	IgnoreErr error          // the list of ignored secrets could not be read
+}
+
+// All returns every check the policy enables, in report order, without
+// anything set locally.
+func All(p policy.Policy) []check.Check { return AllWith(p, Local{}) }
+
+// AllWith is All with what the person at the computer has set.
+func AllWith(p policy.Policy, local Local) []check.Check {
 	c := p.Checks
 	all := []struct {
 		check.Check
@@ -39,13 +51,13 @@ func All(p policy.Policy) []check.Check {
 		{check.Check{ID: "tailscale", Title: "Tailscale blocks incoming connections", Run: tailscale}, c.Tailscale},
 		{check.Check{ID: "docker", Title: "Docker containers stay isolated",
 			Run: func(ctx context.Context) check.Result { return docker(ctx, c.Docker) }}, c.Docker.Common},
-		{check.Check{ID: "secrets", Title: "No plain-text secrets", Run: secrets(c.Secrets)}, c.Secrets.Common},
+		{check.Check{ID: "secrets", Title: "No plain-text secrets", Run: secrets(c.Secrets, local)}, c.Secrets.Common},
 		{check.Check{ID: "os-updates", Title: "OS and browsers are up to date", Run: osUpdates(c.OSUpdates)}, c.OSUpdates.Common},
 		{check.Check{ID: "screen-lock", Title: "Screen locks with a password", Run: screenLock(c.ScreenLock)}, c.ScreenLock.Common},
 		{check.Check{ID: "remote-access", Title: "Remote login and sharing are off", Run: remoteAccess(c.RemoteAccess)}, c.RemoteAccess.Common},
-		{check.Check{ID: "ssh-keys", Title: "SSH keys are protected", Run: sshKeys(c.SSHKeys)}, c.SSHKeys.Common},
+		{check.Check{ID: "ssh-keys", Title: "SSH keys are protected", Run: sshKeys(c.SSHKeys, local)}, c.SSHKeys.Common},
 		{check.Check{ID: "tunnels", Title: "Nothing is tunnelled to the internet", Run: tunnels(c.Tunnels)}, c.Tunnels.Common},
-		{check.Check{ID: "ai-agents", Title: "AI agents keep their guardrails", Run: aiAgents(c.AIAgents, c.Secrets)}, c.AIAgents.Common},
+		{check.Check{ID: "ai-agents", Title: "AI agents keep their guardrails", Run: aiAgents(c.AIAgents, c.Secrets, local)}, c.AIAgents.Common},
 		{check.Check{ID: "cracked-software", Title: "No cracked software", Run: crackedSoftware(c.CrackedSoftware)}, c.CrackedSoftware.Common},
 		{check.Check{ID: "admin-rights", Title: "Daily account has limited rights", Run: adminRights(c.AdminRights)}, c.AdminRights.Common},
 		{check.Check{ID: "os-protections", Title: "Built-in OS protections are on", Run: osProtections(c.OSProtections)}, c.OSProtections.Common},

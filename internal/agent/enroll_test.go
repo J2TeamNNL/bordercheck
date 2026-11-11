@@ -229,7 +229,7 @@ func TestEnrollInstallHappyPath(t *testing.T) {
 	}
 	host := strings.TrimPrefix(p.url(), "https://")
 	for _, want := range []string{"Enrolled:   with " + host + ", role engineering", "Install ID: " + testInstallID,
-		"Waiver:     listeners until", "Sends:      results; evidence off, IP addresses off, location off"} {
+		"Waiver:     listeners until", "Sends:      results, and anything you ignored with your reason; evidence off, IP addresses off, location off"} {
 		if !strings.Contains(status, want) {
 			t.Errorf("status lacks %q:\n%s", want, status)
 		}

@@ -13,6 +13,8 @@
 //	                problems the person at the machine was last notified of,
 //	                and the link to this machine's report page
 //	bordercheck.log what each scheduled run did
+//	ignored.json    secrets the person marked as not sensitive (bordercheck
+//	                ignore; package ignore); a plain run reads it too
 //	Bordercheck.app macOS only: the app bordercheck's notifications come from
 //	                (notifier.go)
 package agent
@@ -40,6 +42,7 @@ import (
 	"github.com/ptrinh/bordercheck/internal/check"
 	"github.com/ptrinh/bordercheck/internal/checks"
 	"github.com/ptrinh/bordercheck/internal/hostinfo"
+	"github.com/ptrinh/bordercheck/internal/ignore"
 	"github.com/ptrinh/bordercheck/internal/notifier"
 	"github.com/ptrinh/bordercheck/internal/policy"
 	"github.com/ptrinh/bordercheck/internal/report"
@@ -126,6 +129,14 @@ type State struct {
 	Notifications      string    `json:"notifications,omitempty"`
 	NotificationsError string    `json:"notifications_error,omitempty"`
 	NotificationsAt    time.Time `json:"notifications_at,omitzero"`
+}
+
+// Local is what the person at this computer has set in the install folder
+// dir: the secrets they marked as not sensitive. A list that cannot be read
+// counts as empty, and the secrets check says so.
+func Local(dir string) checks.Local {
+	entries, err := ignore.Load(dir)
+	return checks.Local{Ignored: entries, IgnoreErr: err}
 }
 
 func readJSON(path string, v any) error {
@@ -300,7 +311,7 @@ func sends(r policy.Report) string {
 // The portal is not told: a revoked or forgotten install is IT's to clean up.
 func Uninstall(env Env) error {
 	err := errors.Join(services.unregister(), notifier.Remove(env.Dir))
-	for _, name := range []string{"config.json", "state.json", "bordercheck.log", policy.FileName, TokenFile, binName()} {
+	for _, name := range []string{"config.json", "state.json", "bordercheck.log", policy.FileName, TokenFile, ignore.FileName, binName()} {
 		if e := os.Remove(filepath.Join(env.Dir, name)); e != nil && !errors.Is(e, os.ErrNotExist) {
 			err = errors.Join(err, e) // Windows cannot remove a running binary; it goes on the next uninstall
 		}
@@ -368,7 +379,7 @@ func Send(ctx context.Context, env Env, force bool) error {
 // checkOnly runs the checks without reporting: what the service does when
 // report.check_interval has passed but a report is not due yet.
 func checkOnly(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *State, now time.Time) {
-	results := pol.Waive(check.RunAll(ctx, checks.All(pol)), identity(cfg), now)
+	results := pol.Waive(check.RunAll(ctx, checks.AllWith(pol, Local(env.Dir))), identity(cfg), now)
 	st.LastCheck = now
 	c := report.New(env.Version, pol.Name, results).Counts
 	fmt.Fprintf(env.Out, "%s checked (no report due until %s): %d fail, %d warn, %d pass, %d waived\n", now.Format(time.RFC3339),
@@ -382,7 +393,7 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 	if force && env.Term != nil { // someone is watching: show how far the checks are
 		progress = report.Progress(env.Term)
 	}
-	results := check.RunAllProgress(ctx, checks.All(pol), progress)
+	results := check.RunAllProgress(ctx, checks.AllWith(pol, Local(env.Dir)), progress)
 	results = pol.Waive(results, identity(cfg), now)
 	rep := report.New(env.Version, pol.Name, results)
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID
@@ -501,8 +512,26 @@ func Status(env Env) (string, error) {
 	if refreshedFrom != "" {
 		fmt.Fprintf(&b, " (refreshed from %s)", refreshedFrom)
 	}
-	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results; %s\nService:    %s\n",
+	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results, and anything you ignored with your reason; %s\nService:    %s\n",
 		pol.Report.CheckEvery(), pol.Report.Interval, hostOf(pol.Report.URL), sends(pol.Report), services.status())
+	if entries, err := ignore.Load(env.Dir); err != nil {
+		fmt.Fprintf(&b, "Ignored:    your list cannot be read (%v), so nothing is ignored\n", err)
+	} else if len(entries) > 0 {
+		allowed := map[string]bool{"secrets": pol.Checks.Secrets.UserIgnore, "ai-agents": pol.Checks.AIAgents.UserIgnore,
+			"ssh-keys": pol.Checks.SSHKeys.UserIgnore}
+		off := 0
+		for _, e := range entries {
+			if !allowed[e.Check] {
+				off++
+			}
+		}
+		fmt.Fprintf(&b, "Ignored:    %d entr%s you marked as not sensitive, sent with your reasons in every report (bordercheck ignore -list)",
+			len(entries), plural(len(entries), "y", "ies"))
+		if off > 0 {
+			fmt.Fprintf(&b, "; %d not applied: the policy does not allow it for that check", off)
+		}
+		b.WriteString("\n")
+	}
 	if !st.LastSent.IsZero() {
 		fmt.Fprintf(&b, "Last sent:  %s\n", st.LastSent.Format(time.RFC1123))
 	}
@@ -541,6 +570,13 @@ func Status(env Env) (string, error) {
 		fmt.Fprintf(&b, "Update err: %s\n", st.UpdateError)
 	}
 	return b.String(), nil
+}
+
+func plural(n int, one, other string) string {
+	if n == 1 {
+		return one
+	}
+	return other
 }
 
 // joinWords joins string-like values with ", ".
