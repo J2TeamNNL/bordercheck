@@ -228,6 +228,7 @@ private key, matches a `high` extra pattern, or is marked production. Values are
 | `walk_depth` | `5` | How many folders below home are searched for `.env` and key files, 0–20. Files and folders kept only in iCloud Drive or another cloud provider (placeholders, not on this disk) are not read, since reading one downloads it; apps, media libraries and disk-image bundles are skipped. |
 | `extra_patterns` | `[]` | Your own token formats: `{"kind": "Acme token", "regex": "\\bacme_[A-Za-z0-9]{32}\\b", "high": true, "show_tail": true}`. `kind` and a valid Go regular expression are required; `high` makes a match fail; `show_tail` is safe only for long random tokens. They are tried before the built-in rules. |
 | `locations` | all `true` | Credential stores read format by format; each switches off alone. |
+| `user_ignore` | `true` | Let the person at the machine mark findings as not sensitive with `bordercheck ignore <path> [-name VAR] -reason "…"` ([how](install.md#secrets-that-are-not-sensitive)); `ai-agents` and `ssh-keys` have the same switch. Ignored findings stop counting toward this check, but every report lists them with the reason in the result's `user_ignored`, also when `include_evidence` is off; the portal shows them on the machine's page. A finding marked `[production]` can never be ignored this way. `false`: `bordercheck ignore` refuses and existing entries are not applied (the summary says so). Needs bordercheck v0.5.0 or later on every machine of the role when set (older ones reject the unknown field); leaving it out keeps the default on new clients and works with old ones. |
 
 `locations`:
 
@@ -309,6 +310,7 @@ is never shown, only type, fingerprint and comment. Hardware (FIDO) keys pass.
 | `authorized_keys` | `true` | List the keys in `authorized_keys` that can log in to this machine. |
 | `allow_keys` | `[]` | Globs of keys exempt from every rule, e.g. `"~/.ssh/ci_deploy"`. |
 | `client_config` | `true` | Read `~/.ssh/config` and the files it `Include`s under `~/.ssh` for `ForwardAgent` (other than `no`), `StrictHostKeyChecking no`/`off` and `UserKnownHostsFile /dev/null`. At the top level, under `Host *` (even with `!` exceptions) or `Match all`: warn medium; under other `Host`/`Match` lines: low. Evidence: file, line and the `Host` line. |
+| `user_ignore` | `true` | Let the person at the machine mark a key without a passphrase as not sensitive (`bordercheck ignore ~/.ssh/aur -reason "…"`, [how](install.md#secrets-that-are-not-sensitive)); it stops counting but every report lists it with the reason. Only a key whose one problem is the missing passphrase: readable keys, `authorized_keys` and client settings cannot be ignored. `false` turns it off for this check. Needs a client that knows the field, like `secrets.user_ignore`. |
 
 ### tunnels
 
@@ -337,6 +339,7 @@ Continue and Zed, at the paths each vendor documents (on Linux and Windows only 
 | `guardrails` | `true` | Settings that skip approvals or the sandbox. |
 | `extra_paths` | `[]` | More config files to scan for tokens. |
 | `ignore_paths` | `[]` | Globs of files to leave out. |
+| `user_ignore` | `true` | Let the person at the machine mark a plain-text token as not sensitive (`bordercheck ignore ~/.claude.json -name Authorization -reason "…"`, [how](install.md#secrets-that-are-not-sensitive)); it stops counting but every report lists it with the reason. Guardrail findings and tokens marked production cannot be ignored. `false` turns it off for this check. Needs a client that knows the field, like `secrets.user_ignore`. |
 
 ### cracked-software
 

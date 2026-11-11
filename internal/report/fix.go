@@ -35,8 +35,13 @@ func (r Report) WriteFix(w io.Writer, exe string, send bool) {
 
 	fmt.Fprintf(w, "%s %s fix: how to fix what bordercheck found on this computer.\n", r.Tool, r.Version)
 	fmt.Fprintln(w, "Written for an AI coding assistant working with the person at this computer; a person can follow it too.")
+	ignoredLine := ""
+	if n := r.UserIgnored(); n > 0 {
+		ignoredLine = fmt.Sprintf("Ignored by you: %d (marked as not sensitive; IT sees each one with its reason; list: %s)\n", n, run("ignore -list"))
+	}
 	if len(todo) == 0 {
 		fmt.Fprintln(w, "\nNothing to fix: no check fails or warns.")
+		fmt.Fprint(w, ignoredLine)
 		if r.Counts.Error > 0 {
 			fmt.Fprintf(w, "%d could not be run; see: %s\n", r.Counts.Error, run(""))
 		}
@@ -57,11 +62,12 @@ Rules
 4. A fix that needs an administrator password or the system's settings window is the person's to do: say
    exactly where to click or what to type.
 5. Do not make a check pass by turning it off: leave bordercheck, its policy and its files as they are.
-   If the person disagrees with a finding, their IT team can waive it.
+   If the person disagrees with a finding, their IT team can waive it. Do not run bordercheck ignore
+   unless the person asks you to ignore that specific item: IT sees every ignored item and its reason.
 6. Do not delete files, keys or accounts to fix a finding unless the person asks for exactly that.
 
 `)
-	fmt.Fprintf(w, "To fix: %d\n\nBEGIN REPORT\n", len(todo))
+	fmt.Fprintf(w, "To fix: %d\n%s\nBEGIN REPORT\n", len(todo), ignoredLine)
 	for _, res := range todo {
 		head := string(res.Status)
 		if res.Severity != "" {

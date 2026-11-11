@@ -177,6 +177,9 @@ type Secrets struct {
 	WalkDepth          int             `json:"walk_depth"`          // folders below home searched for .env and key files
 	ExtraPatterns      []SecretPattern `json:"extra_patterns"`      // the org's own token formats
 	Locations          SecretLocations `json:"locations"`           // credential stores read with format-aware rules
+	// UserIgnore lets the person at the machine mark findings as not sensitive
+	// with `bordercheck ignore`; they are still listed in every report.
+	UserIgnore bool `json:"user_ignore"`
 }
 
 // SecretLocations switches each well-known credential store on or off.
@@ -203,6 +206,9 @@ type SSHKeys struct {
 	AuthorizedKeys   bool     `json:"authorized_keys"`   // keys that can log in to this machine
 	AllowKeys        []string `json:"allow_keys"`        // globs on the shown path (~/.ssh/deploy_key) exempt from every rule
 	ClientConfig     bool     `json:"client_config"`     // ~/.ssh/config: ForwardAgent, StrictHostKeyChecking, UserKnownHostsFile /dev/null
+	// UserIgnore lets the person at the machine mark a key without a
+	// passphrase as not sensitive (bordercheck ignore); still listed in reports.
+	UserIgnore bool `json:"user_ignore"`
 }
 
 // TunnelTools are the names tunnels.allow and tunnels.lower_severity accept.
@@ -226,6 +232,9 @@ type AIAgents struct {
 	Guardrails  bool     `json:"guardrails"`   // agents set to skip approvals or run unsandboxed
 	ExtraPaths  []string `json:"extra_paths"`  // more config files to scan for tokens, ~ allowed
 	IgnorePaths []string `json:"ignore_paths"` // globs on the shown path
+	// UserIgnore lets the person at the machine mark a plain-text token as not
+	// sensitive (bordercheck ignore); still listed in reports. Guardrails cannot be.
+	UserIgnore bool `json:"user_ignore"`
 }
 
 // CrackedSoftware looks for traces of cracked paid software (Adobe, Autodesk,
@@ -356,6 +365,7 @@ func Default() Policy {
 				WalkDepth:          5,
 				Locations: SecretLocations{Docker: true, Kube: true, Netrc: true, GitCredentials: true, GCloud: true,
 					Azure: true, PyPI: true, GitHubCLI: true, Terraform: true, PgPass: true, MySQL: true, GitRemotes: true},
+				UserIgnore: true,
 			},
 			OSUpdates: OSUpdates{
 				MinOSVersions:     map[string]string{"macos": "15", "windows": "26100", "ubuntu": "22.04", "debian": "12", "fedora": "43"},
@@ -366,10 +376,11 @@ func Default() Policy {
 			// A guest account is accepted unless a policy says otherwise: on macOS it
 			// is a sandboxed, throw-away session.
 			RemoteAccess: RemoteAccess{Allow: []string{"guest"}},
-			SSHKeys:      SSHKeys{NoPassphrase: true, LoosePermissions: true, AuthorizedKeys: true, AllowKeys: []string{}, ClientConfig: true},
+			SSHKeys: SSHKeys{NoPassphrase: true, LoosePermissions: true, AuthorizedKeys: true, AllowKeys: []string{}, ClientConfig: true,
+				UserIgnore: true},
 			Tunnels: Tunnels{Processes: true, TailscaleFunnel: true, TailscaleServe: true, Allow: []string{},
 				LowerSeverity: []string{"cloudflared"}},
-			AIAgents:        AIAgents{Tokens: true, Guardrails: true, ExtraPaths: []string{}, IgnorePaths: []string{}},
+			AIAgents:        AIAgents{Tokens: true, Guardrails: true, ExtraPaths: []string{}, IgnorePaths: []string{}, UserIgnore: true},
 			CrackedSoftware: CrackedSoftware{SuggestAlternatives: true},
 			AdminRights:     AdminRights{AllowAdmin: false},
 			OSProtections: OSProtections{SIP: true, Gatekeeper: true, Antivirus: true, SmartScreen: true, SecureBoot: true,

@@ -20,7 +20,7 @@ const policyFmt = `{"name": "Test", "report": {"url": %q, "headers": {"Authoriza
  "interval": "24h", "email_domains": ["acme.com"]}, "update": {%s},
  "checks": {"firewall": {"enabled": false}, "disk-encryption": {"enabled": false},
   "listeners": {"enabled": false}, "tailscale": {"enabled": false}, "docker": {"enabled": false},
-  "secrets": {"enabled": false}}}`
+  "secrets": {"enabled": false}, "ssh-keys": {"enabled": false}, "ai-agents": {"enabled": false}}}`
 
 func setup(t *testing.T, srv *httptest.Server) (Env, *strings.Builder) {
 	t.Helper()

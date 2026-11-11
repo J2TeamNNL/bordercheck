@@ -20,6 +20,14 @@ var Catalog = map[string]Entry{
 	"check.interrupted": s("Interrupted before it finished."),
 	"check.moreAllowed": s("{n} more allowed by policy."),
 
+	// ---- What the person at the machine ignored (bordercheck ignore): secrets, ai-agents, ssh-keys ----
+	"ignore.more": pl("1 more ignored by you.", "{n} more ignored by you."),
+	"ignore.all": pl("The only finding is one you marked as not sensitive.",
+		"The only findings are {n} you marked as not sensitive."),
+	"ignore.off": s("This computer's policy does not allow ignoring findings of this check, so your list is not applied to it."),
+	"ignore.unreadable": s("Your list of ignored findings could not be read, so nothing is ignored; " +
+		"run [code]bordercheck ignore -list[/code]."),
+
 	// ---- firewall: macOS ----
 	"firewall.mac.off": s("The macOS firewall is off."),
 	"firewall.mac.off.fix": s("System Settings → Network → Firewall → turn it on. " +

@@ -118,6 +118,10 @@ export const checksVi: CheckCatalog = {
   "secrets.found": "{n} secret dạng văn bản thuần trong {files} file.",
   "secrets.foundProd": "{n} secret dạng văn bản thuần trong {files} file, {prod} secret được đánh dấu production.",
   "secrets.incomplete": "Lần quét đã hết thời gian cho phép nên một số thư mục chưa được kiểm tra.",
+  "ignore.more": "Ngoài ra còn {n} mục bạn đã bỏ qua.",
+  "ignore.all": "Các mục tìm thấy đều là {n} mục bạn đã đánh dấu là không nhạy cảm.",
+  "ignore.off": "Policy của máy này không cho phép bỏ qua các mục của mục kiểm tra này, nên danh sách của bạn không được áp dụng cho nó.",
+  "ignore.unreadable": "Không đọc được danh sách các mục bạn đã bỏ qua, nên không mục nào được bỏ qua; hãy chạy [code]bordercheck ignore -list[/code].",
   "secrets.fix.mac":
     "Chuyển từng key vào Keychain, có Touch ID bảo vệ, bằng touchenv (https://github.com/ptrinh/touch-env): [code]touchenv set NAME[/code], rồi xoá dòng hoặc file đó.",
   "secrets.fix.win":

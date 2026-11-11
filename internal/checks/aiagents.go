@@ -141,6 +141,20 @@ type aiFinding struct {
 	path, where, what string
 	tail              string
 	sev               check.Severity
+	// A plain-text token, as opposed to a guardrail setting: only these can
+	// be ignored by the person at the machine (userignore.go).
+	token   bool
+	prod    bool   // marked production
+	setting string // the config setting (JSON path) or variable name it sits in
+	name    string // the variable or header name the secret rules saw
+}
+
+// names are what `bordercheck ignore -name` matches for a token finding.
+func (f aiFinding) names() []string {
+	if f.setting == f.name {
+		return nonEmpty(f.setting)
+	}
+	return nonEmpty(f.setting, f.name)
 }
 
 func (f aiFinding) String() string {
@@ -155,19 +169,33 @@ func (f aiFinding) String() string {
 	return s
 }
 
-func aiAgents(p policy.AIAgents, sp policy.Secrets) func(context.Context) check.Result {
+func aiAgents(p policy.AIAgents, sp policy.Secrets, local Local) func(context.Context) check.Result {
 	return func(ctx context.Context) check.Result {
-		home, err := os.UserHomeDir()
+		home, found, files, err := scanAIAgentFiles(p, sp)
 		if err != nil {
 			return check.Errored(err)
 		}
-		s, err := newAIScanner(p, sp, home)
-		if err != nil {
-			return check.Errored(err)
-		}
-		found, files := s.scanAll(home, runtime.GOOS, p)
-		return evalAIAgents(found, files)
+		return evalAIAgentsWith(found, files, newUserIgnore("ai-agents", local, p.UserIgnore, home))
 	}
+}
+
+func scanAIAgentFiles(p policy.AIAgents, sp policy.Secrets) (string, []aiFinding, int, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", nil, 0, err
+	}
+	s, err := newAIScanner(p, sp, home)
+	if err != nil {
+		return "", nil, 0, err
+	}
+	found, files := s.scanAll(home, runtime.GOOS, p)
+	return home, found, files, nil
+}
+
+// scanAIAgents is the ai-agents check's scan, for bordercheck ignore.
+func scanAIAgents(p policy.AIAgents, sp policy.Secrets) (string, []aiFinding, error) {
+	home, found, _, err := scanAIAgentFiles(p, sp)
+	return home, found, err
 }
 
 type aiScanner struct {
@@ -285,17 +313,18 @@ func (s *aiScanner) scanLines(shown, agent, text string) []aiFinding {
 		if f.name != "" {
 			where += " (" + f.name + ")"
 		}
-		out = append(out, s.tokenFinding(f, agent, where))
+		out = append(out, s.tokenFinding(f, agent, where, f.name))
 	}
 	return out
 }
 
-func (s *aiScanner) tokenFinding(f secretFinding, agent, where string) aiFinding {
+func (s *aiScanner) tokenFinding(f secretFinding, agent, where, setting string) aiFinding {
 	sev := check.Medium
 	if f.high() {
 		sev = check.High
 	}
-	return aiFinding{path: f.path, where: where, what: agent + ": " + f.kind + " in plain text", tail: f.tail, sev: sev}
+	return aiFinding{path: f.path, where: where, what: agent + ": " + f.kind + " in plain text", tail: f.tail, sev: sev,
+		token: true, prod: f.prod, setting: setting, name: f.name}
 }
 
 // scanTree checks every string in a JSON subtree. Each one is scanned as
@@ -338,7 +367,7 @@ func (s *aiScanner) scanTree(shown, agent, at string, v any) []aiFinding {
 func (s *aiScanner) scanValue(shown, agent, path, key, value string) []aiFinding {
 	var out []aiFinding
 	for _, f := range s.scan(strings.NewReader(key+"="+value), shown, s.rules) {
-		out = append(out, s.tokenFinding(f, agent, path))
+		out = append(out, s.tokenFinding(f, agent, path, path))
 	}
 	return out
 }
@@ -511,8 +540,16 @@ func splitTOML(data []byte, scope []string) (string, map[string]string) {
 }
 
 func evalAIAgents(found []aiFinding, files int) check.Result {
+	return evalAIAgentsWith(found, files, nil)
+}
+
+func evalAIAgentsWith(found []aiFinding, files int, u *userIgnore) check.Result {
+	// Only plain-text tokens can be set aside, and not those marked production.
+	found = slices.DeleteFunc(slices.Clone(found), func(f aiFinding) bool {
+		return f.token && !f.prod && u.take(f.path, f.names(), f.what, f.what)
+	})
 	if len(found) == 0 {
-		return check.Result{Status: check.Pass}.WithSummary(msg.Of("ai.pass", "n", files))
+		return u.finish(check.Result{Status: check.Pass}.WithSummary(msg.Of("ai.pass", "n", files)), nil)
 	}
 	sort.SliceStable(found, func(i, j int) bool { return found[i].sev == check.High && found[j].sev != check.High })
 	var ev []string
@@ -520,7 +557,7 @@ func evalAIAgents(found []aiFinding, files int) check.Result {
 	for _, f := range found {
 		ev = append(ev, f.String())
 		high = high || f.sev == check.High
-		if strings.HasSuffix(f.what, " in plain text") {
+		if f.token || strings.HasSuffix(f.what, " in plain text") {
 			tokens++
 		} else {
 			guards++
@@ -542,5 +579,5 @@ func evalAIAgents(found []aiFinding, files int) check.Result {
 	if high {
 		r.Status, r.Severity = check.Fail, check.High
 	}
-	return r
+	return u.finish(r, nil)
 }

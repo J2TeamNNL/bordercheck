@@ -151,35 +151,43 @@ func newSecretScanner(p policy.Secrets, home string) (*secretScanner, error) {
 	return s, nil
 }
 
-func secrets(p policy.Secrets) func(context.Context) check.Result {
+func secrets(p policy.Secrets, local Local) func(context.Context) check.Result {
 	return func(ctx context.Context) check.Result {
-		home, err := os.UserHomeDir()
+		home, found, bundles, incomplete, err := scanSecrets(ctx, p)
 		if err != nil {
 			return check.Errored(err)
 		}
-		s, err := newSecretScanner(p, home)
-		if err != nil {
-			return check.Errored(err)
-		}
-		ctx, cancel := context.WithTimeout(ctx, secretScanTimeout)
-		defer cancel()
-		files, bundles, incomplete := s.find(ctx, home)
-		var found []secretFinding
-		for _, f := range files {
-			if shown := tildePath(home, f); !s.ignored(shown) {
-				found = append(found, s.scanFile(f, shown)...)
-			}
-		}
-		found = append(found, s.scanLocations(home, runtime.GOOS, p.Locations)...)
-		found = append(found, s.scanGitRemotes(home, p.Locations)...)
-		var shownBundles []string
-		for _, b := range bundles {
-			if shown := tildePath(home, b); !s.ignored(shown) {
-				shownBundles = append(shownBundles, shown)
-			}
-		}
-		return evalSecrets(found, shownBundles, incomplete, secretFix())
+		u := newUserIgnore("secrets", local, p.UserIgnore, home)
+		return evalSecretsWith(found, bundles, incomplete, secretFix(), u)
 	}
+}
+
+// scanSecrets finds what the policy looks for: findings and certificate
+// bundles, by the path the report shows.
+func scanSecrets(ctx context.Context, p policy.Secrets) (home string, found []secretFinding, bundles []string, incomplete bool, err error) {
+	if home, err = os.UserHomeDir(); err != nil {
+		return "", nil, nil, false, err
+	}
+	s, err := newSecretScanner(p, home)
+	if err != nil {
+		return "", nil, nil, false, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, secretScanTimeout)
+	defer cancel()
+	files, bs, incomplete := s.find(ctx, home)
+	for _, f := range files {
+		if shown := tildePath(home, f); !s.ignored(shown) {
+			found = append(found, s.scanFile(f, shown)...)
+		}
+	}
+	found = append(found, s.scanLocations(home, runtime.GOOS, p.Locations)...)
+	found = append(found, s.scanGitRemotes(home, p.Locations)...)
+	for _, b := range bs {
+		if shown := tildePath(home, b); !s.ignored(shown) {
+			bundles = append(bundles, shown)
+		}
+	}
+	return home, found, bundles, incomplete, nil
 }
 
 func (s *secretScanner) ignored(shown string) bool {
@@ -359,13 +367,25 @@ func isPlaceholder(v string) bool {
 	return strings.Trim(l, l[:1]) == "" // one character repeated
 }
 
+// bundleKind is the kind a certificate bundle is matched and listed by.
+const bundleKind = "certificate bundle"
+
 func evalSecrets(found []secretFinding, bundles []string, incomplete bool, fix msg.Text) check.Result {
+	return evalSecretsWith(found, bundles, incomplete, fix, nil)
+}
+
+func evalSecretsWith(found []secretFinding, bundles []string, incomplete bool, fix msg.Text, u *userIgnore) check.Result {
+	// Findings marked production are for IT alone to set aside.
+	found = slices.DeleteFunc(slices.Clone(found), func(f secretFinding) bool {
+		return !f.prod && u.take(f.path, nonEmpty(f.name), f.kind, f.kind)
+	})
+	bundles = slices.DeleteFunc(slices.Clone(bundles), func(b string) bool { return u.take(b, nil, bundleKind, bundleKind) })
 	var note msg.Text
 	if incomplete {
 		note = msg.Of("secrets.incomplete")
 	}
 	if len(found)+len(bundles) == 0 {
-		return check.Result{Status: check.Pass}.WithSummary(append(msg.Of("secrets.pass"), note...))
+		return u.finish(check.Result{Status: check.Pass}.WithSummary(append(msg.Of("secrets.pass"), note...)), note)
 	}
 	sort.SliceStable(found, func(i, j int) bool { return found[i].high() && !found[j].high() })
 	files, prod, high := map[string]bool{}, 0, false
@@ -380,7 +400,7 @@ func evalSecrets(found []secretFinding, bundles []string, incomplete bool, fix m
 	}
 	for _, b := range bundles {
 		files[b] = true
-		ev = append(ev, b+"  certificate bundle (may hold a private key)")
+		ev = append(ev, b+"  "+bundleKind+" (may hold a private key)")
 	}
 	if len(ev) > secretMaxEvidence {
 		ev = append(ev[:secretMaxEvidence], fmt.Sprintf("… and %d more", len(ev)-secretMaxEvidence))
@@ -394,7 +414,7 @@ func evalSecrets(found []secretFinding, bundles []string, incomplete bool, fix m
 	if high {
 		r.Status, r.Severity = check.Fail, check.High
 	}
-	return r
+	return u.finish(r, nil)
 }
 
 func tildePath(home, p string) string {

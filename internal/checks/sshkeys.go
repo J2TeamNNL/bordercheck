@@ -49,15 +49,82 @@ type authorizedKey struct {
 	comment     string
 }
 
-func sshKeys(p policy.SSHKeys) func(context.Context) check.Result {
+func sshKeys(p policy.SSHKeys, local Local) func(context.Context) check.Result {
 	return func(ctx context.Context) check.Result {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return check.Errored(err)
 		}
 		keys, auth := gatherSSH(home, runtime.GOOS != "windows")
-		return sshClientConfigResult(evalSSHKeys(keys, auth, p), home, p) // client config: sshconfig.go
+		u := newUserIgnore("ssh-keys", local, p.UserIgnore, home)
+		r := sshClientConfigResult(evalSSHKeysWith(keys, auth, p, u), home, p) // client config: sshconfig.go
+		return u.finish(r, sshHardwareNote(keys, p))
 	}
+}
+
+// scanSSH is the ssh-keys check's scan, for bordercheck ignore.
+func scanSSH(p policy.SSHKeys) (home string, keys []sshKey, auth []authorizedKey, settings []sshSetting, err error) {
+	if home, err = os.UserHomeDir(); err != nil {
+		return "", nil, nil, nil, err
+	}
+	keys, auth = gatherSSH(home, runtime.GOOS != "windows")
+	if p.ClientConfig {
+		settings = readSSHClientConfig(home, filepath.Join(home, ".ssh", "config"))
+	}
+	return home, keys, auth, settings, nil
+}
+
+// sshNoPassphrase is the kind a key without a passphrase is matched and listed by.
+const sshNoPassphrase = "no passphrase"
+
+// sshItems lists the check's findings for bordercheck ignore. Only a key
+// whose one problem is that it has no passphrase can be ignored: loose
+// permissions are a one-line fix, who can log in here is IT's business, and
+// client settings are changed rather than ignored.
+func sshItems(keys []sshKey, auth []authorizedKey, settings []sshSetting, p policy.SSHKeys) []Item {
+	var out []Item
+	for _, k := range keys {
+		if sshKeyAllowed(k.path, p.AllowKeys) || k.hardware {
+			continue
+		}
+		noPass := p.NoPassphrase && !k.encrypted
+		open := p.LoosePermissions && k.mode&0o077 != 0
+		switch {
+		case noPass:
+			it := Item{Check: "ssh-keys", Path: k.path, Names: nonEmpty(k.keyType), Kind: sshNoPassphrase}
+			if open {
+				it.Blocked = BlockedPerms
+			}
+			out = append(out, it)
+		case open:
+			out = append(out, Item{Check: "ssh-keys", Path: k.path, Kind: "readable by other users", Blocked: BlockedPerms})
+		}
+	}
+	if p.AuthorizedKeys {
+		for _, a := range auth {
+			if !sshKeyAllowed(a.path, p.AllowKeys) {
+				out = append(out, Item{Check: "ssh-keys", Path: a.path, Names: nonEmpty(a.comment, a.fingerprint), Kind: "can log in here", Blocked: BlockedAuthorized})
+			}
+		}
+	}
+	for _, st := range settings {
+		out = append(out, Item{Check: "ssh-keys", Path: st.path, Names: nonEmpty(st.setting), Kind: st.setting, Blocked: BlockedSSHConfig})
+	}
+	return out
+}
+
+// sshHardwareNote counts the hardware-backed keys, as the summary does.
+func sshHardwareNote(keys []sshKey, p policy.SSHKeys) msg.Text {
+	hw := 0
+	for _, k := range keys {
+		if k.hardware && !sshKeyAllowed(k.path, p.AllowKeys) {
+			hw++
+		}
+	}
+	if hw == 0 {
+		return nil
+	}
+	return msg.Of("sshkeys.hardware", "n", hw)
 }
 
 // gatherSSH reads every private key file directly in ~/.ssh, the keys named
@@ -361,6 +428,13 @@ func sshKeyAllowed(path string, allow []string) bool {
 }
 
 func evalSSHKeys(keys []sshKey, auth []authorizedKey, p policy.SSHKeys) check.Result {
+	return evalSSHKeysWith(keys, auth, p, nil)
+}
+
+// evalSSHKeysWith is evalSSHKeys with the person's list: a key whose only
+// problem is a missing passphrase is left out when an entry covers it.
+// The caller finishes the result with u.finish.
+func evalSSHKeysWith(keys []sshKey, auth []authorizedKey, p policy.SSHKeys, u *userIgnore) check.Result {
 	var high, medium []string
 	plain, loose, authN, hw := 0, 0, 0, 0
 	for _, k := range keys {
@@ -377,6 +451,9 @@ func evalSSHKeys(keys []sshKey, auth []authorizedKey, p policy.SSHKeys) check.Re
 		}
 		noPass := p.NoPassphrase && !k.encrypted
 		open := p.LoosePermissions && k.mode&0o077 != 0
+		if noPass && !open && u.take(k.path, nonEmpty(k.keyType), sshNoPassphrase, sshNoPassphrase+" ("+desc+")") {
+			continue
+		}
 		switch {
 		case noPass && open:
 			high = append(high, fmt.Sprintf("%s  no passphrase and readable by other users (mode %04o, %s)", k.path, k.mode, desc))

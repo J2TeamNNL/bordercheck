@@ -151,6 +151,16 @@
   "firewall.win.off": "Windows Firewall is off for: {profiles}.",
   "firewall.win.off.fix": "Windows Security → Firewall & network protection → turn it on for every network. Or, as administrator: [code]Set-NetFirewallProfile -All -Enabled True[/code]",
   "firewall.win.on": "Windows Firewall is on for every profile.",
+  "ignore.all": {
+    "one": "The only finding is one you marked as not sensitive.",
+    "other": "The only findings are {n} you marked as not sensitive."
+  },
+  "ignore.more": {
+    "one": "1 more ignored by you.",
+    "other": "{n} more ignored by you."
+  },
+  "ignore.off": "This computer's policy does not allow ignoring findings of this check, so your list is not applied to it.",
+  "ignore.unreadable": "Your list of ignored findings could not be read, so nothing is ignored; run [code]bordercheck ignore -list[/code].",
   "listeners.exposed": {
     "one": "1 port can be reached from other machines (LAN, Wi-Fi, Tailscale).",
     "other": "{n} ports can be reached from other machines (LAN, Wi-Fi, Tailscale)."

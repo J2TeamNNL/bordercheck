@@ -98,14 +98,16 @@
         "pgpass": true,
         "mysql": true,
         "git_remotes": true
-      }
+      },
+      "user_ignore": true
     },
     "ssh-keys": {
       "no_passphrase": true,
       "loose_permissions": true,
       "authorized_keys": true,
       "allow_keys": [],
-      "client_config": true
+      "client_config": true,
+      "user_ignore": true
     },
     "tunnels": {
       "processes": true,
@@ -145,7 +147,8 @@
       "tokens": true,
       "guardrails": true,
       "extra_paths": [],
-      "ignore_paths": []
+      "ignore_paths": [],
+      "user_ignore": true
     },
     "cracked-software": {
       "suggest_alternatives": true

@@ -41,6 +41,14 @@ const usage = `Usage:
   bordercheck send [-force]                          what the service runs; -force sends a report now
   bordercheck update                                 refresh the policy and install a newer signed release now
   bordercheck uninstall
+  bordercheck ignore [-check ID] <path> [-name NAME] -reason "why"
+                                                     mark a finding of secrets, ai-agents (tokens) or ssh-keys
+                                                     (no passphrase) as not sensitive: it no longer counts here,
+                                                     and every report lists it with the reason
+  bordercheck ignore -list                           what is ignored, and entries that no longer match anything
+  bordercheck unignore [-check ID] <path> [-name NAME]
+                                                     make it count again
+  bordercheck fix                                    what to fix, with rules for an AI coding assistant
   bordercheck verify SHA256SUMS SHA256SUMS.sig [file...]
                                                      check downloaded release files against the signed checksums
   bordercheck -list | -print-policy | -version
@@ -64,6 +72,15 @@ Everyday
   bordercheck update             get the newest policy and the newest version now
   bordercheck notifications      macOS: let bordercheck show notifications under its own name
   bordercheck uninstall          remove bordercheck from this computer (stops the reports too)
+
+Secrets that are not sensitive
+  bordercheck ignore ~/proj/.env -reason "local test database"
+                                 stop counting what was found in that file (add -name VAR for one only);
+                                 works for plain-text secrets, tokens in AI agent configs and SSH keys
+                                 without a passphrase; IT still sees each one, with your reason, in every report
+  bordercheck ignore -list       what you ignored, and what no longer matches anything
+  bordercheck unignore ~/proj/.env
+                                 count it again
 
 Looking closer
   bordercheck -only firewall,secrets    run only these checks
@@ -100,6 +117,8 @@ func run(args []string) int {
 			return runAgent(args[0], args[1:])
 		case "fix":
 			return runFix(args[1:])
+		case "ignore", "unignore":
+			return runIgnoreCommand(args[0], args[1:])
 		case "verify":
 			return runVerify(args[1:])
 		}
@@ -138,7 +157,7 @@ func runCheck(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	all := checks.All(pol)
+	all := checks.AllWith(pol, localSettings())
 	switch {
 	case *printPolicy:
 		if err := pol.WriteJSON(os.Stdout); err != nil {
@@ -218,7 +237,7 @@ func runFix(args []string) int {
 	if isTerminal(os.Stderr) {
 		progress = report.Progress(os.Stderr)
 	}
-	rep := report.New(version, pol.Name, pol.Waive(check.RunAllProgress(ctx, checks.All(pol), progress), waiverIdentity(), time.Now()))
+	rep := report.New(version, pol.Name, pol.Waive(check.RunAllProgress(ctx, checks.AllWith(pol, localSettings()), progress), waiverIdentity(), time.Now()))
 	exe, err := os.Executable()
 	if err != nil {
 		exe = "bordercheck"
@@ -258,6 +277,17 @@ func waiverIdentity() policy.Identity {
 		return policy.Identity{Hostname: host}
 	}
 	return agent.Identity(dir)
+}
+
+// localSettings is what the person at this computer has set in the install
+// folder (the findings they ignored), read whether or not bordercheck is
+// installed, so a plain run shows what the service reports.
+func localSettings() checks.Local {
+	dir, err := agent.Dir()
+	if err != nil {
+		return checks.Local{}
+	}
+	return agent.Local(dir)
 }
 
 func runAgent(cmd string, args []string) int {

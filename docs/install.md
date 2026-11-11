@@ -149,6 +149,7 @@ a line in the user's crontab instead; `bordercheck status` says which.
 bordercheck status               # email, enrollment, policy, what is sent, service, last report, report page, updates
 bordercheck send -force          # send a report now
 bordercheck fix                  # what to fix and how, as instructions an AI coding assistant can follow with you
+bordercheck ignore <path> -reason "why"   # a secret, AI config token or SSH key that is not sensitive: stops counting, IT still sees it
 bordercheck update               # refresh the policy and install a newer release now
 bordercheck uninstall
 ```
@@ -358,6 +359,11 @@ The report is the same JSON as `bordercheck -json`, plus `email` and `install_id
   `secrets.show_tail`). Passwords show nothing.
 - Evidence (file paths, variable names, ports) leaves the machine only when the policy sets
   `report.include_evidence`.
+- What the person marked as not sensitive with `bordercheck ignore` is always sent, in the `user_ignored` of
+  the `secrets`, `ai-agents` or `ssh-keys` result: `[{"path": "~/proj/.env", "name": "POSTGRES_PASSWORD", "kind": "Secret-looking
+  variable", "reason": "local Docker database", "since": "2026-11-11"}]`, at most 200, never a value or its last
+  characters. It is the record of what was set aside, so it does not depend on `report.include_evidence`.
+  `bordercheck status` says so. Receivers that do not know the field ignore it.
 - The machine's IP addresses leave it only when the policy sets `report.include_ips`. Whatever the policy says,
   the receiver sees the public IP address the report arrives from, as every web server does, and may store it or
   look up a rough location from it.
@@ -384,3 +390,39 @@ touchenv run OPENAI_API_KEY -- python report.py
 
 On Windows, use Credential Manager or a password manager CLI such as 1Password's `op run`. Rotate any key that
 sat in shell history or a synced folder.
+
+### Secrets that are not sensitive
+
+A value that only looks like a secret (a password for a database in a local container, a test key, a token for a
+local MCP server, an SSH key used for one harmless thing) can be set aside by the person at the machine, with a
+reason. Three checks take it:
+
+| Check | What can be ignored | What cannot |
+|---|---|---|
+| `secrets` | any finding, by file, or by variable name or kind | findings marked `[production]` |
+| `ai-agents` | plain-text tokens, by config file, or by the setting the evidence shows (`mcpServers.x.headers.Authorization`) or the header / variable name | guardrails (approvals skipped, sandbox off); tokens marked production |
+| `ssh-keys` | a key without a passphrase (`~/.ssh/aur`) | a key other users can read (`chmod 600` fixes it), `authorized_keys` (who can log in is IT's business), client settings such as `ForwardAgent` |
+
+```sh
+bordercheck ignore ~/proj/.env -reason "local Docker database, not reachable from outside"   # every finding in that file
+bordercheck ignore ~/proj/.env -name POSTGRES_PASSWORD -reason "local Docker database"        # only that variable (or kind)
+bordercheck ignore ~/.claude.json -name Authorization -reason "local MCP server, no secret behind it"
+bordercheck ignore ~/.ssh/aur -reason "AUR upload key, used for nothing else"
+bordercheck ignore -list                       # what is ignored, per check; entries that match nothing any more are marked stale
+bordercheck unignore ~/proj/.env [-name POSTGRES_PASSWORD] [-check secrets]
+```
+
+The path is the one the report shows (`~/…` or absolute); `-name` is the name or the kind shown in the evidence.
+Lines are never part of an entry, since they move when the file is edited. `-check secrets|ai-agents|ssh-keys`
+says which check; without it bordercheck finds the one with a finding in that file, and asks for `-check` when
+two do (an AI config with a token can be found by both `secrets` and `ai-agents`). bordercheck runs those checks
+first and refuses a path or name that matches nothing (it lists what it finds in that file, by name), what cannot
+be ignored (and says what to do instead), an empty reason, and a check whose policy sets `user_ignore` to `false`.
+
+Ignored findings no longer count toward their check's status, severity or counts (the summary says how many were
+ignored; if nothing else is left, the check passes). They are not hidden from IT: every report lists each one
+under its check with its path, name, kind, reason and date, also when `report.include_evidence` is off (see
+[What is sent](#what-is-sent)). The list is `ignored.json` in the install folder (one file for the three checks,
+each entry naming its check), readable by this user only; a plain `bordercheck` run reads it too, installed or
+not, and `bordercheck uninstall` removes it. An entry that no longer matches anything is kept (the finding may
+come back) until `unignore` removes it. A list that cannot be read counts as empty, and the checks say so.
