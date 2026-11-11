@@ -117,28 +117,39 @@ func TestChromiumPasswordFactsCounted(t *testing.T) {
 	}
 }
 
-// Fewer than low_below saved logins in every profile is a low warning.
-func TestBrowserPasswordsFewAreLow(t *testing.T) {
+// Fewer than pass_below per profile is no finding; up to medium_above is low; more is medium.
+func TestBrowserPasswordsByCount(t *testing.T) {
 	def := policy.Default().Checks.BrowserPasswords
-	few := pwProfile{ID: "chrome", Name: "Chrome", Label: "Chrome (Default)", Saving: true, Stored: true, Logins: 3, Details: "3"}
-	five := pwProfile{ID: "chrome", Name: "Chrome", Label: "Chrome (Profile 2)", Saving: true, Stored: true, Logins: 5, Details: "5"}
-	many := pwProfile{ID: "edge", Name: "Edge", Label: "Edge (Default)", Stored: true, Logins: 10, Details: "10"}
-	unknown := pwProfile{ID: "brave", Name: "Brave", Label: "Brave (Default)", Stored: true, Details: "by size"}
-
-	r := evalBrowserPasswords([]pwProfile{few, five}, def)
-	if r.Status != check.Warn || r.Severity != check.Low || !strings.Contains(r.Summary, "fewer than 10") || r.Fix == "" {
-		t.Errorf("3 and 5: %s %s %q", r.Status, r.Severity, r.Summary)
+	prof := func(id, name string, n int) pwProfile {
+		return pwProfile{ID: id, Name: name, Label: name + " (Default)", Saving: true, Stored: true, Logins: n, Details: "x"}
 	}
-	// Ten in one profile, or a profile that could not be counted, keeps it medium.
-	for name, ps := range map[string][]pwProfile{"ten": {few, many}, "uncounted": {few, unknown}} {
-		if r := evalBrowserPasswords(ps, def); r.Severity != check.Medium || strings.Contains(r.Summary, "fewer than") {
-			t.Errorf("%s: %s %q", name, r.Severity, r.Summary)
+	unknown := pwProfile{ID: "brave", Name: "Brave", Label: "Brave (Default)", Stored: true, Details: "by size"}
+	for _, tc := range []struct {
+		name string
+		ps   []pwProfile
+		st   check.Status
+		sev  check.Severity
+		has  string
+	}{
+		{"3 and 9", []pwProfile{prof("chrome", "Chrome", 3), prof("edge", "Edge", 9)}, check.Pass, "", "Chrome, Edge holds fewer than 10"},
+		{"10", []pwProfile{prof("chrome", "Chrome", 10)}, check.Warn, check.Low, "No profile holds more than 20"},
+		{"20 and 3", []pwProfile{prof("chrome", "Chrome", 20), prof("edge", "Edge", 3)}, check.Warn, check.Low, "Edge holds fewer than 10"},
+		{"21", []pwProfile{prof("chrome", "Chrome", 21)}, check.Warn, check.Medium, "Passwords are saved in Chrome."},
+		{"12 and uncounted", []pwProfile{prof("chrome", "Chrome", 12), unknown}, check.Warn, check.Medium, "Chrome, Brave"},
+	} {
+		r := evalBrowserPasswords(tc.ps, def)
+		if r.Status != tc.st || r.Severity != tc.sev || !strings.Contains(r.Summary, tc.has) {
+			t.Errorf("%s: %s %s %q", tc.name, r.Status, r.Severity, r.Summary)
+		}
+		// A pass has no fix, but still lists what it found.
+		if tc.st == check.Pass && (r.Fix != "" || len(r.Evidence) != 2) {
+			t.Errorf("%s: a pass with fix %q and evidence %q", tc.name, r.Fix, r.Evidence)
 		}
 	}
-	// low_below 0 turns the rule off.
-	off := def
-	off.LowBelow = 0
-	if r := evalBrowserPasswords([]pwProfile{few}, off); r.Severity != check.Medium {
-		t.Errorf("low_below 0: %s", r.Severity)
+	// pass_below 0: any saved login counts; medium_above 0: no low tier.
+	strict := def
+	strict.PassBelow, strict.MediumAbove = 0, 0
+	if r := evalBrowserPasswords([]pwProfile{prof("chrome", "Chrome", 1)}, strict); r.Status != check.Warn || r.Severity != check.Medium {
+		t.Errorf("strict: %s %s", r.Status, r.Severity)
 	}
 }

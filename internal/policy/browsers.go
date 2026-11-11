@@ -35,10 +35,13 @@ type BrowserPasswords struct {
 	// AllowBrowsers are browsers (BrowserIDs) whose password manager the
 	// organisation uses on purpose.
 	AllowBrowsers []string `json:"allow_browsers"`
-	// LowBelow makes the warning low instead of medium when every profile with
-	// saved logins holds fewer than this many (they are probably not the
-	// person's main passwords). 0 = always medium.
-	LowBelow int `json:"low_below"`
+	// A profile with fewer saved logins than PassBelow is not a finding (a
+	// handful are rarely someone's main passwords); up to MediumAbove in every
+	// profile is a low warning; more than that, or a number that could not be
+	// counted, is medium. PassBelow 0 = any saved login counts; MediumAbove 0 =
+	// no low tier.
+	PassBelow   int `json:"pass_below"`
+	MediumAbove int `json:"medium_above"`
 }
 
 // TrustStore judges added root certificates and the system proxy.
@@ -56,8 +59,10 @@ type TrustStore struct {
 }
 
 func (c Checks) validateBrowserChecks() error {
-	if n := c.BrowserPasswords.LowBelow; n < 0 || n > 100000 {
-		return fmt.Errorf("checks.browser-passwords.low_below: %d is not between 0 and 100000", n)
+	for field, n := range map[string]int{"pass_below": c.BrowserPasswords.PassBelow, "medium_above": c.BrowserPasswords.MediumAbove} {
+		if n < 0 || n > 100000 {
+			return fmt.Errorf("checks.browser-passwords.%s: %d is not between 0 and 100000", field, n)
+		}
 	}
 	for field, list := range map[string][]string{
 		"extensions.block": c.Extensions.Block, "extensions.allow": c.Extensions.Allow,

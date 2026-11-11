@@ -185,7 +185,8 @@
     },
     "browser-passwords": {
       "allow_browsers": [],
-      "low_below": 10
+      "pass_below": 10,
+      "medium_above": 20
     },
     "trust-store": {
       "cas": true,

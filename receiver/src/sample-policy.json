@@ -64,7 +64,7 @@
     "os-protections": { "sip": true, "gatekeeper": true, "antivirus": true, "smartscreen": true, "secure_boot": true, "lsm": true },
     "sharing": { "allow": [] },
     "extensions": { "browsers": true, "editors": true, "block": [], "allow": [], "warn_all_sites": false },
-    "browser-passwords": { "allow_browsers": [], "low_below": 10 },
+    "browser-passwords": { "allow_browsers": [], "pass_below": 10, "medium_above": 20 },
     "trust-store": { "cas": true, "proxies": true, "allow_cas": [], "allow_proxies": [], "ca_severity": "medium" },
     "package-managers": { "require_ignore_scripts": true, "require_release_age": false, "allow_hosts": [] },
     "startup-items": { "allow": [], "extra_suspicious_paths": [] },

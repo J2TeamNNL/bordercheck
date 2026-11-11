@@ -398,7 +398,8 @@ export const checksVi: CheckCatalog = {
     "Trình duyệt không lưu mật khẩu nào, nhưng {browsers} vẫn đề nghị lưu mật khẩu: nên tắt tính năng này.",
   "passwords.stored":
     "Có mật khẩu được lưu trong {browsers}. Mã độc đánh cắp thông tin lấy mật khẩu đã lưu trong trình duyệt trước tiên.",
-  "passwords.few": "Mỗi profile lưu ít hơn {n} mật khẩu, nên nhiều khả năng đây không phải các mật khẩu chính của bạn.",
+  "passwords.few": "Không profile nào lưu quá {n} mật khẩu, nên nhiều khả năng đây không phải các mật khẩu chính của bạn.",
+  "passwords.fewPass": "{browsers} lưu ít hơn {n} mật khẩu ở mỗi profile: nhiều khả năng không phải mật khẩu chính của bạn, nên không tính.",
   "passwords.allowed": "Được chính sách cho phép: {browsers}.",
   "passwords.fix":
     "Chuyển các mật khẩu này sang một trình quản lý mật khẩu (phần cài đặt mật khẩu của trình duyệt có thể xuất chúng ra), xoá chúng khỏi trình duyệt, rồi tắt tính năng lưu mật khẩu.",

@@ -54,7 +54,8 @@ func evalBrowserPasswordsOn(goos string, ps []pwProfile, opts policy.BrowserPass
 		return check.SkippedMsg(msg.Of("passwords.notFound"))
 	}
 	var stored, saving, allowed []string
-	few := true // every profile with saved logins holds fewer than opts.LowBelow
+	var fewNames []string // browsers whose profiles hold fewer than opts.PassBelow: not a finding
+	medium := false       // some profile holds more than opts.MediumAbove, or an unknown number
 	var storedIDs []string
 	var ev []string
 	add := func(list []string, name string) []string {
@@ -69,9 +70,12 @@ func evalBrowserPasswordsOn(goos string, ps []pwProfile, opts policy.BrowserPass
 			continue
 		}
 		switch {
+		case p.Stored && p.Logins > 0 && p.Logins < opts.PassBelow:
+			// A handful of saved logins are rarely someone's main passwords.
+			fewNames = add(fewNames, p.Name)
 		case p.Stored:
-			if opts.LowBelow <= 0 || p.Logins <= 0 || p.Logins >= opts.LowBelow {
-				few = false
+			if p.Logins <= 0 || opts.MediumAbove <= 0 || p.Logins > opts.MediumAbove {
+				medium = true
 			}
 			stored = add(stored, p.Name)
 			storedIDs = add(storedIDs, p.ID)
@@ -86,10 +90,16 @@ func evalBrowserPasswordsOn(goos string, ps []pwProfile, opts policy.BrowserPass
 	if len(allowed) > 0 {
 		note = msg.Of("passwords.allowed", "browsers", strings.Join(allowed, ", "))
 	}
+	if len(fewNames) > 0 {
+		note = append(msg.Of("passwords.fewPass", "browsers", strings.Join(fewNames, ", "), "n", opts.PassBelow), note...)
+	}
 	if len(stored) == 0 {
 		summary := msg.Of("passwords.pass")
-		if len(saving) > 0 {
+		switch {
+		case len(saving) > 0:
 			summary = msg.Of("passwords.passSavingOn", "browsers", strings.Join(saving, ", "))
+		case len(fewNames) > 0:
+			summary = nil // the note says what is there
 		}
 		return check.Result{Status: check.Pass, Evidence: ev}.WithSummary(append(summary, note...))
 	}
@@ -108,11 +118,11 @@ func evalBrowserPasswordsOn(goos string, ps []pwProfile, opts policy.BrowserPass
 	if other {
 		fix = append(fix, msg.P("passwords.fix.other"))
 	}
-	// A handful of saved logins per profile are rarely someone's main passwords.
-	if few {
+	// Up to medium_above per profile is a low warning.
+	if !medium {
 		return check.Result{Status: check.Warn, Severity: check.Low, Evidence: ev}.
 			WithSummary(slices.Concat(msg.Of("passwords.stored", "browsers", strings.Join(stored, ", ")),
-				msg.Of("passwords.few", "n", opts.LowBelow), note)).
+				msg.Of("passwords.few", "n", opts.MediumAbove), note)).
 			WithFix(fix)
 	}
 	return check.Result{Status: check.Warn, Severity: check.Medium, Evidence: ev}.

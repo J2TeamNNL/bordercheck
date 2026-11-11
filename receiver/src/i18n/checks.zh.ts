@@ -386,7 +386,8 @@ export const checksZh: CheckCatalog = {
   "passwords.pass": "浏览器中没有保存密码，也不会提示保存密码。",
   "passwords.passSavingOn": "浏览器中没有保存密码，但 {browsers} 仍会提示保存密码：建议关闭此功能。",
   "passwords.stored": "{browsers} 中保存了密码。信息窃取类恶意软件会首先窃取浏览器中保存的密码。",
-  "passwords.few": "每个个人资料保存的密码都少于 {n} 个，因此这些很可能不是你的主要密码。",
+  "passwords.few": "没有哪个个人资料保存的密码超过 {n} 个，因此这些很可能不是你的主要密码。",
+  "passwords.fewPass": "{browsers} 的每个个人资料保存的密码都少于 {n} 个：很可能不是你的主要密码，因此不计入。",
   "passwords.allowed": "策略允许：{browsers}。",
   "passwords.fix": "将这些密码迁移到密码管理器（浏览器的密码设置可以导出密码），从浏览器中删除它们，并关闭密码保存功能。",
   "passwords.fix.mac":
