@@ -5,6 +5,7 @@ import { type Geo, mapLink, parseGeo, place } from "./geo";
 import { checkTitle, type I18n, type Key } from "./i18n";
 import { enrollmentOf, enrollmentSection } from "./portal";
 import { type DeviceLocation, parseReport, type Result, statusRank } from "./report";
+import { likelySamplesList } from "./samples";
 
 export interface MachineRow {
   install_id: string;
@@ -330,7 +331,8 @@ ${waiverNote(L, r, now)}
 ${r.summary ? html`<div class="body">${summaryHtml(L, r)}</div>` : ""}
 ${r.evidence.length ? html`<ul class="evidence">${r.evidence.map((e) => html`<li class="ev">${e}</li>`)}</ul>` : ""}
 ${r.fix ? html`<div class="fix"><b>${L.t("machine.fix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}
-${userIgnoredList(L, r)}</div>`;
+${userIgnoredList(L, r)}
+${likelySamplesList(L, r.likely_samples)}</div>`;
 }
 
 // userIgnoredList shows what the person at the machine marked as not
@@ -438,7 +440,7 @@ ${problems.map((r) => resultCard(L, r, since.get(r.id), now))}
 <h2>${L.t("machine.fine", { n: fine.length })}</h2>
 ${fine.length
     ? html`<div class="compact">${fine.map(
-        (r) => html`<div>${badge(L, r.status)}<div><div class="t">${checkTitle(L, r.id, r.title)}</div><div class="sub"><code>${r.id}</code>${r.summary ? html` · ${summaryHtml(L, r)}` : ""}</div>${userIgnoredList(L, r)}</div></div>`,
+        (r) => html`<div>${badge(L, r.status)}<div><div class="t">${checkTitle(L, r.id, r.title)}</div><div class="sub"><code>${r.id}</code>${r.summary ? html` · ${summaryHtml(L, r)}` : ""}</div>${userIgnoredList(L, r)}${likelySamplesList(L, r.likely_samples)}</div></div>`,
       )}</div>`
     : html`<div class="panel"><p class="muted">${L.t("common.none")}</p></div>`}
 <h2>${L.t("machine.details")}</h2>

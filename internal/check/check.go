@@ -58,6 +58,9 @@ type Result struct {
 	// Unlike Evidence it is always sent, so IT can see what was set aside.
 	// Never holds a value.
 	UserIgnored []Ignored `json:"user_ignored,omitempty"`
+	// LikelySamples lists findings set aside as sample keys (see samples.go).
+	// Always sent, like UserIgnored; never holds a value.
+	LikelySamples []LikelySample `json:"likely_samples,omitempty"`
 	// Compromise lists signs that hostile code is, or very probably is,
 	// already on this computer, as opposed to a door merely being open. Only
 	// a few findings set it, where the finding is made (see Indicator); a

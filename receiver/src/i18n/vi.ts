@@ -456,4 +456,11 @@ export const vi: Catalog = {
   "rep.compTitle": "Dừng lại: máy tính này có thể đã bị xâm nhập",
   "rep.compLead":
     "bordercheck tìm thấy dấu hiệu phần mềm độc hại đã có trên máy tính này ({checks}). Hãy ngừng dùng máy cho công việc và liên hệ bộ phận IT ngay. Đừng tự xoá hay gỡ cài đặt gì: IT cần xem nguyên trạng. Sau khi IT đã kiểm tra, hãy đổi các mật khẩu bạn đã dùng trên máy này.",
+  "machine.likelySamples": "Có vẻ là khoá mẫu ({n})",
+  "machine.likelySamplesNote": "Được để riêng ngay trên máy vì trông giống khoá mẫu chứ không phải khoá thật: các mục này không được tính vào mục kiểm tra này. Một khoá thật đã commit vào repository cũng được tính là không đổi trong git, nên hãy xem qua danh sách.",
+  "machine.likelySamplesShow": "Xem cả {n} mục",
+  "machine.sampleRuleGit": "không đổi trong git",
+  "machine.sampleRuleSdk": "đi kèm một SDK",
+  "machine.sampleRuleDir": "trong thư mục demo hoặc ví dụ",
+  "rep.likelySamples": "[b]{n}[/b] mục có vẻ là khoá mẫu",
 };

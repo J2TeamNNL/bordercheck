@@ -454,4 +454,11 @@ export const zh: Catalog = {
   "rep.compTitle": "请停止使用：这台电脑可能已被入侵",
   "rep.compLead":
     "bordercheck 发现有害软件可能已在这台电脑上（{checks}）。请停止用它办公，并立即联系你的 IT 团队。不要自行删除或卸载任何东西：IT 需要看到原样。IT 检查过之后，请更改你在这台电脑上用过的密码。",
+  "machine.likelySamples": "看起来是示例密钥（{n}）",
+  "machine.likelySamplesNote": "在这台机器上因看起来是示例而非真实密钥而被搁置：这些项不计入本项检查。提交到仓库中的真实密钥也会被算作 git 中未改动，因此请浏览一下列表。",
+  "machine.likelySamplesShow": "显示全部 {n} 项",
+  "machine.sampleRuleGit": "git 中未改动",
+  "machine.sampleRuleSdk": "随 SDK 提供",
+  "machine.sampleRuleDir": "在演示或示例文件夹中",
+  "rep.likelySamples": "[b]{n}[/b] 项看起来是示例密钥",
 };

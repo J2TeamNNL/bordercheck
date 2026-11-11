@@ -38,6 +38,7 @@ import {
 } from "./portal";
 import { type DeviceLocation, parseReport, statusRank } from "./report";
 import { POLICY_CHECKS } from "./roles";
+import { countLikelySamples, SAMPLE_RULES } from "./samples";
 
 export const KNOWN_STATUSES = ["fail", "error", "warn", "waived", "pass", "skip"];
 const KNOWN_SEVERITIES = ["high", "medium", "low", "info"];
@@ -384,6 +385,26 @@ export async function machineDetail(env: Env, id: string, o: { evidence?: boolea
           kind: clean(i.kind, 64),
           reason: clean(i.reason, 200),
           since: clean(i.since, 32),
+        },
+      }));
+    });
+  }
+  // Likely sample keys (checks.secrets.sample_rules): the same, count always,
+  // the items with evidence.
+  const samples = results.filter((r) => r.likely_samples?.length);
+  out.likely_samples_count = countLikelySamples(samples);
+  if (o.evidence && samples.length) {
+    out.likely_samples = samples.flatMap((r) => {
+      const ref = checkRef(r.id);
+      return (r.likely_samples ?? []).slice(0, 50).map((i) => ({
+        check_id: ref.check_id,
+        rule: SAMPLE_RULES.includes(i.rule) ? i.rule : "other",
+        untrusted: {
+          ...(ref.untrusted ?? {}),
+          path: clean(i.path, 200),
+          name: clean(i.name, 100),
+          kind: clean(i.kind, 64),
+          ...(SAMPLE_RULES.includes(i.rule) ? {} : { rule: clean(i.rule, 32) }),
         },
       }));
     });

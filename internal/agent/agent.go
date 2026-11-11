@@ -610,7 +610,7 @@ func Status(env Env) (string, error) {
 	if refreshedFrom != "" {
 		fmt.Fprintf(&b, " (refreshed from %s)", refreshedFrom)
 	}
-	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results, and anything you ignored with your reason; %s\nService:    %s\n",
+	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results, anything you ignored with your reason, and files set aside as likely sample keys; %s\nService:    %s\n",
 		pol.Report.CheckEvery(), pol.Report.Interval, hostOf(pol.Report.URL), sends(pol.Report), services.status())
 	if pol.Report.CompromiseAlert {
 		fmt.Fprintf(&b, "Compromise: looked for every hour, and reported as soon as a sign is found (the other checks run every %s)\n", pol.Report.CheckEvery())

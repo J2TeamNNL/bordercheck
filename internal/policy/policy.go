@@ -186,6 +186,9 @@ type Secrets struct {
 	// UserIgnore lets the person at the machine mark findings as not sensitive
 	// with `bordercheck ignore`; they are still listed in every report.
 	UserIgnore bool `json:"user_ignore"`
+	// SampleRules are the rules that set a finding aside as a likely sample
+	// key (see SampleRuleNames); [] turns that off.
+	SampleRules []string `json:"sample_rules"`
 }
 
 // SecretLocations switches each well-known credential store on or off.
@@ -371,7 +374,8 @@ func Default() Policy {
 				WalkDepth:          5,
 				Locations: SecretLocations{Docker: true, Kube: true, Netrc: true, GitCredentials: true, GCloud: true,
 					Azure: true, PyPI: true, GitHubCLI: true, Terraform: true, PgPass: true, MySQL: true, GitRemotes: true},
-				UserIgnore: true,
+				UserIgnore:  true,
+				SampleRules: slices.Clone(SampleRuleNames),
 			},
 			OSUpdates: OSUpdates{
 				MinOSVersions:     map[string]string{"macos": "15", "windows": "26100", "ubuntu": "22.04", "debian": "12", "fedora": "43"},
@@ -546,6 +550,9 @@ func (p Policy) validate() error {
 		if _, err := regexp.Compile(sp.Regex); err != nil {
 			return fmt.Errorf("checks.secrets.extra_patterns %q: %w", sp.Kind, err)
 		}
+	}
+	if err := validateSampleRules(s.SampleRules); err != nil {
+		return err
 	}
 	if err := c.OSUpdates.validate(); err != nil {
 		return err

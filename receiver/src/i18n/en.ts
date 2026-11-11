@@ -483,6 +483,14 @@ export const en = {
   "rep.compTitle": "Stop: this computer may be compromised",
   "rep.compLead":
     "bordercheck found signs that harmful software is already on this computer ({checks}). Stop using it for work and contact your IT team now. Do not delete or uninstall anything yourself: IT needs to see it as it is. After IT has looked at it, change the passwords you used on this computer.",
+  // Likely sample keys (checks.secrets.sample_rules)
+  "machine.likelySamples": "Look like sample keys ({n})",
+  "machine.likelySamplesNote": "Set aside at the machine because they look like samples, not real keys: they do not count toward this check. A real key committed to a repository also counts as unchanged in git, so skim the list.",
+  "machine.likelySamplesShow": "Show all {n}",
+  "machine.sampleRuleGit": "unchanged in git",
+  "machine.sampleRuleSdk": "shipped with an SDK",
+  "machine.sampleRuleDir": "in a demo or example folder",
+  "rep.likelySamples": "[b]{n}[/b] look like sample keys",
 } satisfies Record<string, Entry>;
 
 export type Key = keyof typeof en;

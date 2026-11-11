@@ -600,4 +600,9 @@ var Catalog = map[string]Entry{
 	"backup.fix.mac.findMy": s("System Settings → your name (Apple Account) → iCloud → Find My Mac → turn it on."),
 	"backup.fix.win.findMy": s("Settings → Privacy & security → Find my device → turn it on (it needs a Microsoft " +
 		"account and location services)."),
+
+	// ---- secrets: likely sample keys (checks.secrets.sample_rules) ----
+	"samples.more": pl("1 more looks like a sample key.", "{n} more look like sample keys."),
+	"samples.all": pl("The only finding looks like a sample key, not a real one.",
+		"The only findings are {n} that look like sample keys, not real ones."),
 }

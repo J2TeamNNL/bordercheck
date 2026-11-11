@@ -4,6 +4,9 @@
 // kept in the stored raw report); unknown statuses are kept as they are.
 
 import { parseParts, type Part } from "./checktext";
+import { type LikelySample, parseLikelySamples } from "./samples";
+
+export type { LikelySample };
 
 export interface Waiver {
   until: string;
@@ -23,6 +26,9 @@ export interface Result {
   // ignore): they do not count toward the status, and the client sends them
   // even without evidence. Absent from older clients.
   user_ignored?: UserIgnored[];
+  // Findings the client set aside as likely sample keys (samples.ts); always
+  // sent, absent from older clients.
+  likely_samples?: LikelySample[];
   // summary and fix as message keys, for showing them translated (checktext.ts).
   summary_parts?: Part[];
   fix_parts?: Part[];
@@ -222,6 +228,8 @@ export function parseReport(raw: unknown): Report {
     if (ui?.length) res.user_ignored = ui;
     const ci = parseIndicators(o.compromise);
     if (ci?.length && status === "fail") res.compromise = ci;
+    const ls = parseLikelySamples(o.likely_samples);
+    if (ls?.length) res.likely_samples = ls;
     const w = obj(o.waived);
     if (o.waived !== undefined && (w.until !== undefined || w.reason !== undefined)) {
       res.waived = { until: str(w.until, 32), reason: str(w.reason, 500) };

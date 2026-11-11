@@ -257,6 +257,14 @@
   "remote.note.noSystemd": "Could not read systemd unit states; judged from open ports only.",
   "remote.off": "Off: {services}.",
   "remote.on": "{service} is on.",
+  "samples.all": {
+    "one": "The only finding looks like a sample key, not a real one.",
+    "other": "The only findings are {n} that look like sample keys, not real ones."
+  },
+  "samples.more": {
+    "one": "1 more looks like a sample key.",
+    "other": "{n} more look like sample keys."
+  },
   "screenlock.fix.gnome.idle": "Settings → Power → Screen Blank → the policy's limit or less, and Settings → Privacy & Security → Screen Lock → Automatic Screen Lock on.",
   "screenlock.fix.gnome.password": "Settings → Privacy & Security → Screen Lock → turn on Automatic Screen Lock and Lock Screen on Suspend, Automatic Screen Lock Delay → Screen Turns Off.",
   "screenlock.fix.kde.idle": "System Settings → Screen Locking → \"Lock screen automatically\" after the policy's limit or less.",

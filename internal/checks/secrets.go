@@ -158,7 +158,8 @@ func secrets(p policy.Secrets, local Local) func(context.Context) check.Result {
 			return check.Errored(err)
 		}
 		u := newUserIgnore("secrets", local, p.UserIgnore, home)
-		return evalSecretsWith(found, bundles, incomplete, secretFix(), u)
+		sc := newSampleClassifier(ctx, p, home)
+		return evalSecretsSamples(found, bundles, incomplete, secretFix(), u, sc)
 	}
 }
 
@@ -375,18 +376,30 @@ func evalSecrets(found []secretFinding, bundles []string, incomplete bool, fix m
 }
 
 func evalSecretsWith(found []secretFinding, bundles []string, incomplete bool, fix msg.Text, u *userIgnore) check.Result {
+	return evalSecretsSamples(found, bundles, incomplete, fix, u, nil)
+}
+
+// evalSecretsSamples sets aside what the person ignored, then likely samples
+// (sc; nil = none), and judges the rest.
+func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool, fix msg.Text, u *userIgnore, sc *sampleClassifier) check.Result {
 	// Findings marked production are for IT alone to set aside.
 	found = slices.DeleteFunc(slices.Clone(found), func(f secretFinding) bool {
 		return !f.prod && u.take(f.path, nonEmpty(f.name), f.kind, f.kind)
 	})
 	bundles = slices.DeleteFunc(slices.Clone(bundles), func(b string) bool { return u.take(b, nil, bundleKind, bundleKind) })
+	found, bundles = sc.setAside(found, bundles)
 	var note msg.Text
 	if incomplete {
 		note = msg.Of("secrets.incomplete")
 	}
 	if len(found)+len(bundles) == 0 {
-		return u.finish(check.Result{Status: check.Pass}.WithSummary(append(msg.Of("secrets.pass"), note...)), note)
+		head, keep := msg.Of("secrets.pass"), note
+		if sn := sc.note(); sn != nil {
+			head, keep = msg.Of("samples.all", "n", len(sc.found)), append(sn, note...)
+		}
+		return sc.finish(u.finish(check.Result{Status: check.Pass}.WithSummary(append(head, note...)), keep))
 	}
+	note = append(sc.note(), note...)
 	sort.SliceStable(found, func(i, j int) bool { return found[i].high() && !found[j].high() })
 	files, prod, high := map[string]bool{}, 0, false
 	var ev []string
@@ -414,7 +427,7 @@ func evalSecretsWith(found []secretFinding, bundles []string, incomplete bool, f
 	if high {
 		r.Status, r.Severity = check.Fail, check.High
 	}
-	return u.finish(r, nil)
+	return sc.finish(u.finish(r, nil))
 }
 
 func tildePath(home, p string) string {

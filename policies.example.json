@@ -100,7 +100,8 @@
         "mysql": true,
         "git_remotes": true
       },
-      "user_ignore": true
+      "user_ignore": true,
+      "sample_rules": ["git-tracked", "sdk", "sample-dir"]
     },
     "ssh-keys": {
       "no_passphrase": true,
