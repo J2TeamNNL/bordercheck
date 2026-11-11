@@ -3,6 +3,7 @@ package checks
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -217,8 +218,16 @@ func TestGatherPackageManagers(t *testing.T) {
 	writeFile(t, home, ".cargo/config.toml", "[registry]\nindex = \"https://x\"\n", 0o600)
 	t.Setenv("CARGO_HOME", "")
 	f := gatherPackageManagers(context.Background(), home, "linux", []string{"npm", "cargo", "pip"})
-	if !f.Present["npm"] || !f.Present["cargo"] || len(f.Configs) != 2 || f.Configs[0].Path != "~/.npmrc" {
-		t.Errorf("got %+v", f)
+	// The machine running the test may have site-wide files of its own (/etc/pip.conf on a CI runner):
+	// only the ones under the temp home are this test's.
+	var mine []string
+	for _, c := range f.Configs {
+		if strings.HasPrefix(c.Path, "~/") {
+			mine = append(mine, c.Path)
+		}
+	}
+	if !f.Present["npm"] || !f.Present["cargo"] || !slices.Equal(mine, []string{"~/.npmrc", "~/.cargo/config.toml"}) {
+		t.Errorf("got %+v (under home: %v)", f, mine)
 	}
 }
 

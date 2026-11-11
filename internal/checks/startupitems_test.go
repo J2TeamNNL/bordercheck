@@ -232,8 +232,13 @@ func TestStatStartup(t *testing.T) {
 	if items[0].Missing || items[0].Writable || !items[1].Writable || !items[2].Missing || items[3].Missing {
 		t.Errorf("got %+v", items)
 	}
-	// On macOS, folders that prompt are never touched.
-	items = []startupItem{{Program: "/Users/demo/Documents/x"}, {Program: "/Users/demo/Library/Containers/x/y"}, {Program: "/Volumes/NAS/x"}}
+	// On macOS, folders that prompt are never touched. Which folders those are
+	// is decided for the OS this runs on (sshPathAvoided), so the home-folder
+	// ones can only be tried on a Mac; /Volumes is refused by name everywhere.
+	items = []startupItem{{Program: "/Volumes/NAS/x"}}
+	if runtime.GOOS == "darwin" {
+		items = append(items, startupItem{Program: "/Users/demo/Documents/x"}, startupItem{Program: "/Users/demo/Library/Containers/x/y"})
+	}
 	statStartup(items, "/Users/demo", "darwin")
 	for _, it := range items {
 		if it.Missing {
