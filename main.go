@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -58,6 +59,7 @@ const help = `bordercheck %s: checks this computer for open doors and says how t
 Everyday
   bordercheck                    check this computer now and show what to fix (sends nothing)
   bordercheck status             is it installed, when it last reported, the link to your report page
+  bordercheck fix                what to fix and how, written for an AI coding assistant to follow with you
   bordercheck send -force        check now and send a fresh report to your organisation
   bordercheck update             get the newest policy and the newest version now
   bordercheck notifications      macOS: let bordercheck show notifications under its own name
@@ -96,6 +98,8 @@ func run(args []string) int {
 			return runHelp()
 		case "install", "uninstall", "status", "send", "update", "notifications":
 			return runAgent(args[0], args[1:])
+		case "fix":
+			return runFix(args[1:])
 		case "verify":
 			return runVerify(args[1:])
 		}
@@ -184,6 +188,47 @@ func runCheck(args []string) int {
 	if rep.Counts.Fail > 0 {
 		return 1
 	}
+	return 0
+}
+
+// runFix runs every check and prints the problems with instructions for an
+// AI coding assistant to fix them together with the person at the machine. It
+// only reads, like a plain run; the prompt on the portal's report page is
+// "Run `bordercheck fix` and follow what it prints."
+func runFix(args []string) int {
+	fs := flag.NewFlagSet("bordercheck fix", flag.ContinueOnError)
+	policyPath := fs.String("policy", "", "policy JSON file")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() > 0 {
+		return fail(fmt.Errorf("fix: unexpected argument %q", fs.Arg(0)))
+	}
+	pol, err := loadPolicy(*policyPath)
+	if err != nil {
+		return fail(err)
+	}
+	if !pol.Report.FixPrompt {
+		return fail(errors.New("fix is turned off by this computer's policy (report.fix_prompt); run bordercheck to see what to fix"))
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	go func() { <-ctx.Done(); stop() }()
+	var progress check.Progress
+	if isTerminal(os.Stderr) {
+		progress = report.Progress(os.Stderr)
+	}
+	rep := report.New(version, pol.Name, pol.Waive(check.RunAllProgress(ctx, checks.All(pol), progress), waiverIdentity(), time.Now()))
+	exe, err := os.Executable()
+	if err != nil {
+		exe = "bordercheck"
+	}
+	installed := false
+	if dir, err := agent.Dir(); err == nil {
+		_, err := os.Stat(filepath.Join(dir, "config.json"))
+		installed = err == nil
+	}
+	rep.WriteFix(os.Stdout, exe, installed)
 	return 0
 }
 

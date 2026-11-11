@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { html } from "../src/html";
+import { COPY_SCRIPT, html } from "../src/html";
 import { english, fromAcceptLanguage, fromCookie, i18n, type Lang, LANGS, msg, negotiate, safeNext } from "../src/i18n";
 import { en } from "../src/i18n/en";
 import { vi } from "../src/i18n/vi";
@@ -258,7 +258,8 @@ describe("pages in every language", () => {
         expect(body, `${lang} ${path}`).not.toContain("<img");
         expect(body, `${lang} ${path}`).not.toContain("<b>id</b>");
       }
-      const body = await (await publicGet(reportUrl, COOKIE(lang))).text();
+      // The report page's one script is the hashed Copy script, there for the fix prompt.
+      const body = (await (await publicGet(reportUrl, COOKIE(lang))).text()).replace(`<script>${COPY_SCRIPT}</script>`, "");
       expect(body, lang).not.toContain("<script>");
       expect(body, lang).not.toContain("<img");
       expect(body, lang).toContain("&lt;script&gt;");

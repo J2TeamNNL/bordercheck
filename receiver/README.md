@@ -198,13 +198,15 @@ can send `Authorization: Bearer <ADMIN_TOKEN>`. If you use only Access, don't se
 Pages carry a CSP with no scripts at all, and every value from a report (hostname, email, title, summary,
 evidence) is escaped: a report is attacker-controllable input. Forms only accept same-origin posts.
 
-**The one script: Copy buttons.** Two pages carry one small inline script, for Copy buttons: the admin page
+**The one script: Copy buttons.** Three pages carry one small inline script, for Copy buttons: the admin page
 that shows freshly issued invites (after creating or re-issuing them: copy the link, either install command,
-or a ready-to-send message in the admin's language), and the invite page `/i/<code>` (copy the command). The
+or a ready-to-send message in the admin's language), the invite page `/i/<code>` (copy the command), and a
+report page `/r/<id>` when it offers the fix prompt (copy the prompt; a report page with nothing to fix, from a
+client older than v0.5.0, or of a role with `report.fix_prompt` off, has no script). The
 script (`COPY_SCRIPT` in `src/html.ts`) only copies the `textContent` of an element the server rendered, with
 `navigator.clipboard` or by selecting it; it builds no HTML, loads nothing and sends nothing, so copied invite
 codes are never logged, audited or transmitted. It is allowed by its SHA-256 hash (`script-src
-'sha256-…'`), on those two responses only; a test recomputes the hash from the page as served. Every other page
+'sha256-…'`), on those responses only; a test recomputes the hash from the page as served. Every other page
 keeps the script-free CSP, unchanged. The buttons are rendered `hidden` and shown by the script, so with
 scripts off they don't appear and the click-to-select command blocks work as before. There is deliberately no
 "copy all links" button: one paste into the wrong channel would leak every code.

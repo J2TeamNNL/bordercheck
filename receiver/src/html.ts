@@ -67,8 +67,9 @@ export function linkify(text: unknown): Html {
 const CSP =
   "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 
-// The portal's one script: Copy buttons, on exactly two pages (the admin page
-// showing freshly issued invites, and the invite page /i/<code>). Every other
+// The portal's one script: Copy buttons, on exactly three pages (the admin page
+// showing freshly issued invites, the invite page /i/<code>, and a report page
+// /r/<id> that offers the fix prompt). Every other
 // page is served with CSP above and runs no script at all.
 //
 // What it does: on a click on an element with data-copy="<id>", copy that
@@ -323,6 +324,7 @@ button.ghost{background:transparent;box-shadow:inset 0 0 0 1px var(--line);color
 .cmd code.msg{font:14px/1.6 var(--font);word-break:normal;overflow-wrap:anywhere}
 .cmd code{display:block;padding:16px 18px;font:13.5px/1.6 var(--mono);color:#e8e8ed;white-space:pre-wrap;word-break:break-all;-webkit-user-select:all;user-select:all;cursor:text}
 .cmd code:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:0}
+.cmd.fixp{margin:22px 0 4px}
 .cmd.big code{font-size:15px;padding:20px 22px}
 
 body.public main{max-width:780px;padding-top:clamp(28px,7vh,72px)}

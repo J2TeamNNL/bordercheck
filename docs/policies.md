@@ -59,6 +59,7 @@ Used only by an installed copy. A plain `bordercheck` never sends anything.
 | `email_domains` | `[]` | With a static `policies.json`, the email typed at install must be in one of these domains. Empty = any. |
 | `include_ips` | `false` | Also send `host.ips`: the addresses of the machine's own network interfaces that are up (IPv4 and IPv6, without loopback and link-local; at most 16), read locally. bordercheck never asks a "what is my IP" service. |
 | `include_location` | `false` | Meant to send a device position. **It has no effect today**: no OS gives one without a permission prompt, admin rights or a lookup with a third party, so no location is sent. See [Location](#location). |
+| `fix_prompt` | `true` | Allow `bordercheck fix`, which prints this machine's findings with rules an AI coding assistant can follow to fix them together with its user, and let the portal's report page offer the one-line prompt that starts it. `false` turns both off. Needs bordercheck v0.5.0 or later on every machine of the role (older ones reject the unknown field). |
 
 What a report contains, and what the receiver sees regardless of these switches, is in
 [the agent guide](install.md#what-is-sent).

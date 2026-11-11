@@ -148,6 +148,7 @@ a line in the user's crontab instead; `bordercheck status` says which.
 ```sh
 bordercheck status               # email, enrollment, policy, what is sent, service, last report, report page, updates
 bordercheck send -force          # send a report now
+bordercheck fix                  # what to fix and how, as instructions an AI coding assistant can follow with you
 bordercheck update               # refresh the policy and install a newer release now
 bordercheck uninstall
 ```

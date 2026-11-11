@@ -13,12 +13,18 @@
 // the last characters of the value removed, because "4 marked production" is
 // no use to the person who has to move them. The rest they see by running
 // bordercheck.
+//
+// When something fails or warns, the page also offers a one-line prompt for an
+// AI coding assistant ("Run `bordercheck fix` and follow what it prints") with
+// a Copy button. The prompt is the same for every report apart from where the
+// program lives on that OS: nothing the machine reported goes into it, the
+// findings and the rules for handling them are printed by bordercheck itself.
 
 import { config, type Env } from "./env";
 import { CAPABILITY_HEADERS, SELF, tooManyRequests } from "./enroll";
 import { fixHtml, summaryHtml } from "./checktext";
 import { checkTitle, forRequest, type I18n } from "./i18n";
-import { badge, Html, html, layout, MARK, page, sev, statusClass } from "./html";
+import { badge, COPY_HEADERS, copyButton, Html, html, layout, MARK, page, sev, statusClass } from "./html";
 
 const GLYPH_OK = new Html(
   `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5.5 12.5 4.2 4.2 8.8-9.2" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
@@ -29,6 +35,36 @@ const GLYPH_ATTENTION = new Html(
 import { hit } from "./ratelimit";
 import { parseReport, type Result, statusRank } from "./report";
 import { LINK_RE, sha256hex } from "./tokens";
+
+// fixCommand is how to run the installed bordercheck's `fix` on that OS: the
+// install folder is not on PATH (see Dir in internal/agent/agent.go).
+export function fixCommand(os: string): string {
+  switch (os) {
+    case "darwin":
+      return `"$HOME/Library/Application Support/bordercheck/bordercheck" fix`;
+    case "linux":
+      return `"\${XDG_DATA_HOME:-$HOME/.local/share}/bordercheck/bordercheck" fix`;
+    case "windows":
+      return `& "$env:LOCALAPPDATA\\bordercheck\\bordercheck.exe" fix`;
+  }
+  return "bordercheck fix";
+}
+
+// fixSupported: `bordercheck fix` exists from v0.5.0. A version that is not a
+// release number (a development build) is taken to have it.
+export function fixSupported(version: string): boolean {
+  const m = /^v?(\d+)\.(\d+)\./.exec(version);
+  return !m || Number(m[1]) > 0 || Number(m[2]) >= 5;
+}
+
+// fixAllowed: the role's policy can turn the prompt off (report.fix_prompt).
+function fixAllowed(rolePolicy: string): boolean {
+  try {
+    return (JSON.parse(rolePolicy) as { report?: { fix_prompt?: unknown } })?.report?.fix_prompt !== false;
+  } catch {
+    return true;
+  }
+}
 
 function notFound(L: I18n): Response {
   return page(
@@ -46,22 +82,25 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   // Same work for every id: hash, then one query.
   const h = await sha256hex(id);
   const row = await env.DB.prepare(
-    `SELECT m.email, m.hostname, m.last_seen, m.report
+    `SELECT m.email, m.hostname, m.last_seen, m.report, ro.policy AS role_policy
      FROM report_links l
      JOIN machines m ON m.install_id = l.install_id
      JOIN enrollments e ON e.install_id = l.install_id
+     JOIN roles ro ON ro.id = e.role_id
      WHERE l.link_hash = ?1 AND ?2 = 1 AND l.expires_at > ?3 AND e.revoked_at IS NULL`,
   )
     .bind(h, LINK_RE.test(id) ? 1 : 0, now.toISOString())
-    .first<{ email: string; hostname: string; last_seen: string; report: string }>();
+    .first<{ email: string; hostname: string; last_seen: string; report: string; role_policy: string }>();
   if (!row) return notFound(L);
 
   let results: Result[] = [];
   let version = "";
+  let os = "";
   try {
     const parsed = parseReport(JSON.parse(row.report));
     results = parsed.results;
     version = parsed.version;
+    os = parsed.host.os;
   } catch {
     results = [];
   }
@@ -72,11 +111,16 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
 
   const failing = problems.some((r) => r.status === "fail");
   const tone = problems.length === 0 ? "s-pass" : failing ? "s-fail" : "s-warn";
+  const fixPrompt =
+    problems.some((r) => r.status === "fail" || r.status === "warn") && fixSupported(version) && fixAllowed(row.role_policy)
+      ? html`<div class="cmd fixp"><div class="cmd-h"><b>${L.t("rep.fixPromptTitle")}</b><span>${L.t("rep.fixPromptSub")}</span>${copyButton(L, "fix-prompt", "copy.prompt")}</div><code class="msg" tabindex="0" id="fix-prompt">${L.s("rep.fixPrompt", { cmd: fixCommand(os) })}</code></div>`
+      : "";
   const headline = problems.length === 0 ? L.t("rep.allClear") : L.t("rep.toFixHeadline", { n: problems.length });
   const body = html`<div class="status-mark ${tone}">${problems.length === 0 ? GLYPH_OK : GLYPH_ATTENTION}</div>
 <p class="eyebrow">${L.t("rep.eyebrow")}</p><h1>${headline}</h1>
 <p class="lead">${L.t("rep.for", { email: row.email || L.s("common.noEmail"), host: row.hostname || L.s("common.noHostname"), when: L.when(row.last_seen) })}${L.lang === "zh" ? "" : " "}${problems.length === 0 ? L.t("rep.okText") : L.t("rep.fixText")}</p>
 <div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}${version ? html`<span class="chip">bordercheck <b>${version}</b></span>` : ""}</div>
+${fixPrompt}
 ${problems.length === 0
     ? ""
     : html`<h2>${L.t("rep.toFix", { n: problems.length })}</h2>${problems.map(
@@ -94,6 +138,8 @@ ${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${fixHtml(L, 
       )}`
     : ""}
 <p class="foot">${L.t("rep.foot")}</p>`;
+  // With the prompt comes its Copy button, so that response alone carries the hashed Copy script.
+  if (fixPrompt) return page(layout(L, L.s("rep.title"), null, body, undefined, { ...SELF, copy: true }), 200, { ...CAPABILITY_HEADERS, ...COPY_HEADERS });
   return page(layout(L, L.s("rep.title"), null, body, undefined, SELF), 200, CAPABILITY_HEADERS);
 }
 

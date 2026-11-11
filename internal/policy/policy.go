@@ -67,6 +67,10 @@ type Report struct {
 	// (location) where the OS can give one without a prompt. Both off by default.
 	IncludeIPs      bool `json:"include_ips"`
 	IncludeLocation bool `json:"include_location"`
+	// FixPrompt lets `bordercheck fix` print instructions an AI coding assistant
+	// can follow to fix this machine's findings with its user, and lets the
+	// portal's report page offer the prompt that starts it. On by default.
+	FixPrompt bool `json:"fix_prompt"`
 }
 
 // Every returns the interval between reports.
@@ -331,7 +335,7 @@ func ptr[T any](v T) *T { return &v }
 func Default() Policy {
 	return Policy{
 		Name:   "built-in",
-		Report: Report{Headers: map[string]string{}, Interval: "24h", EmailDomains: []string{}, IncludeIPs: false, IncludeLocation: false},
+		Report: Report{Headers: map[string]string{}, Interval: "24h", EmailDomains: []string{}, IncludeIPs: false, IncludeLocation: false, FixPrompt: true},
 		Update: Update{Interval: "24h", Repo: "ptrinh/bordercheck"},
 		Notify: defaultNotify(),
 

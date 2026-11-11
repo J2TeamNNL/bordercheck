@@ -12,7 +12,8 @@
       "example.com"
     ],
     "include_ips": false,
-    "include_location": false
+    "include_location": false,
+    "fix_prompt": true
   },
   "update": {
     "binary": true,

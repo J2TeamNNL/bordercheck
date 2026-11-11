@@ -2,7 +2,8 @@
   "report": {
     "interval": "24h",
     "include_evidence": false,
-    "include_ips": false
+    "include_ips": false,
+    "fix_prompt": true
   },
   "update": {
     "binary": true,
