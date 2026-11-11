@@ -519,13 +519,15 @@ taken as holding saved logins, which can be wrong both ways.
 | Chromium browsers | `credentials_enable_service` in `Preferences` ("Offer to save passwords", on unless false); the number of rows in the login databases |
 | Firefox | `signon.rememberSignons` in `prefs.js` ("Ask to save passwords"); the number of entries in `logins.json` |
 
-Saved passwords warn with medium severity; saving on with nothing saved passes with a note. A setting forced by
+Saved passwords warn with medium severity, or low when every profile with saved logins holds fewer than
+`low_below` (a handful are rarely someone's main passwords); saving on with nothing saved passes with a note. A setting forced by
 the browser's enterprise policy is not read. Whether Firefox has a primary password is not checked: that needs
 `key4.db`, which the check does not open.
 
 | Field | Default | |
 |---|---|---|
 | `allow_browsers` | `[]` | Browsers whose password manager you use on purpose: `chrome`, `edge`, `brave`, `chromium`, `vivaldi`, `arc`, `firefox`. |
+| `low_below` | `10` | The warning is low instead of medium when every profile with saved logins holds fewer than this many. A profile whose logins could not be counted keeps it medium. `0` = always medium. |
 
 ### trust-store
 

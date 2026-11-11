@@ -184,7 +184,8 @@
       "allow_unpacked": []
     },
     "browser-passwords": {
-      "allow_browsers": []
+      "allow_browsers": [],
+      "low_below": 10
     },
     "trust-store": {
       "cas": true,

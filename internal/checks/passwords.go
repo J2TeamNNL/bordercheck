@@ -39,6 +39,7 @@ type pwProfile struct {
 	Label   string // "Chrome (Default)"
 	Saving  bool   // the browser offers to save passwords
 	Stored  bool   // logins are (very probably) stored
+	Logins  int    // how many, when they could be counted; 0 = not known
 	Details string // evidence: sizes or a count, never contents
 }
 
@@ -53,6 +54,7 @@ func evalBrowserPasswordsOn(goos string, ps []pwProfile, opts policy.BrowserPass
 		return check.SkippedMsg(msg.Of("passwords.notFound"))
 	}
 	var stored, saving, allowed []string
+	few := true // every profile with saved logins holds fewer than opts.LowBelow
 	var storedIDs []string
 	var ev []string
 	add := func(list []string, name string) []string {
@@ -68,6 +70,9 @@ func evalBrowserPasswordsOn(goos string, ps []pwProfile, opts policy.BrowserPass
 		}
 		switch {
 		case p.Stored:
+			if opts.LowBelow <= 0 || p.Logins <= 0 || p.Logins >= opts.LowBelow {
+				few = false
+			}
 			stored = add(stored, p.Name)
 			storedIDs = add(storedIDs, p.ID)
 		case p.Saving:
@@ -102,6 +107,13 @@ func evalBrowserPasswordsOn(goos string, ps []pwProfile, opts policy.BrowserPass
 	}
 	if other {
 		fix = append(fix, msg.P("passwords.fix.other"))
+	}
+	// A handful of saved logins per profile are rarely someone's main passwords.
+	if few {
+		return check.Result{Status: check.Warn, Severity: check.Low, Evidence: ev}.
+			WithSummary(slices.Concat(msg.Of("passwords.stored", "browsers", strings.Join(stored, ", ")),
+				msg.Of("passwords.few", "n", opts.LowBelow), note)).
+			WithFix(fix)
 	}
 	return check.Result{Status: check.Warn, Severity: check.Medium, Evidence: ev}.
 		WithSummary(append(msg.Of("passwords.stored", "browsers", strings.Join(stored, ", ")), note...)).
@@ -181,6 +193,7 @@ func chromiumPasswordFactsCounted(p browserProfile, prefs []byte, sizes map[stri
 	_ = json.Unmarshal(prefs, &doc)
 	r := pwProfile{ID: p.ID, Name: p.Name, Label: p.Label(), Saving: doc.Save == nil || *doc.Save}
 	var parts []string
+	logins, uncounted := 0, false
 	for _, n := range []string{"Login Data", "Login Data For Account"} {
 		sz, ok := sizes[n]
 		if !ok {
@@ -188,15 +201,20 @@ func chromiumPasswordFactsCounted(p browserProfile, prefs []byte, sizes map[stri
 		}
 		if c, counted := counts[n]; counted {
 			if c > 0 {
+				logins += c
 				r.Stored = true
 				parts = append(parts, fmt.Sprintf("%s holds %d saved login(s)", n, c))
 			}
 			continue
 		}
 		if sz > chromeEmptyLoginData {
+			uncounted = true
 			r.Stored = true
 			parts = append(parts, fmt.Sprintf("%s is %d KB, larger than an empty one (%d KB)", n, sz/1024, chromeEmptyLoginData/1024))
 		}
+	}
+	if !uncounted {
+		r.Logins = logins
 	}
 	if !r.Stored {
 		parts = append(parts, "no saved logins found")
@@ -245,7 +263,7 @@ func firefoxPasswordFacts(p browserProfile, prefsJS []byte, logins int) pwProfil
 			saving = !strings.HasPrefix(line, `user_pref("signon.rememberSignons",false)`)
 		}
 	}
-	r := pwProfile{ID: p.ID, Name: p.Name, Label: p.Label(), Saving: saving, Stored: logins > 0}
+	r := pwProfile{ID: p.ID, Name: p.Name, Label: p.Label(), Saving: saving, Stored: logins > 0, Logins: logins}
 	parts := []string{"no saved logins"}
 	if logins > 0 {
 		parts = []string{fmt.Sprintf("%d saved logins in logins.json", logins)}

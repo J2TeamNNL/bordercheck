@@ -402,7 +402,7 @@ func Default() Policy {
 			Sharing: Sharing{Allow: []string{}},
 			Extensions: Extensions{Browsers: true, Editors: true, Block: []string{}, Allow: []string{},
 				AllowUnpacked: []string{}},
-			BrowserPasswords: BrowserPasswords{AllowBrowsers: []string{}},
+			BrowserPasswords: BrowserPasswords{AllowBrowsers: []string{}, LowBelow: 10},
 			TrustStore: TrustStore{CAs: true, Proxies: true, AllowCAs: []string{}, AllowProxies: []string{},
 				CASeverity: check.Medium},
 			PackageManagers: PackageManagers{Tools: slices.Clone(PackageManagerTools), RequireIgnoreScripts: true, AllowHosts: []string{}},

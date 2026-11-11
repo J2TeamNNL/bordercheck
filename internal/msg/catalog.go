@@ -479,6 +479,7 @@ var Catalog = map[string]Entry{
 		"consider turning that off."),
 	"passwords.stored": s("Passwords are saved in {browsers}. Information-stealing malware takes a browser's saved " +
 		"passwords first."),
+	"passwords.few":     s("Each profile holds fewer than {n}, so these are probably not your main passwords."),
 	"passwords.allowed": s("Allowed by policy: {browsers}."),
 	"passwords.fix": s("Move these passwords to a password manager (the browser's password settings can export them), " +
 		"delete them from the browser, and turn off saving."),
