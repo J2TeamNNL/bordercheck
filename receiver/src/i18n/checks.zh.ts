@@ -127,7 +127,7 @@ export const checksZh: CheckCatalog = {
     "把每个密钥移入桌面密钥环（libsecret 的 [code]secret-tool store[/code] / [code]secret-tool lookup[/code]）或密码管理器的命令行工具（如 pass 或 1Password [code]op run[/code]），然后删除那一行或那个文件。",
   "secrets.fix.other": "把每个密钥移入密码管理器或系统密钥环，然后删除那一行或那个文件。",
   "secrets.fix.rotate": 
-    "对于出现在 Shell 历史中的密钥，删除相应的行即可。只有当这台电脑可能已被入侵，或文件曾被共享或同步到别处时，才需要轮换密钥。",
+    "对于出现在 Shell 历史中的密钥，删除相应的行即可。只有在有证据表明这台电脑已被入侵时，才需要轮换密钥。",
 
   "updates.belowMin": "{os} 低于策略规定的最低版本 {min}。",
   "updates.belowMinWin": "{os} 低于策略规定的最低版本 build {min}。",
@@ -261,14 +261,14 @@ export const checksZh: CheckCatalog = {
   "ai.tokens": "AI 代理 / MCP 配置中有 {n} 个明文令牌。",
   "ai.guards": "{n} 项代理设置跳过了审批或沙箱。",
   "ai.fix":
-    "不要把令牌写在 MCP 配置中：改为引用环境变量（[code]\"env\": {\"API_KEY\": \"${env:API_KEY}\"}[/code] 或代理自带的输入/密钥机制），并从系统钥匙串加载（macOS 上用 [code]touchenv run[/code]）。轮换曾写在这些文件中的令牌。重新开启审批和沙箱：否则，代理读取的任何文件、网页或 issue 中的提示词注入都能以你的身份执行命令。",
+    "不要把令牌写在 MCP 配置中：改为引用环境变量（[code]\"env\": {\"API_KEY\": \"${env:API_KEY}\"}[/code] 或代理自带的输入/密钥机制），并从系统钥匙串加载（macOS 上用 [code]touchenv run[/code]）。重新开启审批和沙箱：否则，代理读取的任何文件、网页或 issue 中的提示词注入都能以你的身份执行命令。",
 
   "cracked.pass": "没有发现破解版 Adobe、Autodesk、Windows 或 Microsoft Office 的痕迹。",
   "cracked.found": "发现破解软件的迹象（{products}）。破解软件是植入窃取密码和令牌的恶意软件的常见途径。",
   "cracked.fix":
-    "卸载破解软件及所有破解或激活工具，删除破解程序添加到 hosts 文件中的条目，并进行全盘恶意软件扫描。然后更改在这台电脑上使用过的密码和令牌：破解软件常常携带信息窃取木马。请向 IT 申请正版授权。",
+    "卸载破解软件及所有破解或激活工具，删除破解程序添加到 hosts 文件中的条目，并进行全盘恶意软件扫描：破解软件常常携带信息窃取木马。如果扫描发现木马，请更改在这台电脑上使用过的密码和令牌。请向 IT 申请正版授权。",
   "cracked.fixAlternatives":
-    "卸载破解软件及所有破解或激活工具，删除破解程序添加到 hosts 文件中的条目，并进行全盘恶意软件扫描。然后更改在这台电脑上使用过的密码和令牌：破解软件常常携带信息窃取木马。请向 IT 申请正版授权，或使用 ArtCraft 提供的免费开源替代软件（https://getartcraft.com）。",
+    "卸载破解软件及所有破解或激活工具，删除破解程序添加到 hosts 文件中的条目，并进行全盘恶意软件扫描：破解软件常常携带信息窃取木马。如果扫描发现木马，请更改在这台电脑上使用过的密码和令牌。请向 IT 申请正版授权，或使用 ArtCraft 提供的免费开源替代软件（https://getartcraft.com）。",
   "cracked.alt.adobe":
     "Adobe：PhotoCraft 替代 Photoshop，VectorCraft 替代 Illustrator，FilmCraft 替代 Premiere Pro，LightCraft 替代 Lightroom，EffectCraft 替代 After Effects，DesignCraft 替代 InDesign，PdfCraft 替代 Acrobat。",
   "cracked.alt.office": "Microsoft Office：WordCraft 替代 Word，GridCraft 替代 Excel，DeckCraft 替代 PowerPoint。",
@@ -363,7 +363,7 @@ export const checksZh: CheckCatalog = {
   "extensions.allSites": "其中 {n} 个可以读取和更改你访问的所有网站。",
   "extensions.allSitesWarn": "{n} 个扩展可以读取和更改你访问的所有网站：{names}。",
   "extensions.fix.blocked":
-    "立即移除：在浏览器中打开扩展页面（[code]chrome://extensions[/code]、[code]edge://extensions[/code]、[code]brave://extensions[/code]，Firefox 中为 [code]about:addons[/code]）→ 移除（Remove）；在编辑器中打开扩展视图（Extensions view）→ 该扩展 → 卸载（Uninstall）。然后更改在该浏览器或编辑器中使用过的密码，并通知 IT。",
+    "立即移除：在浏览器中打开扩展页面（[code]chrome://extensions[/code]、[code]edge://extensions[/code]、[code]brave://extensions[/code]，Firefox 中为 [code]about:addons[/code]）→ 移除（Remove）；在编辑器中打开扩展视图（Extensions view）→ 该扩展 → 卸载（Uninstall）。然后通知 IT。只有在 IT 确认该扩展窃取了数据时，才需要更改在该浏览器或编辑器中使用过的密码。",
   "extensions.fix.outside":
     "移除不是你有意安装的扩展（浏览器扩展页面 → 移除（Remove），或编辑器扩展视图 → 卸载（Uninstall）），需要的扩展请从 Chrome Web Store、Microsoft Edge Add-ons、addons.mozilla.org 或编辑器的扩展市场安装。如果 IT 批准了某个扩展，可以将其加入策略的 allow_unpacked。",
   "extensions.fix.notAllowed": "移除组织未批准的扩展，或请 IT 将其加入允许列表。",
@@ -432,11 +432,11 @@ export const checksZh: CheckCatalog = {
   "startup.writable": "{n} 个项目启动的程序任何用户都能修改。",
   "startup.missing": "{n} 个项目指向已不存在的程序。",
   "startup.fix.mac":
-    "逐一查明列出的项目。如果不认识，就将其移除：[code]launchctl bootout gui/$(id -u)/LABEL[/code]，然后从 ~/Library/LaunchAgents 删除其 .plist（/Library 中的项目需要管理员权限）；System Settings → General → Login Items & Extensions 中也能看到它们。如果有项目会下载并运行代码，请进行恶意软件扫描，并更改在这台 Mac 上使用过的密码。程序已不存在的项目是已卸载应用的残留，直接删除即可。",
+    "逐一查明列出的项目。如果不认识，就将其移除：[code]launchctl bootout gui/$(id -u)/LABEL[/code]，然后从 ~/Library/LaunchAgents 删除其 .plist（/Library 中的项目需要管理员权限）；System Settings → General → Login Items & Extensions 中也能看到它们。如果有项目会下载并运行代码，请进行恶意软件扫描；如果发现恶意软件，再更改在这台 Mac 上使用过的密码。程序已不存在的项目是已卸载应用的残留，直接删除即可。",
   "startup.fix.win":
-    "逐一查明列出的项目。如果不认识，就将其关闭：Task Manager → Startup apps → Disable，Task Scheduler → 该任务 → Disable，或从 Startup 文件夹（[code]shell:startup[/code]）删除其快捷方式。如果有项目会下载并运行代码，请用 Windows Security 进行完整扫描，并更改在这台电脑上使用过的密码。程序已不存在的项目是已卸载应用的残留。",
+    "逐一查明列出的项目。如果不认识，就将其关闭：Task Manager → Startup apps → Disable，Task Scheduler → 该任务 → Disable，或从 Startup 文件夹（[code]shell:startup[/code]）删除其快捷方式。如果有项目会下载并运行代码，请用 Windows Security 进行完整扫描；如果发现恶意软件，再更改在这台电脑上使用过的密码。程序已不存在的项目是已卸载应用的残留。",
   "startup.fix.linux":
-    "逐一查明列出的项目。如果不认识，就将其移除：删除 ~/.config/autostart 中对应的 .desktop 文件、[code]systemctl --user disable --now UNIT[/code]，或 [code]crontab -e[/code]。如果有项目会下载并运行代码，请检查机器上的恶意软件，并更改在这台机器上使用过的密码。",
+    "逐一查明列出的项目。如果不认识，就将其移除：删除 ~/.config/autostart 中对应的 .desktop 文件、[code]systemctl --user disable --now UNIT[/code]，或 [code]crontab -e[/code]。如果有项目会下载并运行代码，请检查机器上的恶意软件；如果发现，再更改在这台机器上使用过的密码。",
 
   "backup.unsupported": "未在 {os} 上检查：没有可读取的标准备份或设备查找服务。",
   "backup.unencrypted": "{n} 个 Time Machine 备份未加密：拿到磁盘的人都能读取你的文件。",

@@ -354,7 +354,7 @@ The report is the same JSON as `bordercheck -json`, plus `email` and `install_id
   ignore them.
 
 - Secret values are never printed or sent. For long provider tokens (OpenAI, GitHub, AWS…) the report shows the
-  last 4 characters, as the providers' own dashboards do, so people can tell which key to rotate (policy
+  last 4 characters, as the providers' own dashboards do, so people can tell which key it is (policy
   `secrets.show_tail`). Passwords show nothing.
 - Evidence (file paths, variable names, ports) leaves the machine only when the policy sets
   `report.include_evidence`.
@@ -382,5 +382,5 @@ touchenv set OPENAI_API_KEY        # paste it, then delete the line from .zshrc 
 touchenv run OPENAI_API_KEY -- python report.py
 ```
 
-On Windows, use Credential Manager or a password manager CLI such as 1Password's `op run`. Rotate any key that
-sat in shell history or a synced folder.
+On Windows, use Credential Manager or a password manager CLI such as 1Password's `op run`. A key that sat in shell
+history needs only those lines deleted; rotate keys only when there is evidence the machine was compromised.

@@ -146,8 +146,8 @@ var Catalog = map[string]Entry{
 		"[code]secret-tool lookup[/code], from libsecret) or a password manager CLI such as pass or 1Password " +
 		"[code]op run[/code], then delete the line or file."),
 	"secrets.fix.other": s("Move each key into a password manager or the OS keyring, then delete the line or file."),
-	"secrets.fix.rotate": s("For a key in shell history, deleting those lines is enough. Rotate a key only if this computer " +
-		"may have been compromised, or the file was shared or synced somewhere else."),
+	"secrets.fix.rotate": s("For a key in shell history, deleting those lines is enough. Rotate a key only if there is " +
+		"evidence that this computer was compromised."),
 
 	// ---- os-updates: problems ----
 	"updates.belowMin":           s("{os} is older than the minimum version {min} set by policy."),
@@ -310,7 +310,7 @@ var Catalog = map[string]Entry{
 	"ai.guards": pl("1 agent setting skips approvals or the sandbox.", "{n} agent settings skip approvals or the sandbox."),
 	"ai.fix": s("Keep tokens out of MCP configs: reference an environment variable instead " +
 		"([code]\"env\": {\"API_KEY\": \"${env:API_KEY}\"}[/code] or the agent's own input/secret mechanism) and load it " +
-		"from the OS keychain ([code]touchenv run[/code] on macOS). Rotate tokens that sat in these files. Turn " +
+		"from the OS keychain ([code]touchenv run[/code] on macOS). Turn " +
 		"approvals and the sandbox back on: a prompt injection in any file, web page or issue the agent reads can " +
 		"then run commands as you."),
 
@@ -319,11 +319,11 @@ var Catalog = map[string]Entry{
 	"cracked.found": s("Signs of cracked software ({products}). Cracks are a common way to install malware that " +
 		"steals passwords and tokens."),
 	"cracked.fix": s("Uninstall the cracked software and any crack or activation tool, remove the lines the crack " +
-		"added to the hosts file, and run a full malware scan. Then change the passwords and tokens used on this " +
-		"machine: cracks often carry information stealers. Ask IT for a licensed copy."),
+		"added to the hosts file, and run a full malware scan: cracks often carry information stealers. If the scan " +
+		"finds one, change the passwords and tokens used on this machine. Ask IT for a licensed copy."),
 	"cracked.fixAlternatives": s("Uninstall the cracked software and any crack or activation tool, remove the lines " +
-		"the crack added to the hosts file, and run a full malware scan. Then change the passwords and tokens used on " +
-		"this machine: cracks often carry information stealers. Ask IT for a licensed copy, or use a free, " +
+		"the crack added to the hosts file, and run a full malware scan: cracks often carry information stealers. If " +
+		"the scan finds one, change the passwords and tokens used on this machine. Ask IT for a licensed copy, or use a free, " +
 		"open-source alternative from ArtCraft (https://getartcraft.com)."),
 	"cracked.alt.adobe": s("Adobe: PhotoCraft for Photoshop, VectorCraft for Illustrator, FilmCraft for Premiere Pro, " +
 		"LightCraft for Lightroom, EffectCraft for After Effects, DesignCraft for InDesign, PdfCraft for Acrobat."),
@@ -443,8 +443,8 @@ var Catalog = map[string]Entry{
 		"{n} extensions can read and change every website you visit: {names}."),
 	"extensions.fix.blocked": s("Remove it now: in the browser open the extensions page ([code]chrome://extensions[/code], " +
 		"[code]edge://extensions[/code], [code]brave://extensions[/code], or [code]about:addons[/code] in Firefox) → Remove; " +
-		"in the editor open the Extensions view → the extension → Uninstall. Then change the passwords you used in that " +
-		"browser or editor, and tell IT."),
+		"in the editor open the Extensions view → the extension → Uninstall. Then tell IT. Change the passwords you used in " +
+		"that browser or editor only if IT confirms the extension stole data."),
 	"extensions.fix.outside": s("Remove extensions you did not install on purpose (the browser's extensions page → Remove, " +
 		"or the editor's Extensions view → Uninstall) and install the ones you need from the Chrome Web Store, Microsoft " +
 		"Edge Add-ons, addons.mozilla.org or the editor's marketplace. If IT approves one, it can be listed in the " +
@@ -551,15 +551,15 @@ var Catalog = map[string]Entry{
 	"startup.fix.mac": s("Look up each item listed. If you don't recognise it, remove it: " +
 		"[code]launchctl bootout gui/$(id -u)/LABEL[/code] and delete its .plist from ~/Library/LaunchAgents (items in " +
 		"/Library need an administrator); System Settings → General → Login Items & Extensions shows them too. If one " +
-		"downloads and runs code, run a malware scan and change the passwords used on this Mac. Items whose program is " +
+		"downloads and runs code, run a malware scan; if it finds malware, change the passwords used on this Mac. Items whose program is " +
 		"gone are leftovers of uninstalled apps and can simply be removed."),
 	"startup.fix.win": s("Look up each item listed. If you don't recognise it, turn it off: Task Manager → Startup apps " +
 		"→ Disable, Task Scheduler → the task → Disable, or delete its shortcut from the Startup folder " +
-		"([code]shell:startup[/code]). If one downloads and runs code, run a full scan in Windows Security and change " +
-		"the passwords used on this PC. Items whose program is gone are leftovers of uninstalled apps."),
+		"([code]shell:startup[/code]). If one downloads and runs code, run a full scan in Windows Security; if it " +
+		"finds malware, change the passwords used on this PC. Items whose program is gone are leftovers of uninstalled apps."),
 	"startup.fix.linux": s("Look up each item listed. If you don't recognise it, remove it: delete its .desktop file " +
 		"from ~/.config/autostart, [code]systemctl --user disable --now UNIT[/code], or [code]crontab -e[/code]. If " +
-		"one downloads and runs code, check the machine for malware and change the passwords used on it."),
+		"one downloads and runs code, check the machine for malware; if you find any, change the passwords used on it."),
 
 	// ---- backup ----
 	"backup.unsupported": s("Not checked on {os}: there is no standard backup or device-finding service to read."),

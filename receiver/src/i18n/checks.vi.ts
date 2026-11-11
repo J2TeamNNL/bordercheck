@@ -126,7 +126,7 @@ export const checksVi: CheckCatalog = {
     "Chuyển từng key vào keyring của desktop ([code]secret-tool store[/code] / [code]secret-tool lookup[/code], thuộc libsecret) hoặc CLI của trình quản lý mật khẩu như pass hay 1Password [code]op run[/code], rồi xoá dòng hoặc file đó.",
   "secrets.fix.other": "Chuyển từng key vào trình quản lý mật khẩu hoặc keyring của hệ điều hành, rồi xoá dòng hoặc file đó.",
   "secrets.fix.rotate": 
-    "Với key nằm trong lịch sử shell, xoá các dòng đó là đủ. Chỉ cần đổi (rotate) key khi máy này có thể đã bị xâm nhập, hoặc file từng được chia sẻ hay đồng bộ ra nơi khác.",
+    "Với key nằm trong lịch sử shell, xoá các dòng đó là đủ. Chỉ cần đổi (rotate) key khi có bằng chứng máy này đã bị xâm nhập.",
 
   "updates.belowMin": "{os} cũ hơn phiên bản tối thiểu {min} mà policy yêu cầu.",
   "updates.belowMinWin": "{os} cũ hơn phiên bản tối thiểu build {min} mà policy yêu cầu.",
@@ -261,15 +261,15 @@ export const checksVi: CheckCatalog = {
   "ai.tokens": "{n} token dạng văn bản thuần trong cấu hình AI agent / MCP.",
   "ai.guards": "{n} thiết lập của agent bỏ qua bước xác nhận hoặc sandbox.",
   "ai.fix":
-    "Không để token trong cấu hình MCP: hãy tham chiếu biến môi trường ([code]\"env\": {\"API_KEY\": \"${env:API_KEY}\"}[/code] hoặc cơ chế input/secret riêng của agent) và nạp giá trị từ keychain của hệ điều hành ([code]touchenv run[/code] trên macOS). Đổi các token từng nằm trong những file này. Bật lại bước xác nhận và sandbox: nếu không, một đoạn prompt injection trong bất kỳ file, trang web hay issue nào agent đọc đều có thể chạy lệnh dưới danh nghĩa của bạn.",
+    "Không để token trong cấu hình MCP: hãy tham chiếu biến môi trường ([code]\"env\": {\"API_KEY\": \"${env:API_KEY}\"}[/code] hoặc cơ chế input/secret riêng của agent) và nạp giá trị từ keychain của hệ điều hành ([code]touchenv run[/code] trên macOS). Bật lại bước xác nhận và sandbox: nếu không, một đoạn prompt injection trong bất kỳ file, trang web hay issue nào agent đọc đều có thể chạy lệnh dưới danh nghĩa của bạn.",
 
   "cracked.pass": "Không có dấu vết của Adobe, Autodesk, Windows hay Microsoft Office bẻ khoá.",
   "cracked.found":
     "Có dấu hiệu phần mềm bẻ khoá ({products}). Bản crack là con đường phổ biến để cài mã độc đánh cắp mật khẩu và token.",
   "cracked.fix":
-    "Gỡ phần mềm bẻ khoá cùng mọi công cụ crack hoặc kích hoạt, xoá các dòng mà bản crack đã thêm vào file hosts, rồi quét mã độc toàn bộ máy. Sau đó đổi các mật khẩu và token đã dùng trên máy này: bản crack thường kèm mã độc đánh cắp thông tin. Hãy đề nghị IT cấp bản có bản quyền.",
+    "Gỡ phần mềm bẻ khoá cùng mọi công cụ crack hoặc kích hoạt, xoá các dòng mà bản crack đã thêm vào file hosts, rồi quét mã độc toàn bộ máy: bản crack thường kèm mã độc đánh cắp thông tin. Nếu quét ra mã độc, hãy đổi các mật khẩu và token đã dùng trên máy này. Hãy đề nghị IT cấp bản có bản quyền.",
   "cracked.fixAlternatives":
-    "Gỡ phần mềm bẻ khoá cùng mọi công cụ crack hoặc kích hoạt, xoá các dòng mà bản crack đã thêm vào file hosts, rồi quét mã độc toàn bộ máy. Sau đó đổi các mật khẩu và token đã dùng trên máy này: bản crack thường kèm mã độc đánh cắp thông tin. Hãy đề nghị IT cấp bản có bản quyền, hoặc dùng phần mềm thay thế miễn phí, mã nguồn mở của ArtCraft (https://getartcraft.com).",
+    "Gỡ phần mềm bẻ khoá cùng mọi công cụ crack hoặc kích hoạt, xoá các dòng mà bản crack đã thêm vào file hosts, rồi quét mã độc toàn bộ máy: bản crack thường kèm mã độc đánh cắp thông tin. Nếu quét ra mã độc, hãy đổi các mật khẩu và token đã dùng trên máy này. Hãy đề nghị IT cấp bản có bản quyền, hoặc dùng phần mềm thay thế miễn phí, mã nguồn mở của ArtCraft (https://getartcraft.com).",
   "cracked.alt.adobe":
     "Adobe: PhotoCraft thay cho Photoshop, VectorCraft thay cho Illustrator, FilmCraft thay cho Premiere Pro, LightCraft thay cho Lightroom, EffectCraft thay cho After Effects, DesignCraft thay cho InDesign, PdfCraft thay cho Acrobat.",
   "cracked.alt.office": "Microsoft Office: WordCraft thay cho Word, GridCraft thay cho Excel, DeckCraft thay cho PowerPoint.",
@@ -372,7 +372,7 @@ export const checksVi: CheckCatalog = {
   "extensions.allSites": "{n} tiện ích trong số đó có thể đọc và thay đổi mọi trang web bạn truy cập.",
   "extensions.allSitesWarn": "{n} tiện ích có thể đọc và thay đổi mọi trang web bạn truy cập: {names}.",
   "extensions.fix.blocked":
-    "Gỡ ngay: trong trình duyệt, mở trang tiện ích ([code]chrome://extensions[/code], [code]edge://extensions[/code], [code]brave://extensions[/code], hoặc [code]about:addons[/code] trong Firefox) → Remove; trong trình soạn thảo, mở Extensions view → chọn tiện ích → Uninstall. Sau đó đổi các mật khẩu đã dùng trong trình duyệt hoặc trình soạn thảo đó, và báo cho IT.",
+    "Gỡ ngay: trong trình duyệt, mở trang tiện ích ([code]chrome://extensions[/code], [code]edge://extensions[/code], [code]brave://extensions[/code], hoặc [code]about:addons[/code] trong Firefox) → Remove; trong trình soạn thảo, mở Extensions view → chọn tiện ích → Uninstall. Sau đó báo cho IT. Chỉ đổi các mật khẩu đã dùng trong trình duyệt hoặc trình soạn thảo đó nếu IT xác nhận tiện ích đã lấy cắp dữ liệu.",
   "extensions.fix.outside":
     "Gỡ những tiện ích bạn không chủ động cài (trang tiện ích của trình duyệt → Remove, hoặc Extensions view của trình soạn thảo → Uninstall), rồi cài những tiện ích cần dùng từ Chrome Web Store, Microsoft Edge Add-ons, addons.mozilla.org hoặc marketplace của trình soạn thảo. Nếu IT duyệt một tiện ích, có thể thêm nó vào allow_unpacked trong chính sách.",
   "extensions.fix.notAllowed":
@@ -449,11 +449,11 @@ export const checksVi: CheckCatalog = {
   "startup.writable": "{n} mục chạy chương trình mà người dùng nào cũng sửa được.",
   "startup.missing": "{n} mục trỏ tới chương trình không còn tồn tại.",
   "startup.fix.mac":
-    "Tra cứu từng mục được liệt kê. Nếu không nhận ra, hãy gỡ nó: [code]launchctl bootout gui/$(id -u)/LABEL[/code] rồi xoá file .plist của nó trong ~/Library/LaunchAgents (mục trong /Library cần quyền administrator); System Settings → General → Login Items & Extensions cũng liệt kê chúng. Nếu có mục tải code về và chạy, hãy quét mã độc và đổi các mật khẩu đã dùng trên máy Mac này. Mục có chương trình đã mất là phần sót lại của app đã gỡ, cứ xoá đi.",
+    "Tra cứu từng mục được liệt kê. Nếu không nhận ra, hãy gỡ nó: [code]launchctl bootout gui/$(id -u)/LABEL[/code] rồi xoá file .plist của nó trong ~/Library/LaunchAgents (mục trong /Library cần quyền administrator); System Settings → General → Login Items & Extensions cũng liệt kê chúng. Nếu có mục tải code về và chạy, hãy quét mã độc; nếu quét ra mã độc thì đổi các mật khẩu đã dùng trên máy Mac này. Mục có chương trình đã mất là phần sót lại của app đã gỡ, cứ xoá đi.",
   "startup.fix.win":
-    "Tra cứu từng mục được liệt kê. Nếu không nhận ra, hãy tắt nó: Task Manager → Startup apps → Disable, Task Scheduler → chọn task → Disable, hoặc xoá shortcut của nó khỏi thư mục Startup ([code]shell:startup[/code]). Nếu có mục tải code về và chạy, hãy quét toàn bộ máy bằng Windows Security và đổi các mật khẩu đã dùng trên máy này. Mục có chương trình đã mất là phần sót lại của app đã gỡ.",
+    "Tra cứu từng mục được liệt kê. Nếu không nhận ra, hãy tắt nó: Task Manager → Startup apps → Disable, Task Scheduler → chọn task → Disable, hoặc xoá shortcut của nó khỏi thư mục Startup ([code]shell:startup[/code]). Nếu có mục tải code về và chạy, hãy quét toàn bộ máy bằng Windows Security; nếu quét ra mã độc thì đổi các mật khẩu đã dùng trên máy này. Mục có chương trình đã mất là phần sót lại của app đã gỡ.",
   "startup.fix.linux":
-    "Tra cứu từng mục được liệt kê. Nếu không nhận ra, hãy gỡ nó: xoá file .desktop của nó trong ~/.config/autostart, [code]systemctl --user disable --now UNIT[/code], hoặc [code]crontab -e[/code]. Nếu có mục tải code về và chạy, hãy kiểm tra mã độc trên máy và đổi các mật khẩu đã dùng trên đó.",
+    "Tra cứu từng mục được liệt kê. Nếu không nhận ra, hãy gỡ nó: xoá file .desktop của nó trong ~/.config/autostart, [code]systemctl --user disable --now UNIT[/code], hoặc [code]crontab -e[/code]. Nếu có mục tải code về và chạy, hãy kiểm tra mã độc trên máy; nếu tìm thấy thì đổi các mật khẩu đã dùng trên đó.",
 
   "backup.unsupported": "Không kiểm tra trên {os}: không có dịch vụ sao lưu hay định vị thiết bị chuẩn nào để đọc.",
   "backup.unencrypted": "{n} bản sao lưu Time Machine không được mã hoá: ai lấy được ổ đĩa đều đọc được file của bạn.",
