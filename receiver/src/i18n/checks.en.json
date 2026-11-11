@@ -264,7 +264,7 @@
   "secrets.fix.linux": "Move each key into the desktop keyring ([code]secret-tool store[/code] / [code]secret-tool lookup[/code], from libsecret) or a password manager CLI such as pass or 1Password [code]op run[/code], then delete the line or file.",
   "secrets.fix.mac": "Move each key into the Keychain behind Touch ID with touchenv (https://github.com/ptrinh/touch-env): [code]touchenv set NAME[/code], then delete the line or file.",
   "secrets.fix.other": "Move each key into a password manager or the OS keyring, then delete the line or file.",
-  "secrets.fix.rotate": "Keys that sat in shell history or a synced folder may already have leaked: rotate them.",
+  "secrets.fix.rotate": "For a key in shell history, deleting those lines is enough. Rotate a key only if this computer may have been compromised, or the file was shared or synced somewhere else.",
   "secrets.fix.win": "Move each key into Windows Credential Manager or a password manager CLI (e.g. 1Password [code]op run[/code]), then delete the line or file.",
   "secrets.found": {
     "one": "1 secret in plain text across {files} file(s).",

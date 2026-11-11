@@ -125,7 +125,8 @@ export const checksVi: CheckCatalog = {
   "secrets.fix.linux":
     "Chuyển từng key vào keyring của desktop ([code]secret-tool store[/code] / [code]secret-tool lookup[/code], thuộc libsecret) hoặc CLI của trình quản lý mật khẩu như pass hay 1Password [code]op run[/code], rồi xoá dòng hoặc file đó.",
   "secrets.fix.other": "Chuyển từng key vào trình quản lý mật khẩu hoặc keyring của hệ điều hành, rồi xoá dòng hoặc file đó.",
-  "secrets.fix.rotate": "Key từng nằm trong lịch sử shell hay thư mục đồng bộ có thể đã bị lộ: hãy đổi (rotate) các key đó.",
+  "secrets.fix.rotate": 
+    "Với key nằm trong lịch sử shell, xoá các dòng đó là đủ. Chỉ cần đổi (rotate) key khi máy này có thể đã bị xâm nhập, hoặc file từng được chia sẻ hay đồng bộ ra nơi khác.",
 
   "updates.belowMin": "{os} cũ hơn phiên bản tối thiểu {min} mà policy yêu cầu.",
   "updates.belowMinWin": "{os} cũ hơn phiên bản tối thiểu build {min} mà policy yêu cầu.",

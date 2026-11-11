@@ -145,8 +145,9 @@ var Catalog = map[string]Entry{
 	"secrets.fix.linux": s("Move each key into the desktop keyring ([code]secret-tool store[/code] / " +
 		"[code]secret-tool lookup[/code], from libsecret) or a password manager CLI such as pass or 1Password " +
 		"[code]op run[/code], then delete the line or file."),
-	"secrets.fix.other":  s("Move each key into a password manager or the OS keyring, then delete the line or file."),
-	"secrets.fix.rotate": s("Keys that sat in shell history or a synced folder may already have leaked: rotate them."),
+	"secrets.fix.other": s("Move each key into a password manager or the OS keyring, then delete the line or file."),
+	"secrets.fix.rotate": s("For a key in shell history, deleting those lines is enough. Rotate a key only if this computer " +
+		"may have been compromised, or the file was shared or synced somewhere else."),
 
 	// ---- os-updates: problems ----
 	"updates.belowMin":           s("{os} is older than the minimum version {min} set by policy."),

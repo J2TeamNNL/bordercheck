@@ -126,7 +126,8 @@ export const checksZh: CheckCatalog = {
   "secrets.fix.linux":
     "把每个密钥移入桌面密钥环（libsecret 的 [code]secret-tool store[/code] / [code]secret-tool lookup[/code]）或密码管理器的命令行工具（如 pass 或 1Password [code]op run[/code]），然后删除那一行或那个文件。",
   "secrets.fix.other": "把每个密钥移入密码管理器或系统密钥环，然后删除那一行或那个文件。",
-  "secrets.fix.rotate": "曾出现在 Shell 历史或同步文件夹中的密钥可能已经泄露：请轮换这些密钥。",
+  "secrets.fix.rotate": 
+    "对于出现在 Shell 历史中的密钥，删除相应的行即可。只有当这台电脑可能已被入侵，或文件曾被共享或同步到别处时，才需要轮换密钥。",
 
   "updates.belowMin": "{os} 低于策略规定的最低版本 {min}。",
   "updates.belowMinWin": "{os} 低于策略规定的最低版本 build {min}。",
