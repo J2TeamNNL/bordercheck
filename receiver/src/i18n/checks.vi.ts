@@ -140,9 +140,6 @@ export const checksVi: CheckCatalog = {
   "docker.fix":
     "Chỉ publish cổng trên localhost ([code]-p 127.0.0.1:5432:5432[/code]). Không dùng [code]--network host[/code] hay [code]--privileged[/code]. Chỉ mount thư mục dự án; không bao giờ mount Docker socket, thư mục home hay thư mục chứa thông tin đăng nhập.",
 
-  "privacy.credentialsOff": "Quét kho thông tin xác thực đang tắt trong cài đặt quyền riêng tư trên máy.",
-  "privacy.secretsOff": "Quét secret đang tắt trong cài đặt quyền riêng tư trên máy.",
-  "privacy.secretsPartial": "Không tìm thấy secret dạng văn bản trong các nguồn đã bật trên máy.",
   "secrets.pass": "Không có secret dạng văn bản thuần trong file shell, lịch sử shell, file thông tin đăng nhập hay file .env.",
   "secrets.found": "{n} secret dạng văn bản thuần trong {files} file.",
   "secrets.foundProd": "{n} secret dạng văn bản thuần trong {files} file, {prod} secret được đánh dấu production.",

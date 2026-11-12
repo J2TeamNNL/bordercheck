@@ -191,7 +191,7 @@ func TestSecretsCheckSamplesEndToEnd(t *testing.T) {
 	}
 	p := policy.Default().Checks.Secrets
 	p.Locations = policy.SecretLocations{}
-	r := secrets(p, Local{Privacy: Privacy{ProjectEnv: true, CredentialStores: true}})(t.Context())
+	r := secrets(p, Local{})(t.Context())
 	rules := map[string]string{}
 	for _, s := range r.LikelySamples {
 		rules[filepath.ToSlash(s.Path)] = s.Rule
@@ -218,7 +218,7 @@ func TestSecretsCheckSamplesEndToEnd(t *testing.T) {
 	}
 
 	p.SampleRules = []string{}
-	if r := secrets(p, Local{Privacy: Privacy{ProjectEnv: true, CredentialStores: true}})(t.Context()); len(r.LikelySamples) != 0 || len(r.Evidence) != 6 {
+	if r := secrets(p, Local{})(t.Context()); len(r.LikelySamples) != 0 || len(r.Evidence) != 6 {
 		t.Errorf("off: %v %v", r.LikelySamples, r.Evidence)
 	}
 }

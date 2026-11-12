@@ -453,7 +453,7 @@ func TestScanLocations(t *testing.T) {
 
 func TestSecretsMovedFilesStillCovered(t *testing.T) {
 	for _, rel := range []string{".netrc", ".pypirc", ".git-credentials", ".docker/config.json"} {
-		if slices.Contains(credentialScanFiles, rel) {
+		if slices.Contains(secretFiles, rel) {
 			t.Errorf("%s is read by both the generic scan and its location reader", rel)
 		}
 	}

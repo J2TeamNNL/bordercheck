@@ -19,14 +19,15 @@ import (
 // dummy .env, the certificates an SDK ships to everyone, a demo app's signing
 // key. A secrets finding that one of these rules matches is set aside: it does
 // not count toward the check's status, severity, counts or evidence, and is
-// listed in the result's LikelySamples for local and detailed reports. Never set aside: a finding marked [production], anything inside a .git
+// listed in the result's LikelySamples, which is always sent, so IT still sees
+// it. Never set aside: a finding marked [production], anything inside a .git
 // folder (a repository's own config holds real remote credentials), and, by
 // sample-dir alone, a live-looking provider token.
 //
 //   - git-tracked: the file is tracked by a git repository below the home
 //     folder and its content is exactly what the index records (gitindex.go).
 //     A real secret committed to a repository matches too: that is why the
-//     list is available for review and production-marked findings are excluded.
+//     list goes to IT and production-marked findings are excluded.
 //   - sdk: a file an SDK ships identically to every user (sdkSampleDirs).
 //   - sample-dir: a folder between the home folder and the file is named
 //     like a demo, sample, example, fixture, testdata or mock folder.

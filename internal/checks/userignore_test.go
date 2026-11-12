@@ -155,7 +155,7 @@ func TestUserIgnoreOnMadeUpHome(t *testing.T) {
 	writeFile(t, home, ".ssh/config", "Host *\n  ForwardAgent yes\n", 0o600)
 
 	pol := policy.Default()
-	items, gotHome, err := IgnorableItems(t.Context(), pol, Privacy{ShellHistory: true, ProjectEnv: true, CredentialStores: true})
+	items, gotHome, err := IgnorableItems(t.Context(), pol)
 	if err != nil || gotHome != home {
 		t.Fatalf("%v %q", err, gotHome)
 	}
@@ -180,7 +180,7 @@ func TestUserIgnoreOnMadeUpHome(t *testing.T) {
 		}
 	}
 
-	local := Local{Privacy: Privacy{ProjectEnv: true, CredentialStores: true}, Ignored: []ignore.Entry{
+	local := Local{Ignored: []ignore.Entry{
 		{Check: "secrets", Path: "~/app/.env", Name: "POSTGRES_PASSWORD", Reason: "local db"},
 		{Check: "ai-agents", Path: "~/.claude.json", Name: "Authorization", Reason: "local MCP"},
 		{Check: "ai-agents", Path: "~/.codex/config.toml", Reason: "cannot apply"},

@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/ptrinh/bordercheck/internal/check"
-	"github.com/ptrinh/bordercheck/internal/checks"
 	"github.com/ptrinh/bordercheck/internal/notify"
 	"github.com/ptrinh/bordercheck/internal/policy"
 	"github.com/ptrinh/bordercheck/internal/report"
@@ -179,7 +178,7 @@ func TestEnrollInstallHappyPath(t *testing.T) {
 	if len(p.enrolls) != 1 || p.enrolls[0]["code"] != "Inv1te-code_ok" || p.enrolls[0]["version"] != "v1.0.0" || p.enrollAuth[0] != "" {
 		t.Fatalf("enroll requests %v, auth %q", p.enrolls, p.enrollAuth)
 	}
-	if h, _ := p.enrolls[0]["host"].(map[string]any); h["os"] != runtime.GOOS || h["arch"] != runtime.GOARCH || h["hostname"] != nil {
+	if h, _ := p.enrolls[0]["host"].(map[string]any); h["os"] != runtime.GOOS || h["arch"] != runtime.GOARCH {
 		t.Errorf("host %v", p.enrolls[0]["host"])
 	}
 
@@ -210,9 +209,6 @@ func TestEnrollInstallHappyPath(t *testing.T) {
 	if len(p.reports) != 1 || p.reportAuth[0] != "Bearer "+testToken {
 		t.Fatalf("reports %d, auth %q", len(p.reports), p.reportAuth)
 	}
-	if strings.Contains(p.reports[0], `"hostname"`) {
-		t.Error("summary report includes a hostname field")
-	}
 	var rep report.Report
 	if err := json.Unmarshal([]byte(p.reports[0]), &rep); err != nil || rep.Email != "an@example.com" ||
 		rep.InstallID != testInstallID || rep.Policy != "Engineering" {
@@ -233,7 +229,7 @@ func TestEnrollInstallHappyPath(t *testing.T) {
 	}
 	host := strings.TrimPrefix(p.url(), "https://")
 	for _, want := range []string{"Enrolled:   with " + host + ", role engineering", "Install ID: " + testInstallID,
-		"Waiver:     listeners until", "Sends:      check statuses and device metadata; evidence off, IP addresses off, location off"} {
+		"Waiver:     listeners until", "Sends:      results, anything you ignored with your reason, and files set aside as likely sample keys; evidence off, IP addresses off, location off"} {
 		if !strings.Contains(status, want) {
 			t.Errorf("status lacks %q:\n%s", want, status)
 		}
@@ -792,7 +788,7 @@ func TestNotifyOpensReportPageForNewHighProblems(t *testing.T) {
 	}
 }
 
-func TestReportCarriesIPsOnlyWithLocalConsent(t *testing.T) {
+func TestReportCarriesIPsOnlyWhenAsked(t *testing.T) {
 	p := newPortal(t)
 	env, out := enrolledEnv(t, p)
 	if err := Send(t.Context(), env, true); err != nil {
@@ -807,20 +803,11 @@ func TestReportCarriesIPsOnlyWithLocalConsent(t *testing.T) {
 	if err := Send(t.Context(), env, true); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if strings.Contains(p.reports[1], `"ips"`) || strings.Contains(p.reports[1], `"location"`) {
-		t.Errorf("policy alone enabled IPs or location: %s", p.reports[1])
-	}
-	if err := writeJSON(filepath.Join(env.Dir, "privacy.json"), checks.Privacy{ReportDetails: true}); err != nil {
-		t.Fatal(err)
-	}
-	if err := Send(t.Context(), env, true); err != nil {
-		t.Fatalf("%v\n%s", err, out)
-	}
 	var rep struct {
 		Host     map[string]any `json:"host"`
 		Location any            `json:"location"`
 	}
-	if err := json.Unmarshal([]byte(p.reports[2]), &rep); err != nil {
+	if err := json.Unmarshal([]byte(p.reports[1]), &rep); err != nil {
 		t.Fatal(err)
 	}
 	// IPs may be absent on a machine with no network; when present they are a list.

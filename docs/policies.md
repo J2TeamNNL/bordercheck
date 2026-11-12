@@ -47,7 +47,7 @@ A small policy:
 
 ## report
 
-Used only by an installed copy. A plain `bordercheck` never sends anything. The three optional detail flags also require [local consent](install.md#local-privacy-settings).
+Used only by an installed copy. A plain `bordercheck` never sends anything.
 
 | Field | Default | |
 |---|---|---|
@@ -55,7 +55,7 @@ Used only by an installed copy. A plain `bordercheck` never sends anything. The 
 | `headers` | `{}` | Extra request headers, e.g. `{"Authorization": "Bearer …"}` for your own endpoint: a token that can only submit reports. Not used with invite links: an enrolled install sends its own token, and the portal strips any `Authorization` header from a role. |
 | `interval` | `"24h"` | Go duration between reports, at least `15m`. The service wakes hourly and sends when this much time has passed since the last report that got through, so a failed send retries the next hour. |
 | `check_interval` | `""` | Check the machine more often than it reports, e.g. `"24h"` with `"interval": "168h"`: the person at the machine is told about a new problem within a day, IT gets one report a week. At least `15m`, not longer than `interval`. `""` checks only when a report is due. Needs bordercheck v0.3.1 or later: an older one rejects a policy with this field. |
-| `include_evidence` | `false` | With local consent, send hostname, summaries, fixes and evidence such as paths, ports, variable names and container names. |
+| `include_evidence` | `false` | Also send evidence: file paths, ports, variable names, container names. Off, the report carries only status, severity, summary and fix. |
 | `email_domains` | `[]` | With a static `policies.json`, the email typed at install must be in one of these domains. Empty = any. |
 | `include_ips` | `false` | Also send `host.ips`: the addresses of the machine's own network interfaces that are up (IPv4 and IPv6, without loopback and link-local; at most 16), read locally. bordercheck never asks a "what is my IP" service. |
 | `include_location` | `false` | Meant to send a device position. **It has no effect today**: no OS gives one without a permission prompt, admin rights or a lookup with a third party, so no location is sent. See [Location](#location). |
@@ -81,7 +81,8 @@ not offer) never mark a report.
 When a report carries a sign:
 
 - **The report** has `"compromised": true` and `"compromise_checks"`; each result lists its signs under
-  `compromise` (what it is and which item) in detailed reports. Summary reports carry the flag and check IDs.
+  `compromise` (what it is; which item only when `include_evidence` is on). The flag and the check IDs go whatever
+  `include_evidence` says.
 - **It goes at once.** The service sends a report as soon as a scheduled check finds the signs changed (new, a
   different one, or gone), instead of waiting for `interval`, and tries again every hour until it gets through.
   The same signs are not sent again until the next ordinary report. A sign is noticed within about an hour
@@ -160,7 +161,7 @@ A waiver exempts one machine from one check for a while, without loosening the r
 | `email`, `install_id` | Which machine; at least one. `email` is the one bordercheck was installed with (or that IT set in the invite). `install_id` is in the machine's reports and in `bordercheck status`. A portal adds waivers keyed by `install_id` for enrolled machines. |
 | `hostname` | Optional. Narrows the waiver to one of that person's machines: the report's `host.hostname`, ignoring case and a trailing `.local`. Never enough alone, since people set their own hostname. |
 | `until` | Required, `YYYY-MM-DD`: the last day it applies, by the machine's local date. At most a year ahead; a waiver without an end is rejected. |
-| `reason` | Required. Shown to the person and included in detailed reports. |
+| `reason` | Required. Shown to the person and sent in the report. |
 
 Every field given must match. While a waiver applies, a `fail` or `warn` from that check reports as `waived`:
 it keeps its severity, summary and fix, gains `"waived": {"until": "2026-12-01", "reason": "…"}` in the JSON,
@@ -298,8 +299,8 @@ private key, matches a `high` extra pattern, or is marked production. Values are
 | `walk_depth` | `5` | How many folders below home are searched for `.env` and key files, 0–20. Files and folders kept only in iCloud Drive or another cloud provider (placeholders, not on this disk) are not read, since reading one downloads it; apps, media libraries and disk-image bundles are skipped. |
 | `extra_patterns` | `[]` | Your own token formats: `{"kind": "Acme token", "regex": "\\bacme_[A-Za-z0-9]{32}\\b", "high": true, "show_tail": true}`. `kind` and a valid Go regular expression are required; `high` makes a match fail; `show_tail` is safe only for long random tokens. They are tried before the built-in rules. |
 | `locations` | all `true` | Credential stores read format by format; each switches off alone. |
-| `user_ignore` | `true` | Let the person at the machine mark findings as not sensitive with `bordercheck ignore <path> [-name VAR] -reason "…"` ([how](install.md#secrets-that-are-not-sensitive)); `ai-agents` and `ssh-keys` have the same switch. Ignored findings stop counting toward this check, and detailed reports list them with the reason in the result's `user_ignored`; the portal shows them on the machine's page. A finding marked `[production]` can be ignored too, and is listed for IT as production. `false`: `bordercheck ignore` refuses and existing entries are not applied (the summary says so). Needs bordercheck v0.5.0 or later on every machine of the role when set (older ones reject the unknown field); leaving it out keeps the default on new clients and works with old ones. |
-| `sample_rules` | `["git-tracked", "sdk", "sample-dir"]` | Which rules set a finding aside as a likely sample key ([what each does](install.md#sample-keys)): `git-tracked` (tracked by a git repository below the home folder and unchanged from what its index records; read without running git), `sdk` (files an SDK ships to every user, such as Tizen Studio's certificates), `sample-dir` (a folder named like `demo`, `samples`, `examples`, `fixtures`, `testdata`, `mocks`). A likely sample stops counting toward the check, and detailed reports list it in the result's `likely_samples` (path, name or kind, rule); the portal shows it on the machine's page. `[]` turns this off; an unknown rule is an error. Never set aside: findings marked `[production]`, files inside `.git`, and by `sample-dir` alone a live-looking provider token. Caveat: a real secret committed to a repository also matches `git-tracked`; production-marked findings are excluded and IT can review samples when details are enabled. Needs a client that knows the field on every machine of the role when set (older ones reject the unknown field); leaving it out keeps the default on new clients and works with old ones. |
+| `user_ignore` | `true` | Let the person at the machine mark findings as not sensitive with `bordercheck ignore <path> [-name VAR] -reason "…"` ([how](install.md#secrets-that-are-not-sensitive)); `ai-agents` and `ssh-keys` have the same switch. Ignored findings stop counting toward this check, but every report lists them with the reason in the result's `user_ignored`, also when `include_evidence` is off; the portal shows them on the machine's page. A finding marked `[production]` can be ignored too, and is listed for IT as production. `false`: `bordercheck ignore` refuses and existing entries are not applied (the summary says so). Needs bordercheck v0.5.0 or later on every machine of the role when set (older ones reject the unknown field); leaving it out keeps the default on new clients and works with old ones. |
+| `sample_rules` | `["git-tracked", "sdk", "sample-dir"]` | Which rules set a finding aside as a likely sample key ([what each does](install.md#sample-keys)): `git-tracked` (tracked by a git repository below the home folder and unchanged from what its index records; read without running git), `sdk` (files an SDK ships to every user, such as Tizen Studio's certificates), `sample-dir` (a folder named like `demo`, `samples`, `examples`, `fixtures`, `testdata`, `mocks`). A likely sample stops counting toward the check, and every report lists it in the result's `likely_samples` (path, name or kind, rule; never a value), also when `include_evidence` is off; the portal shows it on the machine's page. `[]` turns this off; an unknown rule is an error. Never set aside: findings marked `[production]`, files inside `.git`, and by `sample-dir` alone a live-looking provider token. Caveat: a real secret committed to a repository also matches `git-tracked`; that is why the list goes to IT and production-marked findings are excluded. Needs a client that knows the field on every machine of the role when set (older ones reject the unknown field); leaving it out keeps the default on new clients and works with old ones. |
 
 `locations`:
 

@@ -26,18 +26,14 @@ const (
 	secretMaxEvidence = 100
 )
 
-// Fixed sources are grouped by the local permission that allows reading them.
-var credentialScanFiles = []string{
+// Files under the home folder that often hold keys, on any OS.
+var secretFiles = []string{
 	".zshrc", ".zprofile", ".zshenv", ".bashrc", ".bash_profile", ".profile",
-	".config/fish/config.fish",
+	".zsh_history", ".bash_history", ".config/fish/config.fish", ".local/share/fish/fish_history",
+	".aws/credentials", ".npmrc", // .netrc, .pypirc, .git-credentials, Docker…: see credLocations
+	"AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt",
 	"Documents/PowerShell/Microsoft.PowerShell_profile.ps1",
 	"Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1",
-	".aws/credentials", ".npmrc",
-}
-
-var shellHistoryFiles = []string{
-	".zsh_history", ".bash_history", ".local/share/fish/fish_history",
-	"AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt",
 }
 
 // Folders the .env walk never enters: big, generated, or not the user's own files.
@@ -157,34 +153,19 @@ func newSecretScanner(p policy.Secrets, home string) (*secretScanner, error) {
 
 func secrets(p policy.Secrets, local Local) func(context.Context) check.Result {
 	return func(ctx context.Context) check.Result {
-		if !local.Privacy.scansSecrets() {
-			return check.SkippedMsg(msg.Of("privacy.secretsOff"))
-		}
-		home, found, bundles, incomplete, err := scanSecrets(ctx, p, local.Privacy)
+		home, found, bundles, incomplete, err := scanSecrets(ctx, p)
 		if err != nil {
 			return check.Errored(err)
 		}
 		u := newUserIgnore("secrets", local, p.UserIgnore, home)
-		samplePolicy := p
-		if !local.Privacy.CredentialStores {
-			// The git-tracked rule can read a Git config that contains credentials.
-			samplePolicy.SampleRules = slices.DeleteFunc(slices.Clone(p.SampleRules), func(rule string) bool {
-				return rule == "git-tracked"
-			})
-		}
-		sc := newSampleClassifier(ctx, samplePolicy, home)
-		r := evalSecretsSamples(found, bundles, incomplete, secretFix(), u, sc)
-		if !local.Privacy.allowsExtraPaths() && len(r.SummaryParts) > 0 && r.SummaryParts[0].Key == "secrets.pass" {
-			r.SummaryParts[0] = msg.P("privacy.secretsPartial")
-			r = r.WithSummary(r.SummaryParts)
-		}
-		return r
+		sc := newSampleClassifier(ctx, p, home)
+		return evalSecretsSamples(found, bundles, incomplete, secretFix(), u, sc)
 	}
 }
 
 // scanSecrets finds what the policy looks for: findings and certificate
 // bundles, by the path the report shows.
-func scanSecrets(ctx context.Context, p policy.Secrets, privacy Privacy) (home string, found []secretFinding, bundles []string, incomplete bool, err error) {
+func scanSecrets(ctx context.Context, p policy.Secrets) (home string, found []secretFinding, bundles []string, incomplete bool, err error) {
 	if home, err = os.UserHomeDir(); err != nil {
 		return "", nil, nil, false, err
 	}
@@ -194,16 +175,14 @@ func scanSecrets(ctx context.Context, p policy.Secrets, privacy Privacy) (home s
 	}
 	ctx, cancel := context.WithTimeout(ctx, secretScanTimeout)
 	defer cancel()
-	files, bs, incomplete := s.find(ctx, home, privacy)
+	files, bs, incomplete := s.find(ctx, home)
 	for _, f := range files {
 		if shown := tildePath(home, f); !s.ignored(shown) {
 			found = append(found, s.scanFile(f, shown)...)
 		}
 	}
-	if privacy.CredentialStores {
-		found = append(found, s.scanLocations(home, runtime.GOOS, p.Locations)...)
-		found = append(found, s.scanGitRemotes(home, p.Locations)...)
-	}
+	found = append(found, s.scanLocations(home, runtime.GOOS, p.Locations)...)
+	found = append(found, s.scanGitRemotes(home, p.Locations)...)
 	for _, b := range bs {
 		if shown := tildePath(home, b); !s.ignored(shown) {
 			bundles = append(bundles, shown)
@@ -234,7 +213,7 @@ func secretFix() msg.Text {
 // exist, plus .env and key files found within s.depth folders of home.
 // Certificate bundles (.p12, .pfx) are binary, so they are reported by name
 // instead of scanned.
-func (s *secretScanner) find(ctx context.Context, home string, privacy Privacy) (scan, bundles []string, incomplete bool) {
+func (s *secretScanner) find(ctx context.Context, home string) (scan, bundles []string, incomplete bool) {
 	seen := map[string]bool{}
 	add := func(p string) {
 		if !seen[p] {
@@ -242,29 +221,14 @@ func (s *secretScanner) find(ctx context.Context, home string, privacy Privacy) 
 			scan = append(scan, p)
 		}
 	}
-	var candidates []string
-	addHomeFiles := func(files []string) {
-		for _, rel := range files {
-			candidates = append(candidates, filepath.Join(home, filepath.FromSlash(rel)))
-		}
-	}
-	if privacy.ShellHistory {
-		addHomeFiles(shellHistoryFiles)
-	}
-	if privacy.CredentialStores {
-		addHomeFiles(credentialScanFiles)
-	}
-	// Policy-defined paths may point into any of the sensitive groups.
-	if privacy.allowsExtraPaths() {
-		candidates = append(candidates, s.extra...)
+	candidates := slices.Clone(s.extra)
+	for _, rel := range secretFiles {
+		candidates = append(candidates, filepath.Join(home, filepath.FromSlash(rel)))
 	}
 	for _, p := range candidates {
-		if st, err := os.Lstat(p); err == nil && st.Mode().IsRegular() {
+		if st, err := os.Stat(p); err == nil && st.Mode().IsRegular() {
 			add(p)
 		}
-	}
-	if !privacy.ProjectEnv && !privacy.CredentialStores {
-		return scan, bundles, false
 	}
 	_ = filepath.WalkDir(home, func(p string, d fs.DirEntry, err error) error {
 		if ctx.Err() != nil {
@@ -287,9 +251,7 @@ func (s *secretScanner) find(ctx context.Context, home string, privacy Privacy) 
 		}
 		if d.IsDir() {
 			rel, _ := filepath.Rel(home, p)
-			if privacy.CredentialStores {
-				s.noteGitDir(name, p, rel)
-			}
+			s.noteGitDir(name, p, rel)
 			if secretSkipDirs[name] || strings.Count(rel, string(filepath.Separator)) >= s.depth || isPackageDir(name) {
 				return filepath.SkipDir
 			}
@@ -300,15 +262,11 @@ func (s *secretScanner) find(ctx context.Context, home string, privacy Privacy) 
 		}
 		switch strings.ToLower(filepath.Ext(name)) {
 		case ".pem", ".key", ".p8":
-			if privacy.CredentialStores {
-				add(p)
-			}
+			add(p)
 		case ".p12", ".pfx":
-			if privacy.CredentialStores {
-				bundles = append(bundles, p)
-			}
+			bundles = append(bundles, p)
 		default:
-			if privacy.ProjectEnv && isEnvFile(name) {
+			if isEnvFile(name) {
 				add(p)
 			}
 		}

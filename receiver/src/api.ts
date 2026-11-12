@@ -252,9 +252,7 @@ const S = {
   issued: obj({
     invite_id: { type: "integer" }, email: { type: "string" }, expires_at: { type: "string" },
     invite_link: { type: "string", description: "Contains the one-time code: send it to this person only." },
-    download_macos_linux: { type: "string", format: "uri" }, download_windows: { type: "string", format: "uri" },
-    install_macos_linux: { type: "string", description: "Run after saving and reviewing install.sh." },
-    install_windows: { type: "string", description: "Run after saving and reviewing install.ps1." },
+    install_macos_linux: { type: "string" }, install_windows: { type: "string" },
   }, "A new invite. Its code is in this response only: it is never stored or shown again."),
   role: obj({ role_id: { type: "integer" }, name: { type: "string" }, created_at: { type: "string" }, updated_at: { type: "string" }, policy: { type: "object" }, machines: { type: "array" } }),
   waiver: obj({ waiver_id: { type: "integer" }, check_id: { type: "string" }, until: { type: "string" }, active: { type: "boolean" }, reason: { type: "string" }, added_at: { type: "string" }, added_by: { type: "string" }, removed_at: { type: ["string", "null"] }, removed_by: { type: ["string", "null"] } }),

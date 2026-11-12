@@ -139,9 +139,6 @@ export const checksZh: CheckCatalog = {
   "docker.fix":
     "只在 localhost 上发布端口（[code]-p 127.0.0.1:5432:5432[/code]）。不要使用 [code]--network host[/code] 或 [code]--privileged[/code]。只挂载项目文件夹，切勿挂载 Docker socket、主目录或凭据文件夹。",
 
-  "privacy.credentialsOff": "本机隐私设置已关闭凭据存储扫描。",
-  "privacy.secretsOff": "本机隐私设置已关闭密钥扫描。",
-  "privacy.secretsPartial": "在本机已启用的来源中未发现明文密钥。",
   "secrets.pass": "Shell 配置文件、Shell 历史、凭据文件和 .env 文件中都没有明文密钥。",
   "secrets.found": "{files} 个文件中共有 {n} 个明文密钥。",
   "secrets.foundProd": "{files} 个文件中共有 {n} 个明文密钥，其中 {prod} 个标记为生产环境。",

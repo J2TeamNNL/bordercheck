@@ -224,7 +224,7 @@ func TestFindSecretFiles(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	scan, bundles, incomplete := testScanner(t, policy.Default().Checks.Secrets).find(t.Context(), home, Privacy{ShellHistory: true, ProjectEnv: true, CredentialStores: true})
+	scan, bundles, incomplete := testScanner(t, policy.Default().Checks.Secrets).find(t.Context(), home)
 	for i, p := range scan {
 		scan[i] = filepath.ToSlash(tildePath(home, p))
 	}

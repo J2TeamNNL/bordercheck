@@ -4,12 +4,21 @@ Installs bordercheck on Windows and sets it up to report to your organisation
 every hour (a per-user scheduled task; no administrator rights).
 
 .DESCRIPTION
-Requires a trusted OpenSSL with Ed25519 support (OpenSSL 3 or later) on PATH.
-Verifies the signed checksum manifest, then checks the binary before executing it.
-Download and review this script before running it from a regular user account.
+Downloads the latest release for this PC, checks it against SHA256SUMS before
+running it, has the binary check the ed25519 signature on SHA256SUMS with the
+key pinned below, then runs `bordercheck install <policies URL or invite link>`. Any mismatch
+stops the install. Windows PowerShell 5.1 has no ed25519, so unlike install.sh
+with OpenSSL 3 the signature is always checked by the downloaded binary; see
+docs/install.md, "What the install script proves".
 
 .EXAMPLE
-.\install.ps1 'https://bordercheck.acme.com/i/<code>'
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/policies.json
+
+.EXAMPLE
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/policies.json -Email an@acme.com
+
+.EXAMPLE
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/i/<code>
 #>
 param(
     # The policies URL, or an invite link https://<host>/i/<code> from IT.
@@ -64,9 +73,6 @@ function Fetch([string]$url, [string]$file) {
     Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $file
 }
 
-$openssl = Get-Command openssl.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $openssl) { Fail 'A trusted OpenSSL with Ed25519 support is required. Put OpenSSL 3 or later on PATH.' }
-
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('bordercheck-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
 try {
@@ -79,21 +85,6 @@ try {
     Say "Fetching the release list for windows/$arch from github.com/$Repo ..."
     try { Fetch "$sumsBase/SHA256SUMS" $sums } catch { Fail "Could not download SHA256SUMS from $sumsBase ($($_.Exception.Message))." }
     try { Fetch "$sumsBase/SHA256SUMS.sig" $sig } catch { Fail 'The release has no SHA256SUMS.sig, so it cannot be verified.' }
-
-    # SubjectPublicKeyInfo prefix for a raw 32-byte Ed25519 public key.
-    try {
-        $keyBytes = [Convert]::FromBase64String($Key)
-        $signature = [Convert]::FromBase64String([IO.File]::ReadAllText($sig))
-    } catch { Fail 'The release key or signature is not base64.' }
-    if ($keyBytes.Length -ne 32 -or $signature.Length -ne 64) { Fail 'Invalid Ed25519 release key or signature length.' }
-    $derPath = Join-Path $tmp 'key.der'
-    $sigPath = Join-Path $tmp 'sig.bin'
-    [byte[]]$der = @(0x30,0x2a,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x03,0x21,0x00) + $keyBytes
-    [IO.File]::WriteAllBytes($derPath, $der)
-    [IO.File]::WriteAllBytes($sigPath, $signature)
-    & $openssl.Source pkeyutl -verify -pubin -inkey $derPath -keyform DER -rawin -in $sums -sigfile $sigPath | Out-Null
-    if ($LASTEXITCODE -ne 0) { Fail 'OpenSSL could not verify SHA256SUMS with the trusted release key.' }
-    Say 'SHA256SUMS is signed by the release key (checked with OpenSSL).'
 
     $pattern = '^([0-9a-fA-F]{64}) [ *]?(bordercheck-(v\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)-windows-' + $arch + '\.exe)$'
     $match = Get-Content -LiteralPath $sums | ForEach-Object { if ($_.TrimEnd() -match $pattern) { $Matches } } | Select-Object -First 1
@@ -110,6 +101,12 @@ try {
     if ($got -ne $want) { Fail "$asset does NOT match SHA256SUMS (expected $want, got $got). Do not install it; tell your IT team." }
     Say "$asset matches SHA256SUMS."
 
+    # The signature, checked by the binary with the key this script pins.
+    & $exe verify -key $Key $sums $sig $exe | Out-Null
+    if ($LASTEXITCODE -ne 0) { Fail 'SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team.' }
+    Say 'SHA256SUMS is signed by the release key (checked by the downloaded binary).'
+    if (-not ((& $exe -version) -match [regex]::Escape($tag))) { Fail "$asset does not report version $tag." }
+
     $installArgs = @('install', $PolicyUrl)
     if ($Email) { $installArgs += @('-email', $Email) }
     if ($Invite) {
@@ -120,7 +117,6 @@ try {
         Say "Verified $tag. Dry run: would now run: bordercheck $($installArgs -join ' ')"
         return
     }
-    if (-not ((& $exe -version) -match [regex]::Escape($tag))) { Fail "$asset does not report version $tag." }
     # Run from the console, so bordercheck can ask for the work email itself (not with an invite link).
     & $exe @installArgs
     if ($LASTEXITCODE -ne 0) { throw "bordercheck-install: bordercheck install failed (exit $LASTEXITCODE)." }

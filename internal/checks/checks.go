@@ -20,28 +20,8 @@ import (
 // Local is what the person at this computer has set for the checks, kept in
 // the install folder rather than the policy.
 type Local struct {
-	Privacy Privacy
-
 	Ignored   []ignore.Entry // secrets marked as not sensitive (bordercheck ignore)
 	IgnoreErr error          // the list of ignored secrets could not be read
-}
-
-// Privacy is local consent. Its zero value leaves sensitive sources and
-// detailed reporting disabled, including on existing installations.
-type Privacy struct {
-	ShellHistory     bool `json:"shell_history"`
-	ProjectEnv       bool `json:"project_env"`
-	CredentialStores bool `json:"credential_stores"`
-	ReportDetails    bool `json:"report_details"`
-}
-
-func (p Privacy) scansSecrets() bool {
-	return p.ShellHistory || p.ProjectEnv || p.CredentialStores
-}
-
-// Policy-defined paths can point to any of the sensitive sources.
-func (p Privacy) allowsExtraPaths() bool {
-	return p.ShellHistory && p.ProjectEnv && p.CredentialStores
 }
 
 // CompromiseCheckIDs are the checks whose findings can be a sign of compromise
@@ -56,9 +36,6 @@ func All(p policy.Policy) []check.Check { return AllWith(p, Local{}) }
 // AllWith is All with what the person at the computer has set.
 func AllWith(p policy.Policy, local Local) []check.Check {
 	c := p.Checks
-	if !local.Privacy.allowsExtraPaths() {
-		c.AIAgents.ExtraPaths = nil
-	}
 	all := []struct {
 		check.Check
 		policy.Common
@@ -100,12 +77,6 @@ func AllWith(p policy.Policy, local Local) []check.Check {
 	var out []check.Check
 	for _, a := range all {
 		if a.IsEnabled() {
-			switch a.ID {
-			case "ssh-keys", "ai-agents", "browser-passwords", "package-managers":
-				if !local.Privacy.CredentialStores {
-					a.Run = func(context.Context) check.Result { return check.SkippedMsg(msg.Of("privacy.credentialsOff")) }
-				}
-			}
 			out = append(out, withOnProblem(a.Check, a.OnProblem))
 		}
 	}

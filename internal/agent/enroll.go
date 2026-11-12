@@ -212,9 +212,10 @@ var installIDRe = regexp.MustCompile(`^[0-9a-f]{32}$`)
 // enroll spends the invite code. It never retries: a code works once.
 func enroll(ctx context.Context, env Env, portal, code string) (enrollResponse, error) {
 	var enr enrollResponse
+	hostname, _ := os.Hostname()
 	body, err := json.Marshal(map[string]any{
 		"code":    code,
-		"host":    report.Host{OS: runtime.GOOS, Arch: runtime.GOARCH},
+		"host":    report.Host{OS: runtime.GOOS, Arch: runtime.GOARCH, Hostname: hostname},
 		"version": env.Version,
 	})
 	if err != nil {
@@ -464,7 +465,7 @@ func installEnrolled(ctx context.Context, env Env, o InstallOptions, cfg Config,
 	if pol.Update.Binary {
 		fmt.Fprintf(env.Out, "Updates itself from github.com/%s releases.\n", cfg.UpdateRepo)
 	}
-	printSends(env.Out, reportPermissions(pol.Report, localPrivacy(env.Dir)))
+	printSends(env.Out, pol)
 	setUpNotifications(ctx, env, &cfg, pol, o.NotifierZip)
 	fmt.Fprintln(env.Out)
 	return Send(ctx, env, true)

@@ -128,10 +128,10 @@ func TestCompromiseIsSentAtOnce(t *testing.T) {
 	if len(got) != 2 || got[1]["compromised"] != true || fmt.Sprint(got[1]["compromise_checks"]) != "[startup-items]" {
 		t.Fatalf("not sent at once: %d reports, last %v\n%s", len(got), got[len(got)-1], rig.out)
 	}
-	// Summary reports retain the alert and its check ID.
+	// Evidence is off: the sign says what it is, not which item.
 	res := got[1]["results"].([]any)[0].(map[string]any)
-	if res["compromise"] != nil || res["evidence"] != nil || res["summary"] != "" {
-		t.Errorf("summary report contains details: %v", res)
+	if b, _ := json.Marshal(res["compromise"]); string(b) != `[{"what":{"key":"compromise.startupDownloadRun"}}]` || res["evidence"] != nil {
+		t.Errorf("without evidence: %s %v", b, res["evidence"])
 	}
 	if !strings.Contains(rig.out.String(), "signs of compromise found: sending a report now") {
 		t.Errorf("log:\n%s", rig.out)
@@ -200,9 +200,6 @@ func TestCompromiseIsWatchedBetweenChecks(t *testing.T) {
 func TestCompromiseRetriedHourlyWhenTheReportFails(t *testing.T) {
 	rig := newCompromiseRig(t, true, "")
 	env := rig.env
-	if err := writeJSON(filepath.Join(env.Dir, "privacy.json"), checks.Privacy{ReportDetails: true}); err != nil {
-		t.Fatal(err)
-	}
 	if err := Send(t.Context(), env, false); err != nil {
 		t.Fatal(err)
 	}

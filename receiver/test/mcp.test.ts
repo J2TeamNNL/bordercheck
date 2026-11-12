@@ -397,7 +397,7 @@ describe("MCP write tools", () => {
     const inv = r.data.invites[1];
     expect(inv.email).toBe("b@acme.com");
     const code = /\/i\/([A-Za-z0-9_-]{43})$/.exec(inv.invite_link)![1];
-    expect(inv.install_macos_linux).toBe(`sh ./install.sh '${BASE}/i/${code}'`);
+    expect(inv.install_macos_linux).toBe(`curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- ${BASE}/i/${code}`);
     expect(inv.install_windows).toContain(`${BASE}/i/${code}`);
     const audit = JSON.stringify(await auditRows());
     for (const i of r.data.invites) expect(audit).not.toContain(/\/i\/(.+)$/.exec(i.invite_link)![1]);

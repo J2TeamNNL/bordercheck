@@ -2,8 +2,13 @@
 # Installs bordercheck on macOS or Linux and sets it up to report to your
 # organisation every hour (a per-user service; no root, no sudo).
 #
-# Download and review this script first, then run it as a regular user:
-#   sh ./install.sh https://bordercheck.acme.com/i/<code>
+#   curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh \
+#     | sh -s -- https://bordercheck.acme.com/policies.json
+#
+# or, with an invite link IT sent you (no email question; IT set it):
+#
+#   curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh \
+#     | sh -s -- https://bordercheck.acme.com/i/<code>
 #
 # Options (after the URL or before it):
 #   --email you@acme.com   don't ask for the work email (scripted rollouts; not with an invite link)
@@ -13,9 +18,16 @@
 #   --key BASE64           the ed25519 public key that must sign SHA256SUMS
 #   --dry-run              download and verify, then stop before installing
 #
-# Requires a trusted OpenSSL with Ed25519 support (OpenSSL 3 or later).
-# The release signature and binary checksum are verified before execution.
-# A dry run never executes the downloaded binary.
+# What it checks before running anything it downloaded:
+#   1. SHA256SUMS.sig is a valid ed25519 signature of SHA256SUMS by the key
+#      below (with OpenSSL 3; otherwise see step 3),
+#   2. the binary matches its line in SHA256SUMS,
+#   3. without OpenSSL 3 (stock macOS), the signature is checked by the
+#      downloaded binary itself (`bordercheck verify`) once step 2 passed.
+# Any mismatch stops the install. See docs/install.md, "What the install script proves".
+#
+# The whole script is one function called on the last line, so a download cut
+# short runs nothing.
 
 set -eu
 
@@ -155,9 +167,6 @@ main() {
 	trap 'rm -rf "$tmp"' EXIT
 	trap 'exit 130' INT TERM
 
-	openssl_ed25519_works ||
-		die "a trusted OpenSSL with Ed25519 support is required. Put OpenSSL 3 or later on PATH."
-
 	releases=$github/$repo/releases
 	if [ -n "$version" ]; then
 		sums_base=$releases/download/$version
@@ -171,14 +180,19 @@ main() {
 	fetch "$sums_base/SHA256SUMS.sig" "$tmp/SHA256SUMS.sig" ||
 		die "the release has no SHA256SUMS.sig, so it cannot be verified."
 
-	der_key "$key" "$tmp/key.der" && [ "$(wc -c <"$tmp/key.der" | tr -d ' ')" -eq 44 ] ||
-		die "the release key is not a base64 ed25519 public key."
-	tr -d '\r\n' <"$tmp/SHA256SUMS.sig" | openssl base64 -d -A >"$tmp/sig.bin" 2>/dev/null ||
-		die "SHA256SUMS.sig is not base64."
-	openssl pkeyutl -verify -pubin -inkey "$tmp/key.der" -keyform DER -rawin \
-		-in "$tmp/SHA256SUMS" -sigfile "$tmp/sig.bin" >/dev/null 2>&1 ||
-		die "SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team."
-	say "SHA256SUMS is signed by the release key (checked with OpenSSL)."
+	# 1. The signature, with OpenSSL when it can, before anything else is used.
+	sig_checked=no
+	if openssl_ed25519_works; then
+		der_key "$key" "$tmp/key.der" && [ "$(wc -c <"$tmp/key.der" | tr -d ' ')" -eq 44 ] ||
+			die "the release key is not a base64 ed25519 public key."
+		tr -d '\r\n' <"$tmp/SHA256SUMS.sig" | openssl base64 -d -A >"$tmp/sig.bin" 2>/dev/null ||
+			die "SHA256SUMS.sig is not base64."
+		openssl pkeyutl -verify -pubin -inkey "$tmp/key.der" -keyform DER -rawin \
+			-in "$tmp/SHA256SUMS" -sigfile "$tmp/sig.bin" >/dev/null 2>&1 ||
+			die "SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team."
+		sig_checked=yes
+		say "SHA256SUMS is signed by the release key (checked with OpenSSL)."
+	fi
 
 	# The release's binary for this machine; its name carries the version.
 	asset=$(awk -v os="$os" -v arch="$arch" '
@@ -200,6 +214,16 @@ main() {
 	[ "${#want}" -eq 64 ] && [ "$got" = "$want" ] ||
 		die "$asset does NOT match SHA256SUMS (expected $want, got $got). Do not install it; tell your IT team."
 	say "$asset matches SHA256SUMS."
+	chmod 755 "$tmp/$asset"
+
+	# 3. Without OpenSSL 3, the binary checks the signature with the key this script pins.
+	if [ "$sig_checked" = no ]; then
+		"$tmp/$asset" verify -key "$key" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.sig" "$tmp/$asset" >/dev/null ||
+			die "SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team."
+		say "SHA256SUMS is signed by the release key (checked by the downloaded binary; OpenSSL 3 was not found)."
+	fi
+	"$tmp/$asset" -version | grep -qF "$tag" || die "$asset does not report version $tag."
+
 	set -- install "$policy"
 	[ -z "$email" ] || set -- "$@" -email "$email"
 	if [ "$invite" = yes ]; then
@@ -210,8 +234,6 @@ main() {
 		say "Verified $tag. Dry run: would now run: bordercheck $*"
 		return 0
 	fi
-	chmod 755 "$tmp/$asset"
-	"$tmp/$asset" -version | grep -qF "$tag" || die "$asset does not report version $tag."
 	if [ "$invite" = yes ]; then
 		# Nothing to ask: the invite carries the email.
 		"$tmp/$asset" "$@" </dev/null

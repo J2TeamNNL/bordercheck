@@ -162,24 +162,20 @@ export function publicOrigin(env: Env, req: Request): string {
 
 export interface InstallCommands {
   link: string;
-  shURL: string;
-  ps1URL: string;
   sh: string;
   ps1: string;
 }
 
 // installCommands builds the commands an invitee runs. Every part is either a
-// deployment origin or the base64url code. The script URLs are served
-// separately so an invitee can review the script before running it.
+// validated https URL from config, this deployment's origin, or the
+// base64url code, so nothing in them needs shell quoting.
 export function installCommands(env: Env, origin: string, code: string): InstallCommands {
   const cfg = config(env);
   const link = `${origin}/i/${code}`;
   return {
     link,
-    shURL: cfg.installSh,
-    ps1URL: cfg.installPs1,
-    sh: `sh ./install.sh '${link}'`,
-    ps1: `.\\install.ps1 '${link}'`,
+    sh: `curl -fsSL ${cfg.installSh} | sh -s -- ${link}`,
+    ps1: `& ([scriptblock]::Create((irm ${cfg.installPs1}))) ${link}`,
   };
 }
 
@@ -192,18 +188,18 @@ export const CAPABILITY_HEADERS = { "x-robots-tag": "noindex, nofollow", "referr
 // command (CSS user-select: all; there is no script to copy with).
 // With `copyId`, the block gets that id and a Copy button (see COPY_SCRIPT in
 // html.ts; only on pages that include the script).
-function cmdBlock(L: I18n, title: Key, sub: Key, script: string, filename: string, text: string, big: boolean, copyId?: string) {
+function cmdBlock(L: I18n, title: Key, sub: Key, text: string, big: boolean, copyId?: string) {
   return html`<div class="cmd${big ? " big" : ""}"><div class="cmd-h"><b>${L.t(title)}</b><span>${L.t(sub)}</span>${
     copyId ? copyButton(L, copyId, "copy.command") : ""
-  }</div><p><a href="${script}" rel="noreferrer">${filename}</a> · ${L.t("inv.reviewScript")}</p><code tabindex="0"${copyId ? html` id="${copyId}"` : ""}>${text}</code></div>`;
+  }</div><code tabindex="0"${copyId ? html` id="${copyId}"` : ""}>${text}</code></div>`;
 }
 
 export function shBlock(L: I18n, c: InstallCommands, big = false, copyId?: string) {
-  return cmdBlock(L, "inv.cmdUnix", "inv.cmdTerminal", c.shURL, "install.sh", c.sh, big, copyId);
+  return cmdBlock(L, "inv.cmdUnix", "inv.cmdTerminal", c.sh, big, copyId);
 }
 
 export function ps1Block(L: I18n, c: InstallCommands, big = false, copyId?: string) {
-  return cmdBlock(L, "inv.cmdWindows", "inv.cmdPowerShell", c.ps1URL, "install.ps1", c.ps1, big, copyId);
+  return cmdBlock(L, "inv.cmdWindows", "inv.cmdPowerShell", c.ps1, big, copyId);
 }
 
 export function commandBlock(L: I18n, c: InstallCommands, copyPrefix?: string) {
@@ -223,8 +219,13 @@ function platformOf(ua: string): Platform {
 }
 
 function inviteSteps(L: I18n, p: Platform) {
-  const open = L.t(p === "windows" ? "inv.winOpen" : p === "mac" ? "inv.macOpen" : "inv.linuxOpen");
+  const [open, copy] = p === "windows"
+    ? [L.t("inv.winOpen"), L.t("inv.winCopy")]
+    : p === "mac"
+      ? [L.t("inv.macOpen"), L.t("inv.macCopy")]
+      : [L.t("inv.linuxOpen"), L.t("inv.linuxCopy")];
   return html`<ol class="steps"><li><span>${open}</span></li>
+<li><span>${copy}</span></li>
 <li><span>${L.t("inv.follow")}</span></li></ol>`;
 }
 

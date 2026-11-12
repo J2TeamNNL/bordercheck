@@ -74,9 +74,11 @@ macOS. macOS binaries are signed and notarized; Windows binaries are not Authent
 Each machine runs bordercheck every hour as a per-user service and reports to you. Two ways to set that up:
 
 - **The portal** (recommended). Deploy [`receiver/`](receiver), a Cloudflare Worker, on your own account. Give
-  each role (Dev, Support, Sales…) a policy and send each person their own invite link. The invite page links
-  to the installer for their OS. Save and review the script, then run it as a regular user with trusted
-  OpenSSL 3 or later on PATH. See [installation](docs/install.md).
+  each role (Dev, Support, Sales…) a policy, create an invite per person, and send them one command:
+
+  ```sh
+  curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.acme.com/i/<code>
+  ```
 
   Each machine gets its own token, so you can revoke one alone. The portal shows the fleet, posts alerts to
   Discord or Slack, and can be driven by Claude through its MCP server.
@@ -84,7 +86,7 @@ Each machine runs bordercheck every hour as a per-user service and reports to yo
   file beside the binary and only run it by hand.
 
 <p align="center">
-<img src="docs/img/portal-invite.png" width="560" alt="The invite page an employee opens: what bordercheck is, and instructions for installing it on this Mac.">
+<img src="docs/img/portal-invite.png" width="560" alt="The invite page an employee opens: what bordercheck is, and the one command to install it on this Mac.">
 <img src="docs/img/portal-report-phone.png" width="250" alt="The report page a person sees for their own machine, on a phone: 3 things to fix, each with how to fix it.">
 </p>
 
@@ -98,10 +100,9 @@ A policy only needs what it changes:
 
 ## Privacy and security
 
-- A plain run sends nothing. Shell history, project `.env` files and personal credential stores are opt-in
-  on each machine. See [local privacy settings](docs/install.md#local-privacy-settings).
-- Installed copies send check statuses, severity, compromise flags and device metadata, including email and
-  install ID. Detailed findings and interface IPs require permission both on the machine and in IT's policy.
+- A plain run sends nothing. An installed copy sends a report to the one endpoint in its policy: pass/fail,
+  severity, summary and fix per check, plus the email and install ID. Evidence (paths, ports, names) and the
+  machine's own IP addresses are sent only if the policy asks. No location is sent.
 - Secret values are never printed or sent; at most the last 4 characters of a long provider token.
 - An enrolled machine's token goes only to the portal that issued it.
 - Updates install only releases whose checksums are signed with the release key, and the update source is
