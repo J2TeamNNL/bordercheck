@@ -10,7 +10,7 @@ on:
 #   BORDERCHECK_SIGNING_KEY       required. ed25519 key from `go run ./scripts/sign -keygen`; signs SHA256SUMS.
 #   MACOS_CERTIFICATE_P12         optional. base64 of a .p12 holding the "Developer ID Application" certificate and its key.
 #   MACOS_CERTIFICATE_PASSWORD    the .p12's password.
-#   MACOS_SIGNING_IDENTITY        optional. e.g. "Developer ID Application: Acme Ltd (ABCDE12345)"; found in the .p12 when empty.
+#   MACOS_SIGNING_IDENTITY        optional. e.g. "Developer ID Application: Sample Ltd (ABCDE12345)"; found in the .p12 when empty.
 #   APPLE_NOTARY_KEY_P8           optional. Contents of an App Store Connect API key (AuthKey_XXXXXXXXXX.p8) for notarytool.
 #   APPLE_NOTARY_KEY_ID           its key ID.
 #   APPLE_NOTARY_ISSUER_ID        its issuer ID.

@@ -347,7 +347,7 @@ The report is the same JSON as `bordercheck -json`, plus `email` and `install_id
 
 ```json
 {
-  "tool": "bordercheck", "version": "v0.2.0", "policy": "Acme", "time": "2026-10-30T14:46:07Z",
+  "tool": "bordercheck", "version": "v0.2.0", "policy": "Sample", "time": "2026-10-30T14:46:07Z",
   "host": { "os": "darwin", "arch": "arm64", "hostname": "an-mbp", "ips": ["192.168.1.23", "2001:db8::23"] },
   "email": "an@domain.com", "install_id": "4f1c…",
   "counts": { "fail": 1, "error": 0, "warn": 1, "pass": 3, "skip": 1, "waived": 0 },

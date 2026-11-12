@@ -28,9 +28,9 @@
   // and optionally MCP_TOKEN / MCP_READ_TOKEN, API_TOKEN / API_READ_TOKEN.
   "vars": {
     "DASHBOARD_URL": "",            // e.g. https://bordercheck.domain.com, for links in alerts
-    "ACCESS_TEAM_DOMAIN": "",       // e.g. acme.cloudflareaccess.com
+    "ACCESS_TEAM_DOMAIN": "",       // e.g. sample.cloudflareaccess.com
     "ACCESS_AUD": "",               // the Access application's AUD tag
-    "ALLOWED_EMAIL_DOMAINS": "",    // e.g. "domain.com,acme.co.uk"; empty = any
+    "ALLOWED_EMAIL_DOMAINS": "",    // e.g. "domain.com,sample.co.uk"; empty = any
     "SILENT_DAYS": "7",
     "DIGEST_HOURS": "168",          // weekly; "0" = no digest
     "HISTORY_DAYS": "180",

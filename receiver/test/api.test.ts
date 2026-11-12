@@ -225,13 +225,13 @@ describe("API roles", () => {
     expect(allowed.body.policy.waivers).toHaveLength(1);
 
     // A role with such fields (set in the dashboard) can be edited if they stay as they are.
-    const id = await makeRole("Dev", { update: { repo: "acme/bordercheck" }, checks: {} });
-    expect((await api("PUT", `/roles/${id}`, { body: { policy: { update: { repo: "acme/bordercheck" }, checks: { tailscale: { enabled: false } } } } })).status).toBe(200);
+    const id = await makeRole("Dev", { update: { repo: "sample/bordercheck" }, checks: {} });
+    expect((await api("PUT", `/roles/${id}`, { body: { policy: { update: { repo: "sample/bordercheck" }, checks: { tailscale: { enabled: false } } } } })).status).toBe(200);
     const change = await api("PUT", `/roles/${id}`, { body: { policy: { update: { repo: "evil/bordercheck" } } } });
     expect(change.status).toBe(400);
     expect(change.body.error.details[0].message).toBe("update.repo: can't be set or changed through the API; change it in the dashboard");
     const renamed = await api("PUT", `/roles/${id}`, { body: { name: "Developers" } });
-    expect(renamed.body).toMatchObject({ role_id: id, name: "Developers", policy_changed: false, policy: { update: { repo: "acme/bordercheck" } } });
+    expect(renamed.body).toMatchObject({ role_id: id, name: "Developers", policy_changed: false, policy: { update: { repo: "sample/bordercheck" } } });
     expect((await api("PUT", `/roles/${id}`, { body: {} })).status).toBe(400);
     expect((await api("PUT", `/roles/${id}`, { body: { name: "watched" } })).body.error.code).toBe("name_taken");
     expect((await api("PUT", "/roles/999", { body: { name: "Q" } })).status).toBe(404);

@@ -188,7 +188,7 @@ The dashboard shows each machine's weak spots, so it is never public. Two ways i
 **Cloudflare Access (recommended).** Create a self-hosted Access application for `bordercheck.domain.com/admin`
 (only `/admin`: `/report`, `/policy`, `/enroll`, `/i/…` and `/r/…` must stay reachable by
 laptops and people), allow your IT group, and set
-`ACCESS_TEAM_DOMAIN` (e.g. `acme.cloudflareaccess.com`) and `ACCESS_AUD` (the application's AUD tag) in
+`ACCESS_TEAM_DOMAIN` (e.g. `sample.cloudflareaccess.com`) and `ACCESS_AUD` (the application's AUD tag) in
 `wrangler.jsonc`. The Worker verifies the `Cf-Access-Jwt-Assertion` JWT itself (signature against your team's
 keys, audience, issuer, expiry), so a request that skips Access, say through the `workers.dev` URL, is still
 refused.

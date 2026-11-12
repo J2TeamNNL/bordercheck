@@ -17,7 +17,7 @@ export function report(extra: Record<string, unknown> = {}, results?: unknown[])
   return {
     tool: "bordercheck",
     version: "v0.3.0",
-    policy: "Acme",
+    policy: "Sample",
     time: "2026-11-01T10:00:00Z",
     host: { os: "darwin", arch: "arm64", hostname: "an-mbp" },
     email: "an@domain.com",
@@ -59,7 +59,7 @@ export function adminPost(path: string, fields: Record<string, string> = {}, e: 
 }
 
 export const DEV_POLICY = {
-  name: "Acme dev",
+  name: "Sample dev",
   report: { interval: "24h" },
   update: { binary: true },
   checks: { listeners: { on_problem: "fail" } },

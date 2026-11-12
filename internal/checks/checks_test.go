@@ -272,11 +272,11 @@ func TestSecretPolicy(t *testing.T) {
 	p.ProductionKeywords = []string{"prd"}
 	p.ShowTail = new(bool)
 	p.IgnorePaths = []string{"~/demo/**"}
-	p.ExtraPatterns = []policy.SecretPattern{{Kind: "Acme token", Regex: `\bacme_[a-z0-9]{24}\b`, High: true}}
+	p.ExtraPatterns = []policy.SecretPattern{{Kind: "Sample token", Regex: `\bsample_[a-z0-9]{24}\b`, High: true}}
 	s := testScanner(t, p)
-	got := s.scan(strings.NewReader("X=acme_abcdefghijklmnopqrstuvwx\nPRD_KEY=sk-abcdefghijklmnopqrstuvwxyz\nPROD_TOKEN=abcdefgh1234"), "~/.env", s.rules)
+	got := s.scan(strings.NewReader("X=sample_abcdefghijklmnopqrstuvwx\nPRD_KEY=sk-abcdefghijklmnopqrstuvwxyz\nPROD_TOKEN=abcdefgh1234"), "~/.env", s.rules)
 	want := []secretFinding{
-		{"~/.env", 1, "Acme token", "X", false, "", true},
+		{"~/.env", 1, "Sample token", "X", false, "", true},
 		{"~/.env", 2, "OpenAI API key", "PRD_KEY", true, "", false},
 		{"~/.env", 3, "Secret-looking variable", "PROD_TOKEN", false, "", false},
 	}

@@ -370,7 +370,7 @@ describe("passkeys and Cloudflare Access", () => {
   });
 
   it("do not exist for Access-only deployments or Access viewers", async () => {
-    const accessOnly = { ADMIN_TOKEN: "", ACCESS_TEAM_DOMAIN: "acme.cloudflareaccess.com", ACCESS_AUD: "aud" };
+    const accessOnly = { ADMIN_TOKEN: "", ACCESS_TEAM_DOMAIN: "sample.cloudflareaccess.com", ACCESS_AUD: "aud" };
     expect((await jsonPost("/admin/login/passkey/options", {}, {}, accessOnly)).status).toBe(404);
     expect((await jsonPost("/admin/login/passkey", {}, {}, accessOnly)).status).toBe(404);
     expect((await call(new Request(`${BASE}/admin/login`), accessOnly)).status).toBe(403);
@@ -384,7 +384,7 @@ describe("passkeys and Cloudflare Access", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ keys: [{ ...jwk, kid: "k1", alg: "RS256" }] }));
     const part = (o: unknown) => b64url(enc.encode(JSON.stringify(o)));
     const head = part({ alg: "RS256", kid: "k1" });
-    const claims = part({ aud: ["aud"], iss: "https://acme.cloudflareaccess.com", exp: Math.floor(Date.now() / 1000) + 600, email: "it@domain.com" });
+    const claims = part({ aud: ["aud"], iss: "https://sample.cloudflareaccess.com", exp: Math.floor(Date.now() / 1000) + 600, email: "it@domain.com" });
     const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", keys.privateKey, enc.encode(`${head}.${claims}`));
     const jwt = `${head}.${claims}.${b64url(sig)}`;
     for (const e of [accessOnly, { ...accessOnly, ADMIN_TOKEN }]) {

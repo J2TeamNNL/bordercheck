@@ -12,7 +12,7 @@ export interface Env {
   // Neither usable (unset, shorter than 16 characters, or equal to ADMIN_TOKEN): /api/v1 answers 404.
 
   // Vars (wrangler.jsonc "vars").
-  ACCESS_TEAM_DOMAIN?: string; // e.g. acme.cloudflareaccess.com
+  ACCESS_TEAM_DOMAIN?: string; // e.g. sample.cloudflareaccess.com
   ACCESS_AUD?: string; // the Access application's AUD tag
   DASHBOARD_URL?: string; // e.g. https://bordercheck.domain.com, for links in alerts
   ALLOWED_EMAIL_DOMAINS?: string; // comma-separated; reports from other emails are refused

@@ -16,7 +16,7 @@ func TestBrowserChecksPolicy(t *testing.T) {
 	p, err := load(t, `{"checks": {
 	  "extensions": {"editors": false, "block": ["evil.*", "abcdefghijklmnopabcdefghijklmnop"], "warn_all_sites": true},
 	  "browser-passwords": {"allow_browsers": ["edge"], "on_problem": "fail"},
-	  "trust-store": {"proxies": false, "allow_cas": ["Acme Corp *"], "ca_severity": "high"}}}`)
+	  "trust-store": {"proxies": false, "allow_cas": ["Sample Corp *"], "ca_severity": "high"}}}`)
 	if err != nil {
 		t.Fatal(err)
 	}

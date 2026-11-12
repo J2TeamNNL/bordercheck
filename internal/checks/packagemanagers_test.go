@@ -48,19 +48,19 @@ func TestPackageManagersNpm(t *testing.T) {
 	}
 	r = pmEval(t, p, []string{"npm"}, pmConfig{Tool: "npm", Kind: "npmrc", Path: "~/.npmrc", Body: strings.Join([]string{
 		"; comment", "ignore-scripts = true", "registry=http://registry.corp.example/npm/",
-		"@acme:registry=http://user:hunter2@npm.acme.example/", "strict-ssl=false",
-		"@local:registry=http://localhost:4873/", "//npm.acme.example/:_authToken=${NPM_TOKEN}"}, "\n")})
+		"@sample:registry=http://user:hunter2@npm.sample.example/", "strict-ssl=false",
+		"@local:registry=http://localhost:4873/", "//npm.sample.example/:_authToken=${NPM_TOKEN}"}, "\n")})
 	ev := pmEvidence(r)
 	if r.Status != check.Fail || r.Severity != check.Medium || len(r.Evidence) != 3 ||
 		!strings.Contains(ev, "~/.npmrc:3  npm: registry uses plain http (registry.corp.example)") ||
-		!strings.Contains(ev, "~/.npmrc:4  npm: @acme:registry uses plain http (npm.acme.example)") ||
+		!strings.Contains(ev, "~/.npmrc:4  npm: @sample:registry uses plain http (npm.sample.example)") ||
 		!strings.Contains(ev, "~/.npmrc:5  npm: strict-ssl=false") || strings.Contains(ev, "hunter2") || strings.Contains(ev, "localhost") {
 		t.Errorf("got %s %s\n%s", r.Status, r.Severity, ev)
 	}
 	// The org's own registry may be allowed.
-	p.AllowHosts = []string{"*.corp.example", "npm.acme.example"}
+	p.AllowHosts = []string{"*.corp.example", "npm.sample.example"}
 	r = pmEval(t, p, []string{"npm"}, pmConfig{Tool: "npm", Kind: "npmrc", Path: "~/.npmrc",
-		Body: "ignore-scripts=true\nregistry=http://registry.corp.example/\n@acme:registry=http://npm.acme.example/\n"})
+		Body: "ignore-scripts=true\nregistry=http://registry.corp.example/\n@sample:registry=http://npm.sample.example/\n"})
 	if r.Status != check.Pass {
 		t.Errorf("allowed hosts: %s %v", r.Status, r.Evidence)
 	}
@@ -84,14 +84,14 @@ func TestPackageManagersPnpmYarnBun(t *testing.T) {
 			Body: "dangerouslyAllowAllBuilds: true\nminimumReleaseAge: 0\nstrictSsl: false\n"},
 		pmConfig{Tool: "pnpm", Kind: "pnpm-rc", Path: "~/Library/Preferences/pnpm/rc", Body: "minimum-release-age=0\n"},
 		pmConfig{Tool: "yarn", Kind: "yarnrc", Path: "~/.yarnrc.yml", Body: "enableScripts: true\nnpmMinimalAgeGate: 0\n" +
-			"npmScopes:\n  acme:\n    npmRegistryServer: \"http://npm.acme.example\"\n"},
-		pmConfig{Tool: "bun", Kind: "bunfig", Path: "~/.bunfig.toml", Body: "[install]\nregistry = \"http://bun.acme.example/\"\n" +
-			"[install.scopes]\nmyorg = { url = \"http://scoped.acme.example/\", token = \"$TOKEN\" }\n[run]\nregistry = \"http://ignored.example\"\n"})
+			"npmScopes:\n  sample:\n    npmRegistryServer: \"http://npm.sample.example\"\n"},
+		pmConfig{Tool: "bun", Kind: "bunfig", Path: "~/.bunfig.toml", Body: "[install]\nregistry = \"http://bun.sample.example/\"\n" +
+			"[install.scopes]\nmyorg = { url = \"http://scoped.sample.example/\", token = \"$TOKEN\" }\n[run]\nregistry = \"http://ignored.example\"\n"})
 	ev := pmEvidence(r)
 	for _, want := range []string{"config.yaml:1  pnpm: dangerouslyAllowAllBuilds: true", "config.yaml:2  pnpm: minimumReleaseAge: 0",
 		"config.yaml:3  pnpm: strictSsl: false", "rc:1  pnpm: minimum-release-age: 0", "~/.yarnrc.yml:1  yarn: enableScripts: true",
-		"~/.yarnrc.yml:2  yarn: npmMinimalAgeGate: 0", "~/.yarnrc.yml:5  yarn: npmRegistryServer uses plain http (npm.acme.example)",
-		"~/.bunfig.toml:2  bun: registry uses plain http (bun.acme.example)", "~/.bunfig.toml:4  bun: myorg uses plain http (scoped.acme.example)"} {
+		"~/.yarnrc.yml:2  yarn: npmMinimalAgeGate: 0", "~/.yarnrc.yml:5  yarn: npmRegistryServer uses plain http (npm.sample.example)",
+		"~/.bunfig.toml:2  bun: registry uses plain http (bun.sample.example)", "~/.bunfig.toml:4  bun: myorg uses plain http (scoped.sample.example)"} {
 		if !strings.Contains(ev, want) {
 			t.Errorf("missing %q in\n%s", want, ev)
 		}

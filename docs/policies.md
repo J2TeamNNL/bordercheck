@@ -27,7 +27,7 @@ A small policy:
 
 ```json
 {
-  "name": "Acme",
+  "name": "Sample",
   "report": { "url": "https://bordercheck.domain.com/report", "email_domains": ["domain.com"] },
   "update": { "binary": true, "policy_url": "https://bordercheck.domain.com/policies.json" },
   "checks": { "listeners": { "on_problem": "fail" }, "mesh-vpn": { "enabled": false } }
@@ -297,7 +297,7 @@ private key, matches a `high` extra pattern, or is marked production. Values are
 | `production_keywords` | `["prod", "production", "live"]` | A finding whose file path or line contains one of these as a word (any case) is marked `[production]` and fails. Must not be empty. |
 | `show_tail` | `true` | Show the last 4 characters of long provider tokens (OpenAI, GitHub, AWS…), as their own dashboards do, so people can tell which key it is. Passwords never show anything. |
 | `walk_depth` | `5` | How many folders below home are searched for `.env` and key files, 0–20. Files and folders kept only in iCloud Drive or another cloud provider (placeholders, not on this disk) are not read, since reading one downloads it; apps, media libraries and disk-image bundles are skipped. |
-| `extra_patterns` | `[]` | Your own token formats: `{"kind": "Acme token", "regex": "\\bacme_[A-Za-z0-9]{32}\\b", "high": true, "show_tail": true}`. `kind` and a valid Go regular expression are required; `high` makes a match fail; `show_tail` is safe only for long random tokens. They are tried before the built-in rules. |
+| `extra_patterns` | `[]` | Your own token formats: `{"kind": "Sample token", "regex": "\\bsample_[A-Za-z0-9]{32}\\b", "high": true, "show_tail": true}`. `kind` and a valid Go regular expression are required; `high` makes a match fail; `show_tail` is safe only for long random tokens. They are tried before the built-in rules. |
 | `locations` | all `true` | Credential stores read format by format; each switches off alone. |
 | `user_ignore` | `true` | Let the person at the machine mark findings as not sensitive with `bordercheck ignore <path> [-name VAR] -reason "…"` ([how](install.md#secrets-that-are-not-sensitive)); `ai-agents` and `ssh-keys` have the same switch. Ignored findings stop counting toward this check, but every report lists them with the reason in the result's `user_ignored`, also when `include_evidence` is off; the portal shows them on the machine's page. A finding marked `[production]` can be ignored too, and is listed for IT as production. `false`: `bordercheck ignore` refuses and existing entries are not applied (the summary says so). Needs bordercheck v0.5.0 or later on every machine of the role when set (older ones reject the unknown field); leaving it out keeps the default on new clients and works with old ones. |
 | `sample_rules` | `["git-tracked", "sdk", "sample-dir"]` | Which rules set a finding aside as a likely sample key ([what each does](install.md#sample-keys)): `git-tracked` (tracked by a git repository below the home folder and unchanged from what its index records; read without running git), `sdk` (files an SDK ships to every user, such as Tizen Studio's certificates), `sample-dir` (a folder named like `demo`, `samples`, `examples`, `fixtures`, `testdata`, `mocks`). A likely sample stops counting toward the check, and every report lists it in the result's `likely_samples` (path, name or kind, rule; never a value), also when `include_evidence` is off; the portal shows it on the machine's page. `[]` turns this off; an unknown rule is an error. Never set aside: findings marked `[production]`, files inside `.git`, and by `sample-dir` alone a live-looking provider token. Caveat: a real secret committed to a repository also matches `git-tracked`; that is why the list goes to IT and production-marked findings are excluded. Needs a client that knows the field on every machine of the role when set (older ones reject the unknown field); leaving it out keeps the default on new clients and works with old ones. |
@@ -613,8 +613,8 @@ noted. Evidence shows the certificate's common name, SHA-256 fingerprint and exp
 |---|---|---|
 | `cas` | `true` | Check added root certificates. |
 | `proxies` | `true` | Check the proxy settings. |
-| `allow_cas` | `[]` | Certificates that may be trusted: a SHA-256 fingerprint (hex, colons optional) or a glob on the subject common name (`Acme Corp *`). |
-| `allow_proxies` | `[]` | Globs on the proxy or PAC host (`*.acme.example`). |
+| `allow_cas` | `[]` | Certificates that may be trusted: a SHA-256 fingerprint (hex, colons optional) or a glob on the subject common name (`Sample Corp *`). |
+| `allow_proxies` | `[]` | Globs on the proxy or PAC host (`*.sample.example`). |
 | `ca_severity` | `"medium"` | `low`, `medium` or `high` for an added root; `high` makes it fail. |
 ### package-managers
 
@@ -669,7 +669,7 @@ not looked at on disk (that could raise a privacy prompt), so they are never rep
 
 | Field | Default | |
 |---|---|---|
-| `allow` | `[]` | Globs on an item's label or program path (`~` allowed) to leave out, e.g. `"com.acme.*"`, `"~/.acme/bin/*"`. |
+| `allow` | `[]` | Globs on an item's label or program path (`~` allowed) to leave out, e.g. `"com.sample.*"`, `"~/.sample/bin/*"`. |
 | `extra_suspicious_paths` | `[]` | More folders a program should not start from, e.g. `"~/Public"`. |
 
 ### backup
@@ -698,7 +698,7 @@ rights or prompts; what cannot be read is said in a note.
 
 ```json
 {
-  "name": "Acme",
+  "name": "Sample",
   "report": {
     "url": "https://bordercheck.domain.com/report",
     "headers": { "Authorization": "Bearer <submit-only token>" },
@@ -712,7 +712,7 @@ rights or prompts; what cannot be read is said in a note.
     "firewall":   { "require_stealth": false },
     "docker":     { "allow_containers": ["devdb"], "allow_mounts": ["~/projects"] },
     "secrets":    { "ignore_paths": ["~/**/test-fixtures/**"],
-                    "extra_patterns": [{ "kind": "Acme token", "regex": "\\bacme_[A-Za-z0-9]{32}\\b", "high": true }],
+                    "extra_patterns": [{ "kind": "Sample token", "regex": "\\bsample_[A-Za-z0-9]{32}\\b", "high": true }],
                     "locations": { "gcloud": false } },
     "mesh-vpn":   { "allow": ["tailscale"] },
     "os-updates": { "min_os_versions": { "macos": "26", "fedora": "" },
@@ -720,7 +720,7 @@ rights or prompts; what cannot be read is said in a note.
     "remote-access": { "allow": ["ssh", "teamviewer"] },
     "ssh-keys":   { "authorized_keys": false, "allow_keys": ["~/.ssh/ci_deploy"] },
     "tunnels":    { "lower_severity": ["cloudflared"] },
-    "ai-agents":  { "extra_paths": ["~/.config/acme-agent/mcp.json"] }
+    "ai-agents":  { "extra_paths": ["~/.config/sample-agent/mcp.json"] }
   }
 }
 ```

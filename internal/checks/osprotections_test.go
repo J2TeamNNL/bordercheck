@@ -42,9 +42,9 @@ func TestWinProtFacts(t *testing.T) {
 		t.Errorf("got %+v", f)
 	}
 	// Another antivirus on (0x061000), Defender passive, SmartScreen forced on by policy, legacy BIOS.
-	f = winProtFacts("defender=1\nrtp=True\nmode=Passive Mode\nsc=1\nav=393472|Windows Defender\nav=397312|Acme AV\n" +
+	f = winProtFacts("defender=1\nrtp=True\nmode=Passive Mode\nsc=1\nav=393472|Windows Defender\nav=397312|Sample AV\n" +
 		"av=262144|Old AV\nsmartscreen=Off\nsmartscreen_policy=1\nsecureboot=\nfirmware=Legacy\n")
-	if len(f.OtherAV) != 1 || f.OtherAV[0] != "Acme AV" || !*f.SmartScreen || !f.NoUEFI || f.SecureBoot != nil {
+	if len(f.OtherAV) != 1 || f.OtherAV[0] != "Sample AV" || !*f.SmartScreen || !f.NoUEFI || f.SecureBoot != nil {
 		t.Errorf("got %+v", f)
 	}
 	if !avProductOn("397568") || avProductOn("393472") || avProductOn("x") {
@@ -93,7 +93,7 @@ func TestEvalOSProtections(t *testing.T) {
 		{"win no av", protFacts{Family: "windows", DefenderKnown: true, AVKnown: true, SmartScreen: &yes, SecureBoot: &yes},
 			def, check.Fail, check.High, "no other antivirus"},
 		{"win other av", protFacts{Family: "windows", DefenderKnown: true, DefenderMode: "Passive Mode", AVKnown: true,
-			OtherAV: []string{"Acme AV"}, SmartScreen: &yes, SecureBoot: &yes}, def, check.Pass, "", "Acme AV"},
+			OtherAV: []string{"Sample AV"}, SmartScreen: &yes, SecureBoot: &yes}, def, check.Pass, "", "Sample AV"},
 		{"win tamper smartscreen secureboot", protFacts{Family: "windows", DefenderKnown: true, DefenderRTP: true, Tamper: &no,
 			SmartScreen: &no, SecureBoot: &no}, def, check.Warn, check.Medium, "Secure Boot is off"},
 		{"linux ok", protFacts{Family: "linux", SecureBoot: &yes, AppArmor: true}, def, check.Pass, "", "AppArmor"},

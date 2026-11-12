@@ -525,13 +525,13 @@ func TestEnrolledPinsIgnoreThePortal(t *testing.T) {
 	// The person installing may name another source; re-running keeps it.
 	other := "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA="
 	env2, _ := enrollEnv(t, p)
-	if err := Install(t.Context(), env2, InstallOptions{Policy: p.url() + "/i/abc", UpdateRepo: "acme/bordercheck", UpdateKey: other}); err != nil {
+	if err := Install(t.Context(), env2, InstallOptions{Policy: p.url() + "/i/abc", UpdateRepo: "sample/bordercheck", UpdateKey: other}); err != nil {
 		t.Fatal(err)
 	}
 	if err := Install(t.Context(), env2, InstallOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if cfg := readCfg(t, env2); cfg.UpdateRepo != "acme/bordercheck" || cfg.UpdateKey != other {
+	if cfg := readCfg(t, env2); cfg.UpdateRepo != "sample/bordercheck" || cfg.UpdateKey != other {
 		t.Errorf("explicit source: %q %q", cfg.UpdateRepo, cfg.UpdateKey)
 	}
 	if err := Install(t.Context(), env2, InstallOptions{Policy: p.url() + "/i/abc", UpdateKey: "short"}); err == nil {

@@ -11,7 +11,7 @@
 #
 #   scripts/sign-macos-release.sh v1.2.3 [notes-file]
 #
-#   SIGN_ID         signing identity, e.g. "Developer ID Application: Acme Ltd (ABCDE12345)"
+#   SIGN_ID         signing identity, e.g. "Developer ID Application: Sample Ltd (ABCDE12345)"
 #   NOTARY_PROFILE  notarytool keychain profile (xcrun notarytool store-credentials)
 #
 # The workflow accepts the binaries only if they were built from exactly the

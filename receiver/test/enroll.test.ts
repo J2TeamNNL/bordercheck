@@ -175,7 +175,7 @@ describe("GET /policy", () => {
     const res = await getPolicy(m.token);
     expect(res.status).toBe(200);
     const p = await res.json<any>();
-    expect(p.name).toBe("Acme dev");
+    expect(p.name).toBe("Sample dev");
     expect(p.report.url).toBe(`${BASE}/report`);
     expect(p.report.headers).toEqual({});
     expect(p.update.policy_url).toBe(`${BASE}/policy`);
@@ -204,10 +204,10 @@ describe("GET /policy", () => {
 
   it("reflects a role change", async () => {
     const m = await enrolled();
-    const sales = await makeRole("Sales", { name: "Acme sales", checks: { tailscale: { enabled: false } } });
+    const sales = await makeRole("Sales", { name: "Sample sales", checks: { tailscale: { enabled: false } } });
     expect((await adminPost(`/admin/machine/${m.install_id}/role`, { role_id: String(sales) })).status).toBe(303);
     const p = await (await getPolicy(m.token)).json<any>();
-    expect(p.name).toBe("Acme sales");
+    expect(p.name).toBe("Sample sales");
     expect(p.checks.tailscale.enabled).toBe(false);
     expect(p.report.url).toBe(`${BASE}/report`);
     const audit = await env.DB.prepare("SELECT detail FROM audit WHERE action = 'machine.change_role'").first<string>("detail");
@@ -350,7 +350,7 @@ describe("admin portal", () => {
 
   it("edits and deletes roles, but not one in use", async () => {
     const id = await makeRole("Dev");
-    expect((await adminPost(`/admin/roles/${id}`, { name: "Developers", policy: '{"name":"Acme devs"}' })).status).toBe(200);
+    expect((await adminPost(`/admin/roles/${id}`, { name: "Developers", policy: '{"name":"Sample devs"}' })).status).toBe(200);
     expect(await env.DB.prepare("SELECT name FROM roles WHERE id = ?").bind(id).first<string>("name")).toBe("Developers");
     await makeInvites(["a@domain.com"], id);
     expect((await adminPost(`/admin/roles/${id}/delete`)).status).toBe(409);
@@ -408,7 +408,7 @@ describe("role policy helpers", () => {
     expect(
       validateRolePolicy(
         {
-          name: "Acme",
+          name: "Sample",
           report: { interval: "24h", include_evidence: false, email_domains: ["domain.com"] },
           update: { binary: true, interval: "24h", repo: "ptrinh/bordercheck", public_key: "" },
           notify: { enabled: true, statuses: ["fail"], severities: ["high", "medium"], remind_every: "24h" },

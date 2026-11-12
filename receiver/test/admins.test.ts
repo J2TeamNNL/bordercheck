@@ -223,7 +223,7 @@ describe("named admins", () => {
     }
     expect((await addAdmin("Đức Anh")).res.status).toBe(200);
     expect((await addAdmin("x".repeat(40))).res.status).toBe(200);
-    expect((await addAdmin("an.ng_1@acme-co")).res.status).toBe(200);
+    expect((await addAdmin("an.ng_1@sample-co")).res.status).toBe(200);
     // Duplicates, case-insensitively (ASCII and beyond).
     for (const dup of ["đức anh", "ĐỨC ANH", " Đức Anh "]) {
       const r = await addAdmin(dup);
@@ -325,7 +325,7 @@ describe("named admins", () => {
   it("does not exist for Access-only deployments", async () => {
     const res = await call(new Request(`${BASE}/admin/admins`, { headers: { authorization: `Bearer ${ADMIN_TOKEN}` } }), {
       ADMIN_TOKEN: "",
-      ACCESS_TEAM_DOMAIN: "acme.cloudflareaccess.com",
+      ACCESS_TEAM_DOMAIN: "sample.cloudflareaccess.com",
       ACCESS_AUD: "aud",
     });
     expect(res.status).toBe(401);

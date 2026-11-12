@@ -46,7 +46,7 @@ func testCA(t *testing.T, cn string) (der []byte, fp string) {
 const macTrustSample = `Number of trusted certs = 4
 Cert 0: mkcert demo@demo-mac.local (Demo User)
    Number of trust settings : 0
-Cert 1: Acme Corp TLS Inspection CA
+Cert 1: Sample Corp TLS Inspection CA
    Number of trust settings : 1
    Trust Setting 0:
       Policy OID            : SSL
@@ -75,7 +75,7 @@ func TestParseMacTrustSettings(t *testing.T) {
 	got := parseMacTrustSettings(macTrustSample)
 	want := []macTrustEntry{
 		{Name: "mkcert demo@demo-mac.local (Demo User)", Trusted: true},
-		{Name: "Acme Corp TLS Inspection CA", Trusted: true},
+		{Name: "Sample Corp TLS Inspection CA", Trusted: true},
 		{Name: "DEMO-PC", Trusted: true, HostOnly: true},
 		{Name: "Distrusted Thing"},
 	}
@@ -102,12 +102,12 @@ func TestParseScutilProxy(t *testing.T) {
   FTPPassive : 1
   HTTPEnable : 1
   HTTPPort : 3128
-  HTTPProxy : proxy.acme.example
+  HTTPProxy : proxy.sample.example
   HTTPSEnable : 0
   HTTPSPort : 8443
   HTTPSProxy : other.example
   ProxyAutoConfigEnable : 1
-  ProxyAutoConfigURLString : http://user:pw@wpad.acme.example/proxy.pac?token=abc#x
+  ProxyAutoConfigURLString : http://user:pw@wpad.sample.example/proxy.pac?token=abc#x
   SOCKSEnable : 1
   SOCKSPort : 7890
   SOCKSProxy : 127.0.0.1
@@ -123,8 +123,8 @@ func TestParseScutilProxy(t *testing.T) {
 	for _, p := range got {
 		shown = append(shown, p.String())
 	}
-	want := "HTTP proxy proxy.acme.example:3128 (system settings)|SOCKS proxy 127.0.0.1:7890 (system settings)|" +
-		"PAC file http://wpad.acme.example/proxy.pac (system settings)"
+	want := "HTTP proxy proxy.sample.example:3128 (system settings)|SOCKS proxy 127.0.0.1:7890 (system settings)|" +
+		"PAC file http://wpad.sample.example/proxy.pac (system settings)"
 	if strings.Join(shown, "|") != want {
 		t.Errorf("got %s", strings.Join(shown, "|"))
 	}
@@ -134,14 +134,14 @@ func TestParseScutilProxy(t *testing.T) {
 }
 
 func TestProxyParsing(t *testing.T) {
-	got := parseWinProxyServer("http=proxy.acme.example:8080;https=proxy.acme.example:8443;socks=127.0.0.1:1080")
-	if len(got) != 3 || got[0].Shown != "proxy.acme.example:8080" || got[0].Kind != "HTTP proxy" || got[2].Host != "127.0.0.1" {
+	got := parseWinProxyServer("http=proxy.sample.example:8080;https=proxy.sample.example:8443;socks=127.0.0.1:1080")
+	if len(got) != 3 || got[0].Shown != "proxy.sample.example:8080" || got[0].Kind != "HTTP proxy" || got[2].Host != "127.0.0.1" {
 		t.Errorf("per protocol: %+v", got)
 	}
 	if got := parseWinProxyServer("10.0.0.1:3128"); len(got) != 1 || got[0].Shown != "10.0.0.1:3128" {
 		t.Errorf("one for all: %+v", got)
 	}
-	env := map[string]string{"https_proxy": "http://bob:hunter2@proxy.acme.example:3128", "HTTPS_PROXY": "http://bob:hunter2@proxy.acme.example:3128",
+	env := map[string]string{"https_proxy": "http://bob:hunter2@proxy.sample.example:3128", "HTTPS_PROXY": "http://bob:hunter2@proxy.sample.example:3128",
 		"http_proxy": "localhost:8888", "no_proxy": "localhost"}
 	ps := envProxies(func(k string) string { return env[k] })
 	all := ""
@@ -149,20 +149,20 @@ func TestProxyParsing(t *testing.T) {
 		all += p.String() + "\n"
 	}
 	if len(ps) != 2 || strings.Contains(all, "bob") || strings.Contains(all, "hunter2") ||
-		!strings.Contains(all, "https_proxy proxy.acme.example:3128 (environment)") || !strings.Contains(all, "http_proxy localhost:8888") {
+		!strings.Contains(all, "https_proxy proxy.sample.example:3128 (environment)") || !strings.Contains(all, "http_proxy localhost:8888") {
 		t.Errorf("env: %s", all)
 	}
 	gs := map[string]string{
-		"org.gnome.system.proxy mode": "'manual'\n", "org.gnome.system.proxy.http host": "'proxy.acme.example'\n",
+		"org.gnome.system.proxy mode": "'manual'\n", "org.gnome.system.proxy.http host": "'proxy.sample.example'\n",
 		"org.gnome.system.proxy.http port": "3128\n", "org.gnome.system.proxy.https host": "''\n",
 		"org.gnome.system.proxy.socks host": "'127.0.0.1'\n", "org.gnome.system.proxy.socks port": "1080\n",
 	}
 	got = gnomeProxies(func(s, k string) string { return gs[s+" "+k] })
-	if len(got) != 2 || got[0].Shown != "proxy.acme.example:3128" || got[1].Shown != "127.0.0.1:1080" {
+	if len(got) != 2 || got[0].Shown != "proxy.sample.example:3128" || got[1].Shown != "127.0.0.1:1080" {
 		t.Errorf("gnome manual: %+v", got)
 	}
-	gs = map[string]string{"org.gnome.system.proxy mode": "'auto'\n", "org.gnome.system.proxy autoconfig-url": "'https://wpad.acme.example/p.pac'\n"}
-	if got := gnomeProxies(func(s, k string) string { return gs[s+" "+k] }); len(got) != 1 || got[0].Host != "wpad.acme.example" {
+	gs = map[string]string{"org.gnome.system.proxy mode": "'auto'\n", "org.gnome.system.proxy autoconfig-url": "'https://wpad.sample.example/p.pac'\n"}
+	if got := gnomeProxies(func(s, k string) string { return gs[s+" "+k] }); len(got) != 1 || got[0].Host != "wpad.sample.example" {
 		t.Errorf("gnome auto: %+v", got)
 	}
 	if got := gnomeProxies(func(s, k string) string { return "'none'\n" }); len(got) != 0 {
@@ -171,13 +171,13 @@ func TestProxyParsing(t *testing.T) {
 }
 
 func TestTrustCerts(t *testing.T) {
-	der, fp := testCA(t, "Acme Corp TLS Inspection CA")
+	der, fp := testCA(t, "Sample Corp TLS Inspection CA")
 	pemData := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
-	cs := certsFromFile(pemData, "acme.crt", "/usr/local/share/ca-certificates/acme.crt")
-	if len(cs) != 1 || cs[0].CN != "Acme Corp TLS Inspection CA" || cs[0].SHA256 != fp || cs[0].NotAfter.Year() != 2036 {
+	cs := certsFromFile(pemData, "sample.crt", "/usr/local/share/ca-certificates/sample.crt")
+	if len(cs) != 1 || cs[0].CN != "Sample Corp TLS Inspection CA" || cs[0].SHA256 != fp || cs[0].NotAfter.Year() != 2036 {
 		t.Fatalf("pem: %+v", cs)
 	}
-	if cs := certsFromFile(der, "acme.der", "x"); len(cs) != 1 || cs[0].SHA256 != fp {
+	if cs := certsFromFile(der, "sample.der", "x"); len(cs) != 1 || cs[0].SHA256 != fp {
 		t.Errorf("der: %+v", cs)
 	}
 	if cs := certsFromFile([]byte("garbage"), "bad.crt", "x"); len(cs) != 1 || cs[0].Name != "bad.crt" || cs[0].SHA256 != "" {
@@ -201,9 +201,9 @@ func TestTrustCerts(t *testing.T) {
 	}
 
 	out := "roots=ok\ncert=ABCDEF0123:" + base64.StdEncoding.EncodeToString(blob) + "\ncert=99FF:!!!\n" +
-		"ProxyEnable=1\nProxyServer=proxy.acme.example:8080\nAutoConfigURL=http://wpad/proxy.pac\n"
+		"ProxyEnable=1\nProxyServer=proxy.sample.example:8080\nAutoConfigURL=http://wpad/proxy.pac\n"
 	f := winTrustFacts(out)
-	if len(f.Certs) != 2 || f.Certs[0].CN != "Acme Corp TLS Inspection CA" || f.Certs[1].Name != "99FF" || f.CAErr != "" ||
+	if len(f.Certs) != 2 || f.Certs[0].CN != "Sample Corp TLS Inspection CA" || f.Certs[1].Name != "99FF" || f.CAErr != "" ||
 		len(f.Proxies) != 2 || f.Proxies[1].Kind != "PAC file" {
 		t.Errorf("windows: %+v", f)
 	}
@@ -212,9 +212,9 @@ func TestTrustCerts(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	putFile(t, filepath.Join(dir, "deb", "corp", "acme.crt"), string(pemData))
+	putFile(t, filepath.Join(dir, "deb", "corp", "sample.crt"), string(pemData))
 	putFile(t, filepath.Join(dir, "deb", "README"), "not a cert")
-	putFile(t, filepath.Join(dir, "rh", "acme.pem"), string(pemData))
+	putFile(t, filepath.Join(dir, "rh", "sample.pem"), string(pemData))
 	if cs := linuxAnchors([]string{filepath.Join(dir, "deb"), filepath.Join(dir, "rh"), filepath.Join(dir, "missing")}); len(cs) != 3 {
 		// README counts as an unreadable anchor in a folder that is not Debian's.
 		t.Errorf("linux anchors: %+v", cs)
@@ -226,9 +226,9 @@ func TestEvalTrustStore(t *testing.T) {
 	_, fp := testCA(t, "x")
 	mk := trustCert{Name: "mkcert demo@demo-mac.local (Demo User)", CN: "mkcert demo@demo-mac.local (Demo User)",
 		SHA256: "AA11", NotAfter: time.Date(2036, 1, 1, 0, 0, 0, 0, time.UTC), Where: "user trust settings"}
-	corp := trustCert{Name: "Acme Corp TLS Inspection CA", CN: "Acme Corp TLS Inspection CA", SHA256: fp, Where: "admin trust settings"}
-	corpProxy := trustProxy{Kind: "HTTP proxy", Host: "proxy.acme.example", Shown: "proxy.acme.example:3128", Where: "system settings"}
-	envProxy := trustProxy{Kind: "https_proxy", Host: "proxy.acme.example", Shown: "proxy.acme.example:3128", Where: "environment"}
+	corp := trustCert{Name: "Sample Corp TLS Inspection CA", CN: "Sample Corp TLS Inspection CA", SHA256: fp, Where: "admin trust settings"}
+	corpProxy := trustProxy{Kind: "HTTP proxy", Host: "proxy.sample.example", Shown: "proxy.sample.example:3128", Where: "system settings"}
+	envProxy := trustProxy{Kind: "https_proxy", Host: "proxy.sample.example", Shown: "proxy.sample.example:3128", Where: "environment"}
 	local := trustProxy{Kind: "SOCKS proxy", Host: "127.0.0.1", Shown: "127.0.0.1:7890", Where: "system settings"}
 
 	r := evalTrustStore(trustFacts{OS: "darwin", HostOnly: 9, Proxies: []trustProxy{local}}, def)
@@ -257,12 +257,12 @@ func TestEvalTrustStore(t *testing.T) {
 	}
 
 	r = evalTrustStore(trustFacts{OS: "linux", Proxies: []trustProxy{corpProxy, envProxy, local}}, def)
-	if r.Status != check.Warn || r.Severity != check.Medium || !strings.Contains(r.Summary, "through a proxy: proxy.acme.example:3128.") ||
+	if r.Status != check.Warn || r.Severity != check.Medium || !strings.Contains(r.Summary, "through a proxy: proxy.sample.example:3128.") ||
 		!strings.Contains(r.Fix, "Network Proxy") || !strings.Contains(r.Fix, "https_proxy") || len(r.Evidence) != 3 {
 		t.Errorf("proxies: %+v", r)
 	}
 	p = def
-	p.AllowProxies = []string{"*.acme.example"}
+	p.AllowProxies = []string{"*.sample.example"}
 	if r := evalTrustStore(trustFacts{OS: "linux", Proxies: []trustProxy{corpProxy}}, p); r.Status != check.Pass {
 		t.Errorf("allowed proxy: %+v", r)
 	}

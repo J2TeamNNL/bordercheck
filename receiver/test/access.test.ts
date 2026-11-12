@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessIdentity, resetAccessKeys } from "../src/auth";
 import { BASE, call, env } from "./helpers";
 
-const TEAM = "acme.cloudflareaccess.com";
+const TEAM = "sample.cloudflareaccess.com";
 const AUD = "aud-tag-1234";
 const e = { ...env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD };
 

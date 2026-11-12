@@ -375,14 +375,14 @@ describe("MCP write tools", () => {
     expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM roles").first<number>("n")).toBe(0);
 
     // A role that already has such fields (set in the dashboard) can still be edited through MCP if they stay unchanged.
-    const id = await makeRole("Dev", { update: { repo: "acme/bordercheck" }, report: { include_evidence: true }, checks: {} });
-    const keep = await tool("update_role", { role_id: id, policy: { update: { repo: "acme/bordercheck" }, report: { include_evidence: true }, checks: { tailscale: { enabled: false } } } });
+    const id = await makeRole("Dev", { update: { repo: "sample/bordercheck" }, report: { include_evidence: true }, checks: {} });
+    const keep = await tool("update_role", { role_id: id, policy: { update: { repo: "sample/bordercheck" }, report: { include_evidence: true }, checks: { tailscale: { enabled: false } } } });
     expect(keep.isError).toBe(false);
     const change = await tool("update_role", { role_id: id, policy: { update: { repo: "evil/bordercheck" }, checks: {} } });
     expect(change.isError).toBe(true);
     expect(change.data.problems).toContain("update.repo: can't be set or changed through MCP; change it in the dashboard");
     // Turning collection off is fine.
-    expect((await tool("update_role", { role_id: id, policy: { update: { repo: "acme/bordercheck" }, report: { include_evidence: false } } })).isError).toBe(false);
+    expect((await tool("update_role", { role_id: id, policy: { update: { repo: "sample/bordercheck" }, report: { include_evidence: false } } })).isError).toBe(false);
     const renamed = await tool("update_role", { role_id: id, name: "Developers" });
     expect(renamed.data).toMatchObject({ ok: true, name: "Developers", policy_changed: false });
     expect((await tool("update_role", { role_id: id })).isError).toBe(true);

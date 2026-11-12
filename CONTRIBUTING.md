@@ -130,14 +130,14 @@ Repo secrets:
 |---|---|
 | `BORDERCHECK_SIGNING_KEY` | required; the ed25519 key from `go run ./scripts/sign -keygen` |
 | `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD` | optional; base64 of a `.p12` with the *Developer ID Application* certificate and key, and its password |
-| `MACOS_SIGNING_IDENTITY` | optional, e.g. `Developer ID Application: Acme Ltd (ABCDE12345)` |
+| `MACOS_SIGNING_IDENTITY` | optional, e.g. `Developer ID Application: Sample Ltd (ABCDE12345)` |
 | `APPLE_NOTARY_KEY_P8`, `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID` | optional; an App Store Connect API key for `notarytool` |
 
 The macOS secrets put the Developer ID key on GitHub. Releases of this repository are instead signed on the
 maintainer's Mac, before the tag is pushed:
 
 ```sh
-SIGN_ID="Developer ID Application: Acme Ltd (ABCDE12345)" NOTARY_PROFILE=my-notary scripts/sign-macos-release.sh v1.2.3
+SIGN_ID="Developer ID Application: Sample Ltd (ABCDE12345)" NOTARY_PROFILE=my-notary scripts/sign-macos-release.sh v1.2.3
 git tag v1.2.3 && git push origin v1.2.3
 ```
 

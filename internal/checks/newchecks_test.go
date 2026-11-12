@@ -235,7 +235,7 @@ func TestClassifyProc(t *testing.T) {
 		{"cloudflared", "--config /etc/cf.yml tunnel run", "cloudflared", "", check.High},
 		{"cloudflared", "access tcp --hostname db.domain.com --url localhost:5432", "", "", ""},
 		{"cloudflared", "proxy-dns", "", "", ""},
-		{"/usr/local/bin/node", "/usr/local/bin/lt --port 3000 --subdomain acme", "localtunnel", "3000", check.High},
+		{"/usr/local/bin/node", "/usr/local/bin/lt --port 3000 --subdomain sample", "localtunnel", "3000", check.High},
 		{"node", "/Users/me/.npm/_npx/1/node_modules/.bin/npx -y localtunnel -p 4000", "localtunnel", "4000", check.High},
 		{"node", "server.js --port 3000", "", "", ""},
 		{"bore", "local 5000 --to bore.pub --secret " + fakeTunnel, "bore", "5000", check.High},
@@ -370,8 +370,8 @@ func TestCredentialReaders(t *testing.T) {
 		{"git helper store", readGitConfigHelper, "[user]\n  name = Me\n[credential]\n\thelper = store\n", []string{"credential.helper"}},
 		{"git helper keychain", readGitConfigHelper, "[credential]\n  helper = osxkeychain\n[alias]\n  helper = store\n", nil},
 		{"gcloud user", readGCloudADC, `{"type":"authorized_user","client_id":"x.apps.googleusercontent.com","refresh_token":"1//` + fakeSecret + `"}`, []string{""}},
-		{"gcloud service account", readGCloudADC, `{"type":"service_account","client_email":"ci@acme.iam.gserviceaccount.com","private_key":"` +
-			strings.ReplaceAll(randomPEM("PRIVATE KEY", nil), "\n", `\n`) + `"}`, []string{"ci@acme.iam.gserviceaccount.com"}},
+		{"gcloud service account", readGCloudADC, `{"type":"service_account","client_email":"ci@sample.iam.gserviceaccount.com","private_key":"` +
+			strings.ReplaceAll(randomPEM("PRIVATE KEY", nil), "\n", `\n`) + `"}`, []string{"ci@sample.iam.gserviceaccount.com"}},
 		{"gcloud external account", readGCloudADC, `{"type":"external_account","audience":"//iam","credential_source":{"file":"/tmp/t"}}`, nil},
 		{"azure msal", readAzureTokenCache, `{"AccessToken":{},"RefreshToken":{"k":{"secret":"` + fakeSecret + `"}}}`, []string{""}},
 		{"azure empty", readAzureTokenCache, `{"AccessToken":{},"RefreshToken":{},"Account":{}}`, nil},
@@ -504,7 +504,7 @@ sandbox_mode = "workspace-write"
 [profiles.yolo]
 sandbox_mode = "danger-full-access"
 
-[model_providers.acme]
+[model_providers.sample]
 name = "not an mcp server"
 
 [mcp_servers.search]
@@ -585,7 +585,7 @@ func TestAIAgentsScanAll(t *testing.T) {
 	writeFile(t, home, "Library/Application Support/Claude/claude_desktop_config.json", `{"mcpServers":{"s":{"env":{"SLACK_BOT_TOKEN":"`+fakeSecret+`"}}}}`, 0o600)
 	writeFile(t, home, "AppData/Roaming/Claude/claude_desktop_config.json", `{"mcpServers":{"s":{"env":{"SLACK_BOT_TOKEN":"`+fakeSecret+`"}}}}`, 0o600)
 	writeFile(t, home, ".codex/config.toml", "sandbox_mode = \"danger-full-access\"\n", 0o600)
-	writeFile(t, home, "work/agent.json", `{"servers":{"x":{"env":{"ACME_SECRET":"`+fakeSecret+`"}}}}`, 0o600)
+	writeFile(t, home, "work/agent.json", `{"servers":{"x":{"env":{"SAMPLE_SECRET":"`+fakeSecret+`"}}}}`, 0o600)
 	writeFile(t, home, ".cursor/cli-config.json", `{"approvalMode":"allowlist"}`, 0o600)
 
 	p := policy.Default().Checks.AIAgents

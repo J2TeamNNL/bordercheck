@@ -18,12 +18,12 @@ func load(t *testing.T, body string) (Policy, error) {
 }
 
 func TestLoadMergesOverDefault(t *testing.T) {
-	p, err := load(t, `{"name": "Acme", "checks": {"listeners": {"on_problem": "fail"}, "docker": {"enabled": false}}}`)
+	p, err := load(t, `{"name": "Sample", "checks": {"listeners": {"on_problem": "fail"}, "docker": {"enabled": false}}}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := p.Checks
-	if p.Name != "Acme" || c.Listeners.OnProblem != "fail" || c.Docker.IsEnabled() || !c.TailscaleJudged() {
+	if p.Name != "Sample" || c.Listeners.OnProblem != "fail" || c.Docker.IsEnabled() || !c.TailscaleJudged() {
 		t.Errorf("got %+v", p)
 	}
 	if c.Secrets.WalkDepth != 5 || !*c.Firewall.RequireStealth || len(c.Listeners.Allow) != 1 {

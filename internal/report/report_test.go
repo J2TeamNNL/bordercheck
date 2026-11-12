@@ -11,7 +11,7 @@ import (
 )
 
 func TestWaivedInReport(t *testing.T) {
-	r := New("test", "Acme", []check.Result{
+	r := New("test", "Sample", []check.Result{
 		{ID: "listeners", Title: "Nothing listens beyond localhost", Status: check.Waived, Severity: check.Medium,
 			Summary: "1 port(s) can be reached", Fix: "Close it.", Waived: &check.Waiver{Until: "2026-11-15", Reason: "Postgres demo"}},
 		{ID: "docker", Title: "Docker containers stay isolated", Status: check.Waived, Severity: check.High,

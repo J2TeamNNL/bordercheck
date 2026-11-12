@@ -107,7 +107,7 @@ func TestGatherExtensions(t *testing.T) {
 			putFile(t, filepath.Join(home, ".vscode", "extensions", "extensions.json"), `[
 			  {"identifier": {"id": "ms-python.python", "uuid": "u1"}, "version": "2026.1.0",
 			   "metadata": {"id": "u1", "publisherDisplayName": "Microsoft", "source": "gallery"}},
-			  {"identifier": {"id": "Acme.Internal-Tools"}, "version": "0.3.0", "metadata": {"source": "vsix"}},
+			  {"identifier": {"id": "Sample.Internal-Tools"}, "version": "0.3.0", "metadata": {"source": "vsix"}},
 			  {"identifier": {"id": "old.ext"}, "version": "1.0.0"}
 			]`)
 			putFile(t, filepath.Join(home, ".cursor", "extensions", "extensions.json"), `[]`)
@@ -135,7 +135,7 @@ func TestGatherExtensions(t *testing.T) {
 				"sideload@vendor.example": {"Vendor Helper", "installed by another program, not from a store", true, false},
 				"fromfile@example.org":    {"From File", "installed from a file, not from a store", true, false},
 				"ms-python.python":        {"ms-python.python", "", true, false},
-				"acme.internal-tools":     {"acme.internal-tools", "installed from a VSIX file", true, false},
+				"sample.internal-tools":   {"sample.internal-tools", "installed from a VSIX file", true, false},
 				"old.ext":                 {"old.ext", "", true, false},
 			}
 			if len(got) != len(want) {

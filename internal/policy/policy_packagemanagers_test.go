@@ -33,7 +33,7 @@ func TestMoreChecksPolicyDefaults(t *testing.T) {
 func TestMoreChecksPolicy(t *testing.T) {
 	p, err := load(t, `{"checks": {
 	  "package-managers": {"tools": ["npm", "pip"], "require_release_age": true, "allow_hosts": ["*.corp.example"]},
-	  "startup-items": {"on_problem": "fail", "allow": ["com.acme.*"], "extra_suspicious_paths": ["~/Public"]},
+	  "startup-items": {"on_problem": "fail", "allow": ["com.sample.*"], "extra_suspicious_paths": ["~/Public"]},
 	  "backup": {"require_backup": true, "max_backup_age_days": 14},
 	  "ssh-keys": {"client_config": false},
 	  "secrets": {"locations": {"git_remotes": false}}}}`)
@@ -45,7 +45,7 @@ func TestMoreChecksPolicy(t *testing.T) {
 		!c.PackageManagers.RequireReleaseAge {
 		t.Errorf("package-managers: %+v", c.PackageManagers)
 	}
-	if c.StartupItems.OnProblem != "fail" || c.StartupItems.Allow[0] != "com.acme.*" {
+	if c.StartupItems.OnProblem != "fail" || c.StartupItems.Allow[0] != "com.sample.*" {
 		t.Errorf("startup-items: %+v", c.StartupItems)
 	}
 	if !c.Backup.RequireBackup || !c.Backup.RequireEncrypted || c.Backup.MaxBackupAgeDays != 14 {

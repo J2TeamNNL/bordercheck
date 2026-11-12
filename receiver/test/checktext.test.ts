@@ -127,7 +127,7 @@ describe("rendering parts", () => {
     // A link in a parameter is linked only when its host is trusted.
     const p = (service: string) => fixHtml(L.en, { summary: "", fix: "x", fix_parts: [part("remote.fix.macSharing", { service })] }).value;
     expect(p("https://evil.example.com/x")).not.toContain("<a ");
-    expect(p("https://github.com/acme/x")).toContain('<a href="https://github.com/acme/x"');
+    expect(p("https://github.com/sample/x")).toContain('<a href="https://github.com/sample/x"');
   });
 
   it("falls back to the English text when a key is unknown or the parameters are wrong", () => {
