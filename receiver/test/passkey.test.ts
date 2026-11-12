@@ -394,6 +394,10 @@ describe("passkeys and Cloudflare Access", () => {
       expect(await home.text()).not.toContain("/admin/passkeys");
       expect((await call(new Request(`${BASE}/admin/passkeys`, { headers: h }), e)).status).toBe(404);
       expect((await call(new Request(`${BASE}/admin/passkeys/options`, { method: "POST", headers: { ...h, origin: BASE } }), e)).status).toBe(404);
+      // Nor the named-admin pages.
+      expect(await (await call(new Request(`${BASE}/admin`, { headers: h }), e)).text()).not.toContain("/admin/admins");
+      expect((await call(new Request(`${BASE}/admin/admins`, { headers: h }), e)).status).toBe(404);
+      expect((await call(new Request(`${BASE}/admin/admins`, { method: "POST", headers: { ...h, origin: BASE }, body: new URLSearchParams({ name: "x" }) }), e)).status).toBe(404);
     }
     // Switching the token off does not touch Access.
     await env.DB.prepare("INSERT INTO meta (key, value) VALUES ('admin_token_login', 'off')").run();

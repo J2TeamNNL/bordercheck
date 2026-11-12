@@ -6,6 +6,7 @@ import { checkTitle, type I18n, type Key } from "./i18n";
 import { enrollmentOf, enrollmentSection } from "./portal";
 import { type DeviceLocation, parseReport, type Result, statusRank } from "./report";
 import { likelySamplesList } from "./samples";
+import { machineIn, roleIn, type Scope, scopeBind } from "./scope";
 
 export interface MachineRow {
   install_id: string;
@@ -65,15 +66,17 @@ export interface MachineQuery {
   roleId?: number;
   byId?: boolean;
   after?: string;
+  // A named admin's scope (dashboard only); absent: every machine.
+  scope?: Scope;
 }
 
 const MACHINE_FROM = `FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id LEFT JOIN roles r ON r.id = e.role_id`;
-const machineWhere = (filter: Filter) =>
-  `WHERE ${FILTERS[filter].where} AND (?1 = '' OR m.email LIKE ?3 ESCAPE '\\' OR m.hostname LIKE ?3 ESCAPE '\\')
+const machineWhere = (filter: Filter, scope?: Scope) =>
+  `WHERE ${FILTERS[filter].where} AND ${roleIn("e.role_id", 9, scope)} AND (?1 = '' OR m.email LIKE ?3 ESCAPE '\\' OR m.hostname LIKE ?3 ESCAPE '\\')
        AND (?5 = '' OR EXISTS (SELECT 1 FROM checks c WHERE c.install_id = m.install_id AND c.check_id = ?5 AND (?6 = '' OR c.status = ?6)))
        AND (?7 = 0 OR e.role_id = ?7) AND (?8 = '' OR m.install_id > ?8)`;
 const machineBinds = (o: MachineQuery, after: string) =>
-  [o.q, o.silentBefore, `%${o.q.replace(/[\\%_]/g, (c) => "\\" + c)}%`, o.limit, o.check ?? "", o.checkStatus ?? "", o.roleId ?? 0, after];
+  [o.q, o.silentBefore, `%${o.q.replace(/[\\%_]/g, (c) => "\\" + c)}%`, o.limit, o.check ?? "", o.checkStatus ?? "", o.roleId ?? 0, after, scopeBind(o.scope)];
 
 export async function machineRows(env: Env, o: MachineQuery): Promise<MachineListRow[]> {
   const order = o.byId
@@ -85,7 +88,7 @@ export async function machineRows(env: Env, o: MachineQuery): Promise<MachineLis
             e.install_id IS NOT NULL AS enrolled, e.revoked_at, r.name AS role,
             (SELECT MIN(c.since) FROM checks c WHERE c.install_id = m.install_id AND c.status = 'fail') AS failing_since
      ${MACHINE_FROM}
-     ${machineWhere(o.filter)}
+     ${machineWhere(o.filter, o.scope)}
      ORDER BY ${order} LIMIT ?4`,
   )
     .bind(...machineBinds(o, o.byId ? o.after ?? "" : ""))
@@ -95,7 +98,7 @@ export async function machineRows(env: Env, o: MachineQuery): Promise<MachineLis
 
 // machineCount: how many machines machineRows would list without a limit or cursor.
 export async function machineCount(env: Env, o: MachineQuery): Promise<number> {
-  const n = await env.DB.prepare(`SELECT COUNT(*) AS n ${MACHINE_FROM} ${machineWhere(o.filter)} AND ?4 = ?4`)
+  const n = await env.DB.prepare(`SELECT COUNT(*) AS n ${MACHINE_FROM} ${machineWhere(o.filter, o.scope)} AND ?4 = ?4`)
     .bind(...machineBinds(o, ""))
     .first<number>("n");
   return n ?? 0;
@@ -104,15 +107,15 @@ export async function machineCount(env: Env, o: MachineQuery): Promise<number> {
 // waitingRows: enrolled machines that never reported, newest enrollment
 // first; with byId, by install_id after `after` (for a cursor), optionally
 // narrowed by a substring of email or hostname and by role.
-export async function waitingRows(env: Env, limit: number, o: { byId?: boolean; after?: string; q?: string; roleId?: number } = {}) {
+export async function waitingRows(env: Env, limit: number, o: { byId?: boolean; after?: string; q?: string; roleId?: number; scope?: Scope } = {}) {
   const q = o.q ?? "";
   const like = `%${q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
   const r = await env.DB.prepare(
     `SELECT e.install_id, e.email, e.hostname, e.enrolled_at, r.name AS role FROM enrollments e JOIN roles r ON r.id = e.role_id
      WHERE e.revoked_at IS NULL AND NOT EXISTS (SELECT 1 FROM machines m WHERE m.install_id = e.install_id)
-       AND (?2 = '' OR e.install_id > ?2) AND (?3 = '' OR e.email LIKE ?4 ESCAPE '\\' OR e.hostname LIKE ?4 ESCAPE '\\') AND (?5 = 0 OR e.role_id = ?5)
+       AND (?2 = '' OR e.install_id > ?2) AND (?3 = '' OR e.email LIKE ?4 ESCAPE '\\' OR e.hostname LIKE ?4 ESCAPE '\\') AND (?5 = 0 OR e.role_id = ?5) AND ${roleIn("e.role_id", 6, o.scope)}
      ORDER BY ${o.byId ? "e.install_id" : "e.enrolled_at DESC"} LIMIT ?1`,
-  ).bind(limit, o.byId ? o.after ?? "" : "", q, like, o.roleId ?? 0).all<{ install_id: string; email: string; hostname: string; enrolled_at: string; role: string }>();
+  ).bind(limit, o.byId ? o.after ?? "" : "", q, like, o.roleId ?? 0, scopeBind(o.scope)).all<{ install_id: string; email: string; hostname: string; enrolled_at: string; role: string }>();
   return r.results;
 }
 
@@ -144,25 +147,25 @@ function tile(L: I18n, href: string, n: number, label: Html, sub: Html, tone: st
   return html`<a class="tile ${n ? tone : "zero"}" href="${href}"><span class="l">${label}</span><span class="s">${sub}</span><span class="n">${L.num(n)}</span></a>`;
 }
 
-export async function machinesPage(env: Env, url: URL, who: string, now: number, L: I18n): Promise<Response> {
+export async function machinesPage(env: Env, url: URL, who: string, now: number, L: I18n, scope?: Scope): Promise<Response> {
   const f = (url.searchParams.get("filter") ?? "all") as Filter;
   const filter: Filter = f in FILTERS ? f : "all";
   const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
   const cfg = config(env);
   const silentBefore = new Date(now - cfg.silentDays * DAY).toISOString();
   const [rows, waiting, totals, top, pending] = await Promise.all([
-    machineRows(env, { filter, q, silentBefore, limit: 2000 }),
-    waitingRows(env, 500),
+    machineRows(env, { filter, q, silentBefore, limit: 2000, scope }),
+    waitingRows(env, 500, { scope }),
     env.DB.prepare(
       `SELECT COUNT(*) AS n, SUM(m.fail > 0) AS failing, SUM(m.fail = 0 AND (m.error > 0 OR m.warn > 0)) AS attention,
               SUM(m.last_seen < ?1) AS silent, SUM(e.revoked_at IS NOT NULL) AS revoked, SUM(m.compromised_since IS NOT NULL) AS compromised
-       FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id`,
+       FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id WHERE ${roleIn("e.role_id", 2, scope)}`,
     )
-      .bind(silentBefore)
+      .bind(silentBefore, scopeBind(scope))
       .first<{ n: number; failing: number | null; attention: number | null; silent: number | null; revoked: number | null; compromised: number | null }>(),
-    checkStats(env, 4),
-    env.DB.prepare("SELECT COUNT(*) AS n FROM invites WHERE used_at IS NULL AND revoked_at IS NULL AND expires_at > ?")
-      .bind(new Date(now).toISOString())
+    checkStats(env, 4, scope),
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM invites i WHERE i.used_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > ?1 AND ${roleIn("i.role_id", 2, scope)}`)
+      .bind(new Date(now).toISOString(), scopeBind(scope))
       .first<number>("n"),
   ]);
   const n = totals?.n ?? 0;
@@ -223,6 +226,7 @@ ${rows.map(
 
   const body = html`<div class="hero"><p class="eyebrow">${L.t("fleet.eyebrow")}</p><h1>${L.t("nav.machines")}</h1>
 <p class="lead">${L.t("machines.lead", { n, failing, silent: totals?.silent ?? 0, days: cfg.silentDays })}</p></div>
+${scopeNote(L, scope)}
 ${overview}
 <div class="shelf"><h2>${filter === "all" ? L.t("machines.every") : L.t(FILTERS[filter].key)}${q ? L.t("machines.matching", { q }) : ""}</h2><span class="muted small">${L.t("machines.shown", { n: rows.length })}</span></div>
 <div class="toolbar"><nav class="seg" aria-label="${L.s("filter.aria")}">${(Object.keys(FILTERS) as Filter[]).map(
@@ -237,6 +241,11 @@ ${waiting.length
       )}</tbody></table></div></div>`
     : html`<span id="waiting"></span>`}`;
   return page(layout(L, L.s("nav.machines"), who, body, "Machines"));
+}
+
+// scopeNote explains an empty page to a named admin who manages no role yet.
+export function scopeNote(L: I18n, scope?: Scope): Html | string {
+  return scope && scope.roles.length === 0 ? note(L.t("scope.none"), "s-warn") : "";
 }
 
 function waiverNote(L: I18n, r: Result, now: number): Html | string {
@@ -373,7 +382,9 @@ function statTile(L: I18n, n: number, label: Html, tone: string): Html {
   return html`<div class="tile ${n ? tone : "zero"}"><span class="l">${label}</span><span class="n">${L.num(n)}</span></div>`;
 }
 
-export async function machinePage(env: Env, id: string, who: string, now: number, L: I18n): Promise<Response> {
+// machinePage: index.ts has already checked that a scoped viewer may see this
+// machine (scope.machineVisible); `scope` narrows the role choices.
+export async function machinePage(env: Env, id: string, who: string, now: number, L: I18n, scope?: Scope): Promise<Response> {
   // One round of queries for everything keyed by the install ID alone: the
   // database can be far from where the request landed, so each extra round
   // is a long wait.
@@ -388,7 +399,7 @@ export async function machinePage(env: Env, id: string, who: string, now: number
   if (!mRow && !enrollment) {
     return page(layout(L, L.s("common.notFound"), who, html`<p class="eyebrow">${L.t("nav.machines")}</p><h1>${L.t("machine.noSuch")}</h1><p><a href="/admin">${L.t("machine.back")}</a></p>`, "Machines"), 404);
   }
-  const enrollHtml = await enrollmentSection(L, env, id, enrollment, new Date(now));
+  const enrollHtml = await enrollmentSection(L, env, id, enrollment, new Date(now), scope);
   const crumb = html`<p class="eyebrow"><a href="/admin">${L.t("nav.machines")}</a> · ${enrollment?.role ?? L.s("common.machine")}</p>`;
   if (!mRow) {
     const e = enrollment!;
@@ -480,23 +491,25 @@ export interface CheckStat {
   total: number;
 }
 
-// checkStats: each check across all machines' latest reports, most failing first.
-export async function checkStats(env: Env, limit = 1000): Promise<CheckStat[]> {
+// checkStats: each check across all machines' latest reports (those in
+// scope, for a named admin), most failing first.
+export async function checkStats(env: Env, limit = 1000, scope?: Scope): Promise<CheckStat[]> {
   const rows = await env.DB.prepare(
     `SELECT check_id, MAX(title) AS title, SUM(status = 'fail') AS fail, SUM(status = 'fail' AND severity = 'high') AS high,
             SUM(status = 'error') AS error, SUM(status = 'warn') AS warn, SUM(status = 'waived') AS waived,
             SUM(status = 'pass') AS pass, COUNT(*) AS total
-     FROM checks GROUP BY check_id ORDER BY fail DESC, high DESC, error DESC, warn DESC, check_id LIMIT ?`,
-  ).bind(limit).all<CheckStat>();
+     FROM checks WHERE ${machineIn("install_id", 2, scope)} GROUP BY check_id ORDER BY fail DESC, high DESC, error DESC, warn DESC, check_id LIMIT ?1`,
+  ).bind(limit, scopeBind(scope)).all<CheckStat>();
   return rows.results;
 }
 
-export async function checksPage(env: Env, who: string, L: I18n): Promise<Response> {
-  const rows = await checkStats(env);
+export async function checksPage(env: Env, who: string, L: I18n, scope?: Scope): Promise<Response> {
+  const rows = await checkStats(env, 1000, scope);
   const cell = (id: string, status: string, n: number, cls: string) =>
     n ? html`<a class="${cls}" href="/admin/checks/${encodeURIComponent(id)}?status=${status}">${L.num(n)}</a>` : html`<span class="zero">${L.num(0)}</span>`;
   const body = html`<div class="hero"><p class="eyebrow">${L.t("fleet.eyebrow")}</p><h1>${L.t("nav.checks")}</h1>
 <p class="lead">${L.t("checks.lead")}</p></div>
+${scopeNote(L, scope)}
 <div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("common.check")}</th><th class="n">${L.t("common.fail")}</th><th class="n">${L.t("common.high")}</th><th class="n">${L.t("common.error")}</th><th class="n">${L.t("common.warn")}</th><th class="n">${L.t("common.waived")}</th><th class="n">${L.t("common.pass")}</th><th class="n">${L.t("checks.thReportedBy")}</th></tr></thead><tbody>
 ${rows.map(
     (c) => html`<tr><td class="wrap"><a class="strong" href="/admin/checks/${encodeURIComponent(c.check_id)}">${checkTitle(L, c.check_id, c.title)}</a> <code class="muted">${c.check_id}</code>
@@ -510,15 +523,15 @@ ${rows.map(
   return page(layout(L, L.s("nav.checks"), who, body, "Checks"));
 }
 
-export async function checkPage(env: Env, checkId: string, url: URL, who: string, now: number, L: I18n): Promise<Response> {
+export async function checkPage(env: Env, checkId: string, url: URL, who: string, now: number, L: I18n, scope?: Scope): Promise<Response> {
   const status = (url.searchParams.get("status") ?? "").slice(0, 32);
   const rows = await env.DB.prepare(
     `SELECT c.status, c.severity, c.title, c.since, m.install_id, m.email, m.hostname, m.last_seen
      FROM checks c JOIN machines m ON m.install_id = c.install_id
-     WHERE c.check_id = ?1 AND (?2 = '' OR c.status = ?2)
+     WHERE c.check_id = ?1 AND (?2 = '' OR c.status = ?2) AND ${machineIn("c.install_id", 3, scope)}
      ORDER BY c.status = 'fail' DESC, c.status = 'error' DESC, c.status = 'warn' DESC, c.since LIMIT 2000`,
   )
-    .bind(checkId, status)
+    .bind(checkId, status, scopeBind(scope))
     .all<{ status: string; severity: string; title: string; since: string; install_id: string; email: string; hostname: string; last_seen: string }>();
   const title = checkTitle(L, checkId, rows.results[0]?.title);
   const n = rows.results.length;
@@ -546,21 +559,23 @@ export interface AlertListRow {
   delivery: string;
 }
 
-// alertRows: newest first; `before` (an alert id) is where a cursor resumes.
-export async function alertRows(env: Env, limit: number, pendingOnly = false, before = 0): Promise<AlertListRow[]> {
+// alertRows: newest first; `before` (an alert id) is where a cursor resumes;
+// with a scope, only alerts about machines in it.
+export async function alertRows(env: Env, limit: number, pendingOnly = false, before = 0, scope?: Scope): Promise<AlertListRow[]> {
   const rows = await env.DB.prepare(
-    "SELECT id, kind, install_id, check_id, detail, created_at, sent_at, delivery FROM alerts WHERE (?1 = 0 OR sent_at IS NULL) AND (?3 = 0 OR id < ?3) ORDER BY id DESC LIMIT ?2",
-  ).bind(pendingOnly ? 1 : 0, limit, before).all<AlertListRow>();
+    `SELECT id, kind, install_id, check_id, detail, created_at, sent_at, delivery FROM alerts WHERE (?1 = 0 OR sent_at IS NULL) AND (?3 = 0 OR id < ?3) AND ${machineIn("install_id", 4, scope)} ORDER BY id DESC LIMIT ?2`,
+  ).bind(pendingOnly ? 1 : 0, limit, before, scopeBind(scope)).all<AlertListRow>();
   return rows.results;
 }
 
 const ALERT_TONE: Record<string, string> = { high_fail: "s-fail", silent: "s-skip", back: "s-pass", new_country: "s-warn", compromised: "s-comp", compromise_cleared: "s-pass" };
 const ALERT_KEY: Record<string, Key> = { high_fail: "alert.high_fail", silent: "alert.silent", back: "alert.back", new_country: "alert.new_country", compromised: "alert.compromised", compromise_cleared: "alert.compromise_cleared" };
 
-export async function alertsPage(env: Env, who: string, L: I18n): Promise<Response> {
-  const rows = await alertRows(env, 200);
+export async function alertsPage(env: Env, who: string, L: I18n, scope?: Scope): Promise<Response> {
+  const rows = await alertRows(env, 200, false, 0, scope);
   const body = html`<div class="hero"><p class="eyebrow">${L.t("fleet.eyebrow")}</p><h1>${L.t("nav.alerts")}</h1>
 <p class="lead">${L.t("alerts.lead")}${env.ALERT_WEBHOOK_URL ? "" : html` ${L.t("alerts.noWebhook")}`}</p></div>
+${scopeNote(L, scope)}
 <div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("alerts.thRaised")}</th><th>${L.t("alerts.thKind")}</th><th>${L.t("common.personMachine")}</th><th>${L.t("common.check")}</th><th>${L.t("alerts.thDelivery")}</th></tr></thead><tbody>
 ${rows.map((a) => {
     const d = parseStatuses(a.detail);

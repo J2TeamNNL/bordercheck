@@ -342,6 +342,9 @@ textarea{display:block;width:100%;resize:vertical}
 textarea.code{font:13px/1.6 var(--mono);tab-size:2;min-height:max(560px,70vh);padding:16px 18px;background:rgba(0,0,0,.45);white-space:pre;overflow:auto}
 textarea.emails{min-height:140px;font:14px/1.6 var(--mono)}
 .field{margin:0 0 16px}
+fieldset.field{border:0;padding:0;min-width:0}fieldset.field legend{font-size:13px;font-weight:650;color:var(--dim);margin:0 0 6px;padding:0}
+label.check{display:inline-flex;align-items:center;gap:6px;margin:0 14px 6px 0;font-weight:500;color:var(--text)}
+label.check input{width:auto;padding:0;box-shadow:none;accent-color:var(--accent)}
 .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
 .row>.field{margin:0}
 .grow{flex:1 1 220px;min-width:0}
@@ -437,7 +440,7 @@ export const MARK = new Html(
   `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.8 4.5 5.6v5.7c0 4.6 3.1 8.6 7.5 9.9 4.4-1.3 7.5-5.3 7.5-9.9V5.6L12 2.8Z" fill="rgba(255,255,255,.18)" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.6 12.1 2.4 2.4 4.5-4.7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 );
 
-export type NavItem = "Machines" | "Checks" | "Alerts" | "Roles" | "Invites" | "Audit" | "Passkeys";
+export type NavItem = "Machines" | "Checks" | "Alerts" | "Roles" | "Invites" | "Audit" | "Passkeys" | "Admins";
 
 const NAV: [NavItem, string, Key][] = [
   ["Machines", "/admin", "nav.machines"],
@@ -447,11 +450,15 @@ const NAV: [NavItem, string, Key][] = [
   ["Invites", "/admin/invites", "nav.invites"],
   ["Audit", "/admin/audit", "nav.audit"],
   ["Passkeys", "/admin/passkeys", "nav.passkeys"],
+  ["Admins", "/admin/admins", "nav.admins"],
 ];
 
-// Signed in with the admin token or a passkey (not Cloudflare Access): these
-// viewers get Sign out and the Passkeys page.
-export const sessionViewer = (who: string | null) => who === TOKEN_WHO || who === PASSKEY_WHO;
+// Signed in with the portal's own sign-in (the admin token, a named admin's
+// token, or a passkey; not Cloudflare Access): these viewers get Sign out and
+// the Passkeys and Admins pages. index.ts records it on L (L.ownSignIn) once
+// it knows the viewer, since a named admin's name alone does not tell; the
+// fixed owner names are the fallback for pages rendered without it.
+export const sessionViewer = (who: string | null, L?: I18n) => who !== null && (L?.ownSignIn ?? (who === TOKEN_WHO || who === PASSKEY_WHO));
 
 // switcher is the language choice: a POST form with one button per language
 // (no script).
@@ -499,11 +506,11 @@ export function layout(L: I18n, title: string, who: string | null, body: Html, a
 <title>${title} · bordercheck</title><style>${new Html(STYLE)}</style></head><body class="${who ? "admin" : "public"}">
 <header class="top">${
     who
-      ? html`<a class="brand" href="/admin"><span class="mark">${MARK}</span>bordercheck</a><nav class="nav" aria-label="${L.s("nav.sections")}">${NAV.filter(([item]) => item !== "Passkeys" || sessionViewer(who)).map(
+      ? html`<a class="brand" href="/admin"><span class="mark">${MARK}</span>bordercheck</a><nav class="nav" aria-label="${L.s("nav.sections")}">${NAV.filter(([item]) => (item !== "Passkeys" && item !== "Admins") || sessionViewer(who, L)).map(
           ([item, href, key]) => html`<a href="${href}"${item === active ? html` class="on" aria-current="page"` : ""}>${L.t(key)}</a>`,
         )}</nav>
 <div class="who">${langs}<span class="id">${who}</span>${
-          sessionViewer(who)
+          sessionViewer(who, L)
             ? html`<form method="post" action="/admin/logout"><button class="sm ghost">${L.t("nav.signOut")}</button></form>`
             : ""
         }</div>`

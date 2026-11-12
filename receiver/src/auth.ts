@@ -1,4 +1,6 @@
 import { type Env, MIN_TOKEN_LENGTH } from "./env";
+import type { Scope } from "./scope";
+import { sha256hex } from "./tokens";
 
 const enc = new TextEncoder();
 
@@ -121,11 +123,18 @@ async function sessionKey(env: Env): Promise<CryptoKey> {
 // A session is "<expiry>.<HMAC(expiry)>" keyed by ADMIN_TOKEN, so changing the
 // token signs everyone out. A session opened with a passkey is
 // "<expiry>p.<HMAC(<expiry>p)>": the marker is signed with the rest, so a
-// token session cannot be turned into a passkey one.
+// token session cannot be turned into a passkey one. A named admin's session
+// adds "a<id>g<gen>" (also signed): "<expiry>[p]a<id>g<gen>.<HMAC>". It is
+// valid only while that admin's row exists with the same gen (admins.ts).
 export type SessionKind = "token" | "passkey";
 
-export async function newSession(env: Env, now = Date.now(), kind: SessionKind = "token"): Promise<string> {
-  const v = String(Math.floor(now / 1000) + SESSION_TTL) + (kind === "passkey" ? "p" : "");
+export interface SessionAdmin {
+  id: number;
+  gen: number;
+}
+
+export async function newSession(env: Env, now = Date.now(), kind: SessionKind = "token", admin?: SessionAdmin): Promise<string> {
+  const v = String(Math.floor(now / 1000) + SESSION_TTL) + (kind === "passkey" ? "p" : "") + (admin ? `a${admin.id}g${admin.gen}` : "");
   const sig = await crypto.subtle.sign("HMAC", await sessionKey(env), enc.encode(v));
   return `${v}.${b64urlEncode(sig)}`;
 }
@@ -142,14 +151,22 @@ export function cookie(req: Request, name: string): string | null {
   return null;
 }
 
-async function validSession(req: Request, env: Env, now: number): Promise<SessionKind | null> {
+interface Session {
+  kind: SessionKind;
+  admin?: SessionAdmin;
+}
+
+async function validSession(req: Request, env: Env, now: number): Promise<Session | null> {
   const v = cookie(req, SESSION_COOKIE);
-  const m = v && /^(\d{1,12})(p?)\.([A-Za-z0-9_-]{20,100})$/.exec(v);
+  const m = v && /^(\d{1,12})(p?)(?:a(\d{1,12})g(\d{1,12}))?\.([A-Za-z0-9_-]{20,100})$/.exec(v);
   if (!m) return null;
   if (Number(m[1]) < now / 1000) return null;
+  const signed = m[0].slice(0, m[0].lastIndexOf("."));
   try {
-    const ok = await crypto.subtle.verify("HMAC", await sessionKey(env), b64urlDecode(m[3]), enc.encode(m[1] + m[2]));
-    return ok ? (m[2] ? "passkey" : "token") : null;
+    const ok = await crypto.subtle.verify("HMAC", await sessionKey(env), b64urlDecode(m[5]), enc.encode(signed));
+    if (!ok) return null;
+    const kind: SessionKind = m[2] ? "passkey" : "token";
+    return m[3] ? { kind, admin: { id: Number(m[3]), gen: Number(m[4]) } } : { kind };
   } catch {
     return null;
   }
@@ -172,10 +189,21 @@ export const TOKEN_WHO = "admin token";
 export const PASSKEY_WHO = "admin passkey";
 
 export interface Viewer {
-  who: string; // shown in the page header
+  who: string; // shown in the page header, written to the audit trail
   via: "access" | "session" | "bearer";
   // The session was opened with a passkey (only for via "session").
   passkey?: boolean;
+  // A named admin (admins.ts): their row id. Absent for the owner and Access.
+  adminId?: number;
+  // The owner: signed in with ADMIN_TOKEN (session or bearer) or with one of
+  // the owner's passkeys. Only the owner adds and removes admins and switches
+  // token sign-in. Access viewers are not the owner: they manage the fleet,
+  // but the portal's own sign-in (passkeys, admins) is not theirs to change,
+  // and those pages answer 404 for them.
+  owner: boolean;
+  // A named admin's scope: the roles they manage (scope.ts). Undefined, for
+  // the owner and Access viewers, means everything.
+  scope?: Scope;
 }
 
 export function dashboardConfigured(env: Env): boolean {
@@ -185,18 +213,70 @@ export function dashboardConfigured(env: Env): boolean {
 // viewer works out who is looking at the dashboard, or null if nobody we trust.
 export async function viewer(req: Request, env: Env, now = Date.now()): Promise<Viewer | null> {
   const who = await accessIdentity(req, env, now);
-  if (who) return { who, via: "access" };
+  if (who) return { who, via: "access", owner: false };
   if (!usableToken(env.ADMIN_TOKEN)) return null;
   // With token sign-in switched off, ADMIN_TOKEN is no admin credential at
   // all: neither as a bearer header nor through a session it opened earlier.
   // Passkey sessions still work (their HMAC is keyed by ADMIN_TOKEN too, which
   // stays secret).
+  // The same goes for named admins' tokens and token sessions.
   const b = bearer(req);
-  if (b) return (await safeEqual(b, env.ADMIN_TOKEN)) && (await tokenLoginOn(env)) ? { who: TOKEN_WHO, via: "bearer" } : null;
+  if (b) {
+    if (await safeEqual(b, env.ADMIN_TOKEN)) return (await tokenLoginOn(env)) ? { who: TOKEN_WHO, via: "bearer", owner: true } : null;
+    const a = await adminByToken(env, b);
+    return a && (await tokenLoginOn(env)) ? { who: a.name, via: "bearer", adminId: a.id, owner: false, scope: await scopeOf(env, a.id) } : null;
+  }
   const s = await validSession(req, env, now);
-  if (s === "passkey") return { who: PASSKEY_WHO, via: "session", passkey: true };
-  if (s === "token" && (await tokenLoginOn(env))) return { who: TOKEN_WHO, via: "session" };
-  return null;
+  if (!s) return null;
+  if (s.kind === "token" && !(await tokenLoginOn(env))) return null;
+  const passkey = s.kind === "passkey";
+  if (!s.admin) return passkey ? { who: PASSKEY_WHO, via: "session", passkey: true, owner: true } : { who: TOKEN_WHO, via: "session", owner: true };
+  const a = await adminById(env, s.admin.id);
+  if (!a || a.gen !== s.admin.gen) return null;
+  return { who: a.name, via: "session", ...(passkey ? { passkey: true } : {}), adminId: a.id, owner: false, scope: await scopeOf(env, a.id) };
+}
+
+// scopeOf loads a named admin's roles. A failed query is an empty scope,
+// never everything.
+async function scopeOf(env: Env, admin: number): Promise<Scope> {
+  try {
+    const r = await env.DB.prepare("SELECT role_id FROM admin_roles WHERE admin_id = ?").bind(admin).all<{ role_id: number }>();
+    return { admin, roles: r.results.map((x) => x.role_id) };
+  } catch {
+    return { admin, roles: [] };
+  }
+}
+
+// ---- Named admins: lookups (the pages are in admins.ts) ----
+
+export interface AdminRow {
+  id: number;
+  name: string;
+  gen: number;
+}
+
+// Their tokens: a recognisable prefix (for secret scanners) and 32 random bytes.
+export const ADMIN_TOKEN_PREFIX = "bca_";
+export const ADMIN_TOKEN_RE = /^bca_[A-Za-z0-9_-]{43}$/;
+
+// adminByToken finds the named admin a token belongs to, by its SHA-256 (see
+// tokens.ts on why a plain hash and a lookup are enough). Null for anything
+// else, including before migration 0006 is applied (no table).
+export async function adminByToken(env: Env, token: string): Promise<AdminRow | null> {
+  if (!ADMIN_TOKEN_RE.test(token)) return null;
+  try {
+    return await env.DB.prepare("SELECT id, name, gen FROM admins WHERE token_hash = ?").bind(await sha256hex(token)).first<AdminRow>();
+  } catch {
+    return null;
+  }
+}
+
+export async function adminById(env: Env, id: number): Promise<AdminRow | null> {
+  try {
+    return await env.DB.prepare("SELECT id, name, gen FROM admins WHERE id = ?").bind(id).first<AdminRow>();
+  } catch {
+    return null;
+  }
 }
 
 // sameOrigin guards state-changing requests made with cookies (Access or our
@@ -210,4 +290,17 @@ export function sameOrigin(req: Request): boolean {
   const origin = req.headers.get("origin");
   if (origin && origin !== "null") return origin === new URL(req.url).origin;
   return req.headers.get("sec-fetch-site") === "same-origin";
+}
+
+// adminsReady: whether migration 0006 (named admins) is applied. Asked where a
+// query needs passkeys.admin_id; before 0006 every passkey is the owner's and
+// there are no named admins. Not cached: the migration may be applied while
+// this isolate lives.
+export async function adminsReady(env: Env): Promise<boolean> {
+  try {
+    await env.DB.prepare("SELECT (SELECT COUNT(*) FROM admins WHERE 0) AS a, (SELECT admin_id FROM passkeys LIMIT 0) AS b").first();
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -12,11 +12,15 @@
 //   POST /admin/passkeys/<id>/delete
 //   POST /admin/passkeys/token-login   switch sign-in with ADMIN_TOKEN on or off
 //
-// There is one admin identity, so every passkey belongs to it; the user handle
-// is a constant and not checked on sign-in.
+// A passkey belongs to the owner (admin_id NULL) or to one named admin
+// (admins.ts): it is stored with the admin_id of whoever registered it, and
+// signing in with it opens a session for that admin. Each admin sees and
+// deletes only their own. The user handle is per admin (so one authenticator
+// can hold the owner's and an admin's passkey side by side) and not checked
+// on sign-in: the credential id decides.
 
 import { auditStmt } from "./audit";
-import { cookie, newSession, PASSKEY_WHO, sessionCookie, TOKEN_LOGIN_KEY, tokenLoginOn, type Viewer } from "./auth";
+import { adminById, adminsReady, cookie, newSession, sessionCookie, TOKEN_LOGIN_KEY, tokenLoginOn, type Viewer } from "./auth";
 import { publicOrigin } from "./enroll";
 import type { Env } from "./env";
 import { html, layout, note, page, PASSKEY_HEADERS } from "./html";
@@ -30,7 +34,8 @@ const CLIENT_TIMEOUT = 2 * 60 * 1000; // what the browser is asked to wait, unde
 const MAX_BODY = 16 * 1024;
 const ES256 = -7;
 const RS256 = -257;
-const USER_ID = b64url(enc.encode("bordercheck-admin"));
+// The owner keeps the handle every passkey had before named admins existed.
+const userId = (adminId?: number) => b64url(enc.encode(adminId === undefined ? "bordercheck-admin" : `bordercheck-admin-${adminId}`));
 
 // "This browser has used a passkey here": makes the sign-in page start the
 // passkey prompt by itself. It says nothing secret; HttpOnly because only the
@@ -67,6 +72,24 @@ export interface PasskeyRow {
   label: string;
   created_at: string;
   last_used_at: string | null;
+  admin_id?: number | null; // absent before migration 0006
+}
+
+// ownWhere: the SQL condition "this passkey is the viewer's", with ?<n> bound
+// to v.adminId ?? null. Before migration 0006 there is no admin_id column and
+// every passkey is the owner's (nobody else can be signed in then).
+async function ownWhere(env: Env, n: number): Promise<string> {
+  return (await adminsReady(env)) ? `admin_id IS ?${n}` : `?${n} IS NULL`;
+}
+const ownId = (v: Viewer) => v.adminId ?? null;
+
+// ownPasskeyCount: how many passkeys the owner (adminId undefined) or a named admin has.
+export async function ownPasskeyCount(env: Env, adminId?: number): Promise<number> {
+  try {
+    return (await env.DB.prepare(`SELECT COUNT(*) AS n FROM passkeys WHERE ${await ownWhere(env, 1)}`).bind(adminId ?? null).first<number>("n")) ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 // The sign-in page asks this on every view. Deployed before migration 0005 is
@@ -222,6 +245,9 @@ export async function loginVerify(env: Env, req: Request, now = Date.now()): Pro
     ok = false;
   }
   if (!ok) return LOGIN_FAILED();
+  // A named admin's passkey signs in as that admin, while the admin exists.
+  const adm = row.admin_id == null ? null : await adminById(env, row.admin_id);
+  if (row.admin_id != null && !adm) return LOGIN_FAILED();
   // A counter that does not move forward suggests a cloned authenticator.
   // Many passkeys (synced ones) always send 0: then there is nothing to compare.
   if (row.sign_count !== 0 && c.signCount !== 0 && c.signCount <= row.sign_count) return LOGIN_FAILED();
@@ -232,23 +258,27 @@ export async function loginVerify(env: Env, req: Request, now = Date.now()): Pro
     .bind(c.signCount, new Date(now).toISOString(), row.id, c.signCount, c.signCount)
     .run();
   if (upd.meta.changes !== 1) return LOGIN_FAILED();
+  if (adm) await env.DB.prepare("UPDATE admins SET last_used_at = ? WHERE id = ?").bind(new Date(now).toISOString(), adm.id).run();
   const headers = new Headers({ "content-type": "application/json", "cache-control": "no-store" });
-  headers.append("set-cookie", sessionCookie(await newSession(env, now, "passkey")));
+  headers.append("set-cookie", sessionCookie(await newSession(env, now, "passkey", adm ? { id: adm.id, gen: adm.gen } : undefined)));
   headers.append("set-cookie", pkCookie());
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
 
 // ---- Signed in: set up ----
 
-export async function registerOptions(env: Env, req: Request, now = Date.now()): Promise<Response> {
+export async function registerOptions(env: Env, req: Request, v: Viewer, now = Date.now()): Promise<Response> {
   const origin = publicOrigin(env, req);
   const host = new URL(origin).hostname;
-  const existing = await env.DB.prepare("SELECT credential_id FROM passkeys ORDER BY id").all<{ credential_id: string }>();
+  const existing = await env.DB.prepare(`SELECT credential_id FROM passkeys WHERE ${await ownWhere(env, 1)} ORDER BY id`).bind(ownId(v)).all<{ credential_id: string }>();
+  const named = v.adminId !== undefined;
   return json(
     {
       challenge: await newChallenge(env, "register", now),
       rp: { id: host, name: `bordercheck (${host})` },
-      user: { id: USER_ID, name: `admin@${host}`, displayName: "bordercheck admin" },
+      user: named
+        ? { id: userId(v.adminId), name: `${v.who}@${host}`, displayName: `bordercheck: ${v.who}` }
+        : { id: userId(), name: `admin@${host}`, displayName: "bordercheck admin" },
       exclude: existing.results.map((r) => r.credential_id),
       timeout: CLIENT_TIMEOUT,
     },
@@ -282,9 +312,15 @@ export async function register(env: Env, req: Request, v: Viewer, now = Date.now
   const label = (typeof body.label === "string" ? body.label : "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 64);
   const credId = b64url(id);
   const at = new Date(now);
+  // Stored as the viewer's own. Before migration 0006 only the owner can be signed in.
+  const ready = await adminsReady(env);
+  if (!ready && v.adminId !== undefined) return fail();
   const res = await env.DB.batch([
-    env.DB.prepare("INSERT INTO passkeys (credential_id, public_key, alg, sign_count, label, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (credential_id) DO NOTHING")
-      .bind(credId, b64url(spki), alg, c.signCount, label, at.toISOString()),
+    (ready
+      ? env.DB.prepare("INSERT INTO passkeys (credential_id, public_key, alg, sign_count, label, created_at, admin_id) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (credential_id) DO NOTHING")
+          .bind(credId, b64url(spki), alg, c.signCount, label, at.toISOString(), ownId(v))
+      : env.DB.prepare("INSERT INTO passkeys (credential_id, public_key, alg, sign_count, label, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (credential_id) DO NOTHING")
+          .bind(credId, b64url(spki), alg, c.signCount, label, at.toISOString())),
     env.DB.prepare("INSERT INTO audit (at, who, action, target, detail) SELECT ?, ?, 'passkey.add', ?, ? WHERE changes() > 0")
       .bind(at.toISOString(), v.who.slice(0, 200), label || "(no label)", JSON.stringify({ alg: alg === ES256 ? "ES256" : "RS256" })),
   ]);
@@ -294,17 +330,19 @@ export async function register(env: Env, req: Request, v: Viewer, now = Date.now
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
 
+// deletePasskey deletes one of the viewer's own passkeys (anyone else's is "not found").
 export async function deletePasskey(env: Env, req: Request, v: Viewer, id: number, L: I18n): Promise<Response> {
-  const row = await env.DB.prepare("SELECT id, label FROM passkeys WHERE id = ?").bind(id).first<{ id: number; label: string }>();
+  const row = await env.DB.prepare(`SELECT id, label FROM passkeys WHERE id = ?1 AND ${await ownWhere(env, 2)}`).bind(id, ownId(v)).first<{ id: number; label: string }>();
   if (!row) return passkeysPage(env, req, v, L, "passkeys.notFound", 404);
-  // No lockout: the last passkey stays while it is the only way in.
-  if (!(await tokenLoginOn(env)) && (await passkeyCount(env)) <= 1) return passkeysPage(env, req, v, L, "passkeys.lastWhileOff", 409);
+  // No lockout: while token sign-in is off, nobody deletes their own last passkey.
+  if (!(await tokenLoginOn(env)) && (await ownPasskeyCount(env, v.adminId)) <= 1) return passkeysPage(env, req, v, L, "passkeys.lastWhileOff", 409);
   // The DELETE re-checks both conditions, so a concurrent delete cannot remove the last one.
+  const own = await ownWhere(env, 3);
   const res = await env.DB.batch([
     env.DB.prepare(
-      `DELETE FROM passkeys WHERE id = ?1 AND (
-         (SELECT value FROM meta WHERE key = ?2) IS NOT 'off' OR (SELECT COUNT(*) FROM passkeys) > 1)`,
-    ).bind(id, TOKEN_LOGIN_KEY),
+      `DELETE FROM passkeys WHERE id = ?1 AND ${own} AND (
+         (SELECT value FROM meta WHERE key = ?2) IS NOT 'off' OR (SELECT COUNT(*) FROM passkeys WHERE ${own}) > 1)`,
+    ).bind(id, TOKEN_LOGIN_KEY, ownId(v)),
     env.DB.prepare("INSERT INTO audit (at, who, action, target, detail) SELECT ?, ?, 'passkey.delete', ?, '{}' WHERE changes() > 0")
       .bind(new Date().toISOString(), v.who.slice(0, 200), row.label || "(no label)"),
   ]);
@@ -312,15 +350,17 @@ export async function deletePasskey(env: Env, req: Request, v: Viewer, id: numbe
   return passkeysPage(env, req, v, L, "passkeys.deleted", 200);
 }
 
-// setTokenLogin switches sign-in with ADMIN_TOKEN. Off needs a passkey and a
-// session opened with one, so nobody switches the token off on the strength
+// setTokenLogin switches sign-in with tokens (ADMIN_TOKEN and every named
+// admin's), both ways, and only the owner may. Off needs an owner passkey and
+// a session opened with one, so nobody switches the token off on the strength
 // of a passkey that has never worked.
 export async function setTokenLogin(env: Env, req: Request, v: Viewer, form: FormData, L: I18n): Promise<Response> {
+  if (!v.owner) return passkeysPage(env, req, v, L, "admins.ownerOnly", 403);
   const want = String(form.get("state") ?? "");
   if (want !== "on" && want !== "off") return passkeysPage(env, req, v, L, "passkeys.badState", 400);
   if (want === "off") {
-    if ((await passkeyCount(env)) === 0) return passkeysPage(env, req, v, L, "passkeys.needPasskey", 409);
-    if (!v.passkey || v.who !== PASSKEY_WHO) return passkeysPage(env, req, v, L, "passkeys.needPasskeySession", 409);
+    if ((await ownPasskeyCount(env)) === 0) return passkeysPage(env, req, v, L, "passkeys.needPasskey", 409);
+    if (!v.passkey) return passkeysPage(env, req, v, L, "passkeys.needPasskeySession", 409);
     await env.DB.batch([
       env.DB.prepare("INSERT INTO meta (key, value) VALUES (?, 'off') ON CONFLICT (key) DO UPDATE SET value = 'off'").bind(TOKEN_LOGIN_KEY),
       auditStmt(env, v.who, "token-login.off", "admin token"),
@@ -337,8 +377,9 @@ export async function setTokenLogin(env: Env, req: Request, v: Viewer, form: For
 // ---- Pages ----
 
 export async function passkeysPage(env: Env, req: Request, v: Viewer, L: I18n, message?: Key, status = 200): Promise<Response> {
-  const rows = (await env.DB.prepare("SELECT * FROM passkeys ORDER BY id").all<PasskeyRow>()).results;
+  const rows = (await env.DB.prepare(`SELECT * FROM passkeys WHERE ${await ownWhere(env, 1)} ORDER BY id`).bind(ownId(v)).all<PasskeyRow>()).results;
   const tokenOn = await tokenLoginOn(env);
+  const bare = v.owner ? await adminsWithoutPasskey(env) : 0;
   const host = new URL(publicOrigin(env, req)).hostname;
   const body = html`<div class="hero"><p class="eyebrow">${L.t("passkeys.eyebrow")}</p><h1>${L.t("nav.passkeys")}</h1>
 <p class="lead">${L.t("passkeys.lead")}</p></div>
@@ -356,8 +397,20 @@ ${rows.map(
 <h2>${L.t("passkeys.tokenTitle")}</h2>
 <div class="panel"><p>${tokenOn ? L.t("passkeys.tokenOnState") : L.t("passkeys.tokenOffState")}</p>
 <p class="muted small">${L.t("passkeys.tokenRule")}</p>
-<form method="post" action="/admin/passkeys/token-login"><input type="hidden" name="state" value="${tokenOn ? "off" : "on"}"><div class="actions"><button class="${tokenOn ? "danger" : "primary"}">${tokenOn ? L.t("passkeys.turnOff") : L.t("passkeys.turnOn")}</button></div></form></div>`;
+${bare ? note(L.t(tokenOn ? "passkeys.adminsNoPasskey" : "passkeys.adminsNoPasskeyOff", { n: bare }), "s-warn") : ""}
+${v.owner
+    ? html`<form method="post" action="/admin/passkeys/token-login"><input type="hidden" name="state" value="${tokenOn ? "off" : "on"}"><div class="actions"><button class="${tokenOn ? "danger" : "primary"}">${tokenOn ? L.t("passkeys.turnOff") : L.t("passkeys.turnOn")}</button></div></form>`
+    : html`<p class="muted small">${L.t("passkeys.ownerSwitch")}</p>`}</div>`;
   return page(layout(L, L.s("nav.passkeys"), v.who, body, "Passkeys", { passkey: true }), status, PASSKEY_HEADERS);
+}
+
+// adminsWithoutPasskey: named admins who cannot sign in while tokens are off.
+async function adminsWithoutPasskey(env: Env): Promise<number> {
+  try {
+    return (await env.DB.prepare("SELECT COUNT(*) AS n FROM admins a WHERE NOT EXISTS (SELECT 1 FROM passkeys p WHERE p.admin_id = a.id)").first<number>("n")) ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 // autoPrompt decides whether the sign-in page starts the passkey prompt by

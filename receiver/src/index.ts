@@ -1,5 +1,7 @@
 import { runCron } from "./alerts";
+import { addAdmin, adminsPage, deleteAdmin, newToken, setRoles } from "./admins";
 import {
+  adminByToken,
   dashboardConfigured,
   newSession,
   sameOrigin,
@@ -12,7 +14,7 @@ import {
 import { alertsPage, checkPage, checksPage, forgetMachine, machinePage, machinesPage } from "./dashboard";
 import type { Env } from "./env";
 import { FAVICON, html, layout, MARK, note, page, PASSKEY_HEADERS } from "./html";
-import { forRequest, type I18n, isLang, type Key, langCookie, safeNext } from "./i18n";
+import { forRequest, type I18n, isLang, type Key, langCookie, msg, safeNext } from "./i18n";
 import { handleReport, json } from "./ingest";
 import { audit } from "./audit";
 import { handleEnroll, invitePage, serveMachinePolicy } from "./enroll";
@@ -23,6 +25,7 @@ import {
   deleteRole,
   invitesPage,
   issuedLinkPage,
+  noSuchRole,
   issueReportLink,
   type MachineAction,
   machineAction,
@@ -49,6 +52,7 @@ import {
   SIGNED_OUT,
 } from "./passkeys";
 import { hit } from "./ratelimit";
+import { inviteVisible, machineVisible, roleAllowed } from "./scope";
 
 const MAX_FORM_BYTES = 512 * 1024;
 
@@ -104,9 +108,14 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
     if (!(await hit(env, req, "login", now)).ok) return loginPage(req, env, url, L, "login.slow", 429);
     const form = await req.formData();
     const token = String(form.get("token") ?? "");
-    // Token sign-in switched off: the same answer as a wrong token.
-    if (!(await safeEqual(token, env.ADMIN_TOKEN)) || !(await tokenLoginOn(env))) return loginPage(req, env, url, L, "login.wrong", 401);
-    return redirect("/admin", { "set-cookie": sessionCookie(await newSession(env, now)) });
+    // The owner's ADMIN_TOKEN first (constant time), then a named admin's
+    // token by its hash. Token sign-in switched off, or anything else wrong:
+    // the same answer as a wrong token.
+    const owner = await safeEqual(token, env.ADMIN_TOKEN);
+    const named = owner ? null : await adminByToken(env, token);
+    if ((!owner && !named) || !(await tokenLoginOn(env))) return loginPage(req, env, url, L, "login.wrong", 401);
+    if (named) await env.DB.prepare("UPDATE admins SET last_used_at = ? WHERE id = ?").bind(new Date(now).toISOString(), named.id).run();
+    return redirect("/admin", { "set-cookie": sessionCookie(await newSession(env, now, "token", named ? { id: named.id, gen: named.gen } : undefined)) });
   }
   // Passkey sign-in: public, so only a challenge and a verdict. Part of the
   // token/session sign-in: absent (404) when ADMIN_TOKEN is not set.
@@ -127,6 +136,13 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
     }
     return json({ error: "unauthorized" }, 401);
   }
+  // Header, Sign out, Passkeys and Admins follow the viewer, not their name.
+  L.ownSignIn = v.via !== "access";
+  // A named admin's scope (scope.ts): list pages take it, and every route on
+  // one machine, role or invite checks it below before anything runs.
+  const scope = v.scope;
+  const machineGone = () =>
+    page(layout(L, L.s("common.notFound"), v.who, html`<p class="eyebrow">${L.t("nav.machines")}</p><h1>${L.t("machine.noSuch")}</h1><p><a href="/admin">${L.t("machine.back")}</a></p>`, "Machines"), 404);
   // Cookie-borne credentials (Access, our session) need a same-origin check on writes.
   if (req.method !== "GET" && req.method !== "HEAD" && v.via !== "bearer" && !sameOrigin(req)) {
     return new Response("cross-site request refused", { status: 403 });
@@ -136,14 +152,17 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
     // The flag keeps the sign-in page from starting the passkey prompt right away.
     return redirect(usableToken(env.ADMIN_TOKEN) ? `/admin/login?${SIGNED_OUT}=1` : "/admin", { "set-cookie": sessionCookie("", 0) });
   }
-  if (path === "/admin" && req.method === "GET") return machinesPage(env, url, v.who, now, L);
-  if (path === "/admin/checks" && req.method === "GET") return checksPage(env, v.who, L);
-  if (path === "/admin/alerts" && req.method === "GET") return alertsPage(env, v.who, L);
+  if (path === "/admin" && req.method === "GET") return machinesPage(env, url, v.who, now, L, scope);
+  if (path === "/admin/checks" && req.method === "GET") return checksPage(env, v.who, L, scope);
+  if (path === "/admin/alerts" && req.method === "GET") return alertsPage(env, v.who, L, scope);
 
   let m = /^\/admin\/checks\/([^/]+)$/.exec(path);
-  if (m && req.method === "GET") return checkPage(env, decodeURIComponent(m[1]), url, v.who, now, L);
+  if (m && req.method === "GET") return checkPage(env, decodeURIComponent(m[1]), url, v.who, now, L, scope);
+  // Every machine route: out of scope answers exactly like an unknown machine.
+  m = /^\/admin\/machine\/([A-Za-z0-9_-]+)(\/.*)?$/.exec(path);
+  if (m && !(await machineVisible(env, m[1], scope))) return machineGone();
   m = /^\/admin\/machine\/([A-Za-z0-9_-]+)$/.exec(path);
-  if (m && req.method === "GET") return machinePage(env, m[1], v.who, now, L);
+  if (m && req.method === "GET") return machinePage(env, m[1], v.who, now, L, scope);
   m = /^\/admin\/machine\/([A-Za-z0-9_-]+)\/forget$/.exec(path);
   if (m && req.method === "POST") {
     await forgetMachine(env, m[1]);
@@ -166,7 +185,11 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
   if (m && req.method === "POST") {
     const action = (m[3] ? "remove-waiver" : m[2]) as MachineAction;
     const form = await formOf(req);
-    const r = await machineAction(env, v.who, m[1], action, machineParams(form, Number(m[3] ?? 0)));
+    const params = machineParams(form, Number(m[3] ?? 0));
+    // Moving a machine: the target role must be in scope too (the current one is, or it would be 404 above).
+    const r = action === "role" && !roleAllowed(scope, Number(params.role_id))
+      ? { status: 400, error: msg("err.noSuchRole") }
+      : await machineAction(env, v.who, m[1], action, params);
     if (r.error) {
       return page(
         layout(L, L.s("notDone.title"), v.who, html`<p class="eyebrow">${L.t("nav.machines")}</p><h1>${L.t("notDone.title")}</h1>${note(L.m(r.error), "s-fail")}<div class="actions"><a class="btn" href="/admin/machine/${m[1]}">${L.t("notDone.back")}</a></div>`),
@@ -176,31 +199,50 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
     return redirect(`/admin/machine/${m[1]}`);
   }
 
-  if (path === "/admin/roles" && req.method === "GET") return rolesPage(env, v.who, L);
-  if (path === "/admin/roles" && req.method === "POST") return createRole(env, v.who, await formOf(req), L);
+  if (path === "/admin/roles" && req.method === "GET") return rolesPage(env, v.who, L, "", undefined, 200, scope);
+  // Creating a role is open to named admins; the new role joins their scope.
+  if (path === "/admin/roles" && req.method === "POST") return createRole(env, v.who, await formOf(req), L, scope);
+  // Every route on one role: out of scope answers like an unknown role.
+  m = /^\/admin\/roles\/(\d{1,12})(\/.*)?$/.exec(path);
+  if (m && !roleAllowed(scope, Number(m[1]))) return noSuchRole(L, v.who);
   m = /^\/admin\/roles\/(\d{1,12})$/.exec(path);
   if (m && req.method === "GET") return rolePage(env, Number(m[1]), v.who, L);
-  if (m && req.method === "POST") return updateRole(env, Number(m[1]), v.who, await formOf(req), L);
+  if (m && req.method === "POST") return updateRole(env, Number(m[1]), v.who, await formOf(req), L, scope);
   m = /^\/admin\/roles\/(\d{1,12})\/delete$/.exec(path);
-  if (m && req.method === "POST") return deleteRole(env, Number(m[1]), v.who, L);
+  if (m && req.method === "POST") return deleteRole(env, Number(m[1]), v.who, L, scope);
 
-  if (path === "/admin/invites" && req.method === "GET") return invitesPage(env, url, v.who, L);
-  if (path === "/admin/invites" && req.method === "POST") return createInvites(env, req, url, v.who, await formOf(req), L);
+  if (path === "/admin/invites" && req.method === "GET") return invitesPage(env, url, v.who, L, "", 200, scope);
+  if (path === "/admin/invites" && req.method === "POST") return createInvites(env, req, url, v.who, await formOf(req), L, scope);
   m = /^\/admin\/invites\/(\d{1,12})\/(revoke|reissue)$/.exec(path);
   if (m && req.method === "POST") {
-    return m[2] === "revoke" ? revokeInvite(env, url, v.who, Number(m[1]), L) : reissueInvite(env, req, url, v.who, Number(m[1]), L);
+    // Out of scope answers like an unknown invite.
+    if (!(await inviteVisible(env, Number(m[1]), scope))) return invitesPage(env, url, v.who, L, L.m(msg("err.noSuchInvite")), 404, scope);
+    return m[2] === "revoke" ? revokeInvite(env, url, v.who, Number(m[1]), L, scope) : reissueInvite(env, req, url, v.who, Number(m[1]), L, scope);
   }
-  if (path === "/admin/audit" && req.method === "GET") return auditPage(env, url, v.who, L);
+  if (path === "/admin/audit" && req.method === "GET") return auditPage(env, url, v.who, L, scope);
 
   // Passkeys: for the token/session sign-in only. Under Cloudflare Access (or
   // without ADMIN_TOKEN) these routes do not exist, like Sign out.
   if ((path === "/admin/passkeys" || path.startsWith("/admin/passkeys/")) && usableToken(env.ADMIN_TOKEN) && v.via !== "access") {
     if (path === "/admin/passkeys" && req.method === "GET") return passkeysPage(env, req, v, L);
-    if (path === "/admin/passkeys/options" && req.method === "POST") return registerOptions(env, req, now);
+    if (path === "/admin/passkeys/options" && req.method === "POST") return registerOptions(env, req, v, now);
     if (path === "/admin/passkeys" && req.method === "POST") return register(env, req, v, now);
     if (path === "/admin/passkeys/token-login" && req.method === "POST") return setTokenLogin(env, req, v, await formOf(req), L);
     m = /^\/admin\/passkeys\/(\d{1,12})\/delete$/.exec(path);
     if (m && req.method === "POST") return deletePasskey(env, req, v, Number(m[1]), L);
+  }
+  // Named admins (admins.ts): like the passkey pages, only for the portal's
+  // own sign-in. Who may do what is checked there (owner, or the admin themself).
+  if ((path === "/admin/admins" || path.startsWith("/admin/admins/")) && usableToken(env.ADMIN_TOKEN) && v.via !== "access") {
+    if (path === "/admin/admins" && req.method === "GET") return adminsPage(env, v, L);
+    if (path === "/admin/admins" && req.method === "POST") return addAdmin(env, v, await formOf(req), L, now);
+    m = /^\/admin\/admins\/(\d{1,12})\/(token|delete|roles)$/.exec(path);
+    if (m && req.method === "POST") {
+      const id = Number(m[1]);
+      if (m[2] === "token") return newToken(env, v, id, L, now);
+      if (m[2] === "delete") return deleteAdmin(env, v, id, L);
+      return setRoles(env, v, id, await formOf(req), L);
+    }
   }
   return page(layout(L, L.s("common.notFound"), v.who, html`<h1>${L.t("common.notFound")}</h1><p class="lead">${L.t("notFound.lead")}</p><div class="actions"><a class="btn" href="/admin">${L.t("nav.machines")}</a></div>`), 404);
 }

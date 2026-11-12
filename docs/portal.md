@@ -49,6 +49,18 @@ same page. If every passkey is ever lost, the Cloudflare account owner turns tok
 npx wrangler d1 execute bordercheck --remote --command "DELETE FROM meta WHERE key = 'admin_token_login'"
 ```
 
+**Other admins (optional).** Under **Admins**, add a person by name and tick the roles they manage. The
+portal shows their token once: copy it and hand it over privately (only a hash is kept; if it is lost, make
+a new one). They sign in with it on the same page, can add their own passkeys, and appear by name in the
+header and the audit trail. They see and manage only their roles: those machines and invites, the roles
+themselves, and roles they create. The checks and alerts pages count only their machines, and the audit page
+shows only what they did. They cannot add or remove admins, change anyone's roles, switch token sign-in, or
+change where a role's reports go and where its updates come from (`report.url`, `update.repo` and the like):
+that stays with you, the owner (the admin token or your passkey). **Change roles** applies on their next
+page; **New token** or **Remove** signs them out at once. With token sign-in switched off, admins without a
+passkey cannot sign in (the Passkeys page says how many). If you are locked out, the recovery command above
+is the same.
+
 For a team, put `/admin` behind Cloudflare Access instead (recommended): a self-hosted Access application for
 `/admin` only, then set `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` in `wrangler.jsonc` and deploy. Leave `/report`,
 `/policy`, `/enroll`, `/i/…`, `/r/…` and `/mcp` outside it: laptops and people must reach them. Details:

@@ -220,7 +220,8 @@ Passkeys page. That needs at least one passkey and a session opened with a passk
 never worked cannot lock you out). While it is off, `ADMIN_TOKEN` opens nothing in the dashboard: the sign-in
 page has only the passkey button, a token posted to `/admin/login` gets the wrong-token answer (still
 rate-limited), `Authorization: Bearer <ADMIN_TOKEN>` on `/admin` is refused, and sessions opened earlier with
-the token stop working. The last passkey cannot be deleted while it is off. `MCP_TOKEN`, `API_TOKEN` and their
+the token stop working. The same goes for every named admin's token (below). While it is off nobody can
+delete their own last passkey. `MCP_TOKEN`, `API_TOKEN` and their
 read-only variants are separate and unaffected. **If every passkey is lost**, the owner of the Cloudflare
 account switches token sign-in back on from `receiver/`:
 
@@ -228,13 +229,44 @@ account switches token sign-in back on from `receiver/`:
 npx wrangler d1 execute bordercheck --remote --command "DELETE FROM meta WHERE key = 'admin_token_login'"
 ```
 
+**Named admins (sub-admins).** The **owner** is whoever signs in with `ADMIN_TOKEN` (form or bearer) or with
+one of the owner's passkeys. Under **Admins** the owner adds other admins, each with a name (1 to 40
+characters: a letter or digit first, then letters, digits, spaces and `. _ @ -`; unique ignoring case; not
+`admin token`, `admin passkey`, `mcp` or `api`) and the roles they manage. The portal makes each one a token
+(`bca_` + 32 random bytes), **shows it once** on the page that follows (with a Copy button) and keeps only
+its SHA-256. A named admin signs in with it on the same form (or `Authorization: Bearer` on `/admin`), can add
+passkeys of their own (they sign in as that admin), and appears by name in the header and the audit trail.
+
+A named admin's **scope** is exactly the roles the owner gave them, plus any role they create (it joins their
+scope in the same write). Within it they do what the owner does: machines enrolled in those roles (list,
+tiles, filters, pages, revoke/restore, waivers, report links, forget, moving a machine between two roles in
+scope), invites into those roles, editing and deleting those roles; the checks and alerts pages count only
+their machines, and the audit page shows only their own entries. Anything else answers 404, as if it did not
+exist; machines that were never enrolled are the owner's alone. They cannot add or remove admins, change
+anyone's roles, make a token for anyone but themself, or switch token sign-in (403). In a role's policy they
+cannot set or change `report.url`, `report.headers`, `update.policy_url`, `update.repo` or `update.public_key`
+(403): those decide where reports go and whose binary the laptops install, the same lock the API and MCP have.
+A named admin with no
+role sees empty pages and can still create a role. Scopes apply to the dashboard only: `/api/v1` and `/mcp`
+keep their own tokens and see everything, and named tokens open neither.
+
+The owner can make a new token for an admin (the old token and every session of theirs stop at once; an admin
+can do this for themself and stays signed in), change their roles (from their next request), or remove them
+(with their passkeys; their sessions stop on the next request). Audited as `admin.add`, `admin.token`,
+`admin.roles` and `admin.delete`, with the admin's name as the target. A named admin's session cookie is
+`<expiry>[p]a<id>g<gen>.<HMAC>`: the admin id and a generation counter are signed with the rest, and the
+session counts only while that admin exists with the same generation. With Cloudflare Access these pages do
+not exist (404), as for passkeys: Access viewers are not the owner. Locked out: the recovery command above is
+the same; `ADMIN_TOKEN` is always the owner's way in.
+
 Pages carry a CSP with no scripts at all (except the two hashed scripts: Copy buttons, passkeys), and every value from a report (hostname, email, title, summary,
 evidence) is escaped: a report is attacker-controllable input. Forms only accept same-origin posts.
 
-**The one script: Copy buttons.** Four pages carry one small inline script, for Copy buttons: the admin page
+**The one script: Copy buttons.** Five pages carry one small inline script, for Copy buttons: the admin page
 that shows freshly issued invites (after creating or re-issuing them: copy the link, either install command,
 or a ready-to-send message in the admin's language), the admin page that shows a freshly issued public report
-link (the machine page's "Copy public report link" button), the invite page `/i/<code>` (copy the command), and a
+link (the machine page's "Copy public report link" button), the admin page that shows a named admin's new
+token, the invite page `/i/<code>` (copy the command), and a
 report page `/r/<id>` when it offers the fix prompt (copy the prompt; a report page with nothing to fix, from a
 client older than v0.5.0, or of a role with `report.fix_prompt` off, has no script). The
 script (`COPY_SCRIPT` in `src/html.ts`) only copies the `textContent` of an element the server rendered, with
@@ -610,7 +642,7 @@ paste them into an LLM prompt as instructions. `email` and `role` come from the 
 | | Dashboard | MCP (`/mcp`) | API (`/api/v1`) |
 |---|---|---|---|
 | Who | a person, signed in | a model acting for an admin | a script written by an admin |
-| Credential | Access, `ADMIN_TOKEN` or a passkey | `MCP_TOKEN` / `MCP_READ_TOKEN` | `API_TOKEN` / `API_READ_TOKEN` |
+| Credential | Access, `ADMIN_TOKEN`, a named admin's token or a passkey | `MCP_TOKEN` / `MCP_READ_TOKEN` | `API_TOKEN` / `API_READ_TOKEN` |
 | Language | English, 中文, Tiếng Việt | English | English |
 | Forget a machine, delete a role | yes | no | no |
 | Role: `report.url`, `report.headers`, `update.policy_url`, `update.repo`, `update.public_key` | yes | no (keep as is) | no (keep as is) |
@@ -619,7 +651,7 @@ paste them into an LLM prompt as instructions. `email` and `role` come from the 
 | Invites per request | 500 | 50 | 500 |
 | Invite codes shown | once, on create / re-issue | once, in the tool result | once, in the `201` response |
 | Machine tokens, code/token hashes, report-link ids | never | never | never |
-| Audit actor | the Access email, `admin token` or `admin passkey` | `mcp`, `mcp (read-only)` | `api`, `api (read-only)` |
+| Audit actor | the Access email, `admin token`, `admin passkey` or a named admin's name | `mcp`, `mcp (read-only)` | `api`, `api (read-only)` |
 
 Why they differ: MCP's extra rules exist because the caller is a model that reads report text a laptop wrote,
 and a hostname saying "turn on location for everyone" must not be able to do it. A script's author holds a
@@ -717,6 +749,8 @@ Vars (`wrangler.jsonc`):
 | `alerts` | Alerts with an email/hostname/title snapshot | `HISTORY_DAYS` after delivery |
 | `meta` | Last digest time; `admin_token_login` = `off` while token sign-in is switched off | |
 | `roles` | Role names and policies | until deleted (only when unused) |
+| `admins` | Named admins: name, SHA-256 of their token, a generation counter, who added them, last sign-in | until removed |
+| `admin_roles` | Which roles each named admin manages | until the admin or the role is removed |
 | `invites` | Email, role, note, who made it, expiry, state; SHA-256 of the code | kept |
 | `enrollments` | Per enrolled machine: email, role, invite, hostname/OS at enrollment, revoked or not; SHA-256 of the token | kept (revoking keeps it) |
 | `machine_waivers` | Check, end date, reason, who added/removed it | kept |

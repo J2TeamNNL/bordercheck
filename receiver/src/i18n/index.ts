@@ -163,6 +163,9 @@ export interface I18n {
   htmlLang: string;
   // The path and query of the page being rendered: where the switcher returns to.
   path: string;
+  // Set by index.ts once the viewer is known: signed in with the portal's own
+  // sign-in rather than Cloudflare Access (see sessionViewer in html.ts).
+  ownSignIn?: boolean;
   // t renders a message as HTML: the translation's text escaped, its [b] etc.
   // turned into tags, parameters escaped unless they are Html.
   t(key: Key, p?: Params): Html;

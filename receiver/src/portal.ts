@@ -13,6 +13,7 @@ import { config, DAY, type Env } from "./env";
 import { COPY_HEADERS, copyButton, html, Html, layout, note, page, pill } from "./html";
 import { type I18n, type Key, type Msg, msg } from "./i18n";
 import { CHECK_ID_RE, POLICY_CHECKS, today, validateRolePolicy, waiverDateError } from "./roles";
+import { roleAllowed, roleIn, type Scope, scopeBind } from "./scope";
 import { newCode, newLinkId, sha256hex } from "./tokens";
 
 const MAX_ROLE_POLICY = 256 * 1024;
@@ -40,23 +41,25 @@ interface RoleRow {
 // bordercheck accepts it.
 export const SAMPLE_POLICY = JSON.stringify(samplePolicy, null, 2);
 
-// roleRows: every role with its active machines and pending invites.
-export async function roleRows(env: Env) {
+// roleRows: every role (those in scope, for a named admin) with its active
+// machines and pending invites.
+export async function roleRows(env: Env, scope?: Scope) {
   const rows = await env.DB.prepare(
     `SELECT r.id, r.name, r.updated_at,
        (SELECT COUNT(*) FROM enrollments e WHERE e.role_id = r.id AND e.revoked_at IS NULL) AS machines,
        (SELECT COUNT(*) FROM invites i WHERE i.role_id = r.id AND i.used_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > ?) AS pending
-     FROM roles r ORDER BY r.name`,
+     FROM roles r WHERE ${roleIn("r.id", 2, scope)} ORDER BY r.name`,
   )
-    .bind(new Date().toISOString())
+    .bind(new Date().toISOString(), scopeBind(scope))
     .all<{ id: number; name: string; updated_at: string; machines: number; pending: number }>();
   return rows.results;
 }
 
-export async function rolesPage(env: Env, who: string, L: I18n, message: string | Html = "", draft?: { name: string; policy: string }, status = 200) {
-  const rows = await roleRows(env);
+export async function rolesPage(env: Env, who: string, L: I18n, message: string | Html = "", draft?: { name: string; policy: string }, status = 200, scope?: Scope) {
+  const rows = await roleRows(env, scope);
   const body = html`<div class="hero"><p class="eyebrow">${L.t("enrollment.eyebrow")}</p><h1>${L.t("nav.roles")}</h1>
 <p class="lead">${L.t("roles.lead")}</p></div>
+${scope && scope.roles.length === 0 && rows.length === 0 ? note(L.t("scope.noneRoles"), "s-warn") : ""}
 ${note(message, tone(status))}
 ${rows.length
     ? html`<div class="shelf-row">${rows.map(
@@ -119,11 +122,41 @@ export type AuditExtra = Record<string, unknown>;
 export type OpResult<T> = ({ ok: true } & T) | { ok: false; status: number; errors: Msg[] };
 
 // saveRole creates a role (no id) or updates one (id): same checks either way.
+// With a scope (a named admin, dashboard only), a new role joins that scope in
+// the same batch; whether an existing role may be changed is checked by the
+// caller (index.ts).
+// Where reports go and where policy and binary updates come from. A role
+// pointing update.repo and update.public_key elsewhere would run someone
+// else's binary on its laptops, so a named admin (who is given some roles, not
+// the fleet) may not set or change these; the owner can. The API and MCP have
+// the same lock (fleet.ts).
+const OWNER_ONLY_POLICY: string[][] = [["report", "url"], ["report", "headers"], ["update", "policy_url"], ["update", "repo"], ["update", "public_key"]];
+
+function ownerOnlyChanges(next: string, current: string | null): string[] {
+  const parse = (s: string | null): unknown => {
+    try {
+      return s ? JSON.parse(s) : {};
+    } catch {
+      return {};
+    }
+  };
+  const at = (o: unknown, path: string[]): string => {
+    let v = o;
+    for (const k of path) v = v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>)[k] : undefined;
+    const empty = v === undefined || v === null || v === "" || (typeof v === "object" && Object.keys(v as object).length === 0);
+    return empty ? "" : JSON.stringify(v);
+  };
+  const a = parse(next);
+  const b = parse(current);
+  return OWNER_ONLY_POLICY.filter((p) => at(a, p) !== at(b, p)).map((p) => p.join("."));
+}
+
 export async function saveRole(
   env: Env,
   who: string,
   input: { id?: number; name: string; policyText: string },
   extra: AuditExtra = {},
+  scope?: Scope,
 ): Promise<OpResult<{ id: number; name: string; policyChanged: boolean }>> {
   const now = new Date();
   const name = cleanLine(input.name, 64);
@@ -133,13 +166,26 @@ export async function saveRole(
   if (input.id !== undefined && !old) return { ok: false, status: 404, errors: [msg("err.noSuchRole")] };
   const { errs, policy } = await checkRole(env, name, input.policyText, now);
   if (errs.length) return { ok: false, status: 400, errors: errs };
+  if (scope) {
+    const locked = ownerOnlyChanges(policy ?? "", old?.policy ?? null);
+    if (locked.length) return { ok: false, status: 403, errors: locked.map((field) => msg("err.roleOwnerOnly", { field })) };
+  }
   const ts = now.toISOString();
   if (input.id === undefined) {
     const exists = await env.DB.prepare("SELECT id FROM roles WHERE name = ?").bind(name).first();
     if (exists) return { ok: false, status: 409, errors: [msg("err.roleExists")] };
-    const id = await env.DB.prepare("INSERT INTO roles (name, policy, created_at, updated_at) VALUES (?, ?, ?, ?) RETURNING id")
-      .bind(name, policy, ts, ts)
-      .first<number>("id");
+    const insert = env.DB.prepare("INSERT INTO roles (name, policy, created_at, updated_at) VALUES (?, ?, ?, ?) RETURNING id").bind(name, policy, ts, ts);
+    let id: number | null;
+    if (scope) {
+      const res = await env.DB.batch([
+        insert,
+        env.DB.prepare("INSERT INTO admin_roles (admin_id, role_id) SELECT ?, id FROM roles WHERE name = ?").bind(scope.admin, name),
+      ]);
+      id = (res[0].results[0] as { id?: number } | undefined)?.id ?? null;
+      if (id !== null) scope.roles.push(id);
+    } else {
+      id = await insert.first<number>("id");
+    }
     await audit(env, who, "role.create", `role ${name}`, { role_id: id, ...extra });
     return { ok: true, id: id!, name, policyChanged: true };
   }
@@ -159,15 +205,15 @@ export async function saveRole(
   return { ok: true, id, name, policyChanged };
 }
 
-export async function createRole(env: Env, who: string, form: FormData, L: I18n): Promise<Response> {
+export async function createRole(env: Env, who: string, form: FormData, L: I18n, scope?: Scope): Promise<Response> {
   const name = String(form.get("name") ?? "");
   const text = String(form.get("policy") ?? "");
-  const r = await saveRole(env, who, { name, policyText: text });
+  const r = await saveRole(env, who, { name, policyText: text }, {}, scope);
   if (!r.ok) {
     const msgHtml = r.errors.length === 1 && r.errors[0].key === "err.roleExists" ? L.m(r.errors[0]) : errorList(L, "roles.notSaved", r.errors);
-    return rolesPage(env, who, L, msgHtml, { name: cleanLine(name, 64), policy: text }, 400);
+    return rolesPage(env, who, L, msgHtml, { name: cleanLine(name, 64), policy: text }, r.status === 403 ? 403 : 400, scope);
   }
-  return rolesPage(env, who, L, L.t("roles.created", { name: r.name }));
+  return rolesPage(env, who, L, L.t("roles.created", { name: r.name }), undefined, 200, scope);
 }
 
 export async function rolePage(env: Env, id: number, who: string, L: I18n, message: string | Html = "", draft?: { name: string; policy: string }, status = 200) {
@@ -195,23 +241,25 @@ ${n
   return page(layout(L, r.name, who, body, "Roles"), status);
 }
 
-function noSuchRole(L: I18n, who: string): Response {
+export function noSuchRole(L: I18n, who: string): Response {
   return page(layout(L, L.s("common.notFound"), who, html`<h1>${L.t("role.noSuch")}</h1>`, "Roles"), 404);
 }
 
-export async function updateRole(env: Env, id: number, who: string, form: FormData, L: I18n): Promise<Response> {
+export async function updateRole(env: Env, id: number, who: string, form: FormData, L: I18n, scope?: Scope): Promise<Response> {
   const name = String(form.get("name") ?? "");
   const text = String(form.get("policy") ?? "");
-  const r = await saveRole(env, who, { id, name, policyText: text });
+  const r = await saveRole(env, who, { id, name, policyText: text }, {}, scope);
   if (!r.ok) {
     if (r.status === 404) return noSuchRole(L, who);
     const msgHtml = r.errors.length === 1 && r.errors[0].key === "err.roleClash" ? L.m(r.errors[0]) : errorList(L, "roles.notSaved", r.errors);
-    return rolePage(env, id, who, L, msgHtml, { name: cleanLine(name, 64), policy: text }, 400);
+    return rolePage(env, id, who, L, msgHtml, { name: cleanLine(name, 64), policy: text }, r.status === 403 ? 403 : 400);
   }
   return rolePage(env, id, who, L, L.t("role.saved"));
 }
 
-export async function deleteRole(env: Env, id: number, who: string, L: I18n): Promise<Response> {
+// deleteRole: index.ts checks the scope first. admin_roles rows go with the
+// role (ON DELETE CASCADE).
+export async function deleteRole(env: Env, id: number, who: string, L: I18n, scope?: Scope): Promise<Response> {
   const r = await env.DB.prepare("SELECT name FROM roles WHERE id = ?").bind(id).first<{ name: string }>();
   if (!r) return noSuchRole(L, who);
   const used = await env.DB.prepare(
@@ -221,7 +269,8 @@ export async function deleteRole(env: Env, id: number, who: string, L: I18n): Pr
     .first<number>("n");
   if (used) return rolePage(env, id, who, L, L.t("role.inUse"), undefined, 409);
   await env.DB.batch([env.DB.prepare("DELETE FROM roles WHERE id = ?").bind(id), auditStmt(env, who, "role.delete", `role ${r.name}`, { role_id: id })]);
-  return rolesPage(env, who, L, L.t("roles.deleted", { name: r.name }));
+  if (scope) scope.roles = scope.roles.filter((x) => x !== id);
+  return rolesPage(env, who, L, L.t("roles.deleted", { name: r.name }), undefined, 200, scope);
 }
 
 // ---- Invites ----
@@ -248,8 +297,9 @@ export interface InviteRow {
   status: string;
 }
 
-async function roleOptions(env: Env, selected?: number): Promise<Html> {
-  const roles = await env.DB.prepare("SELECT id, name FROM roles ORDER BY name").all<{ id: number; name: string }>();
+// roleOptions: the roles to choose from (those in scope, for a named admin).
+async function roleOptions(env: Env, selected?: number, scope?: Scope): Promise<Html> {
+  const roles = await env.DB.prepare(`SELECT id, name FROM roles r WHERE ${roleIn("r.id", 1, scope)} ORDER BY name`).bind(scopeBind(scope)).all<{ id: number; name: string }>();
   return html`${roles.results.map((r) => html`<option value="${r.id}" ${r.id === selected ? "selected" : ""}>${r.name}</option>`)}`;
 }
 
@@ -263,39 +313,40 @@ export async function inviteRows(
   env: Env,
   filter: InviteFilter,
   limit: number,
-  o: { before?: number; email?: string } = {},
+  o: { before?: number; email?: string; scope?: Scope } = {},
 ): Promise<{ rows: InviteRow[]; counts: Record<string, number> }> {
   const nowIso = new Date().toISOString();
   const rows = await env.DB.prepare(
     `SELECT i.id, i.email, r.name AS role, i.note, i.created_at, i.created_by, i.expires_at, i.used_at, i.used_install_id,
             i.revoked_at, i.reissued_as, ${STATUS_SQL} AS status
      FROM invites i JOIN roles r ON r.id = i.role_id
-     WHERE (?2 = 'all' OR ${STATUS_SQL} = ?2) AND (?4 = 0 OR i.id < ?4) AND (?5 = '' OR i.email = ?5)
+     WHERE (?2 = 'all' OR ${STATUS_SQL} = ?2) AND (?4 = 0 OR i.id < ?4) AND (?5 = '' OR i.email = ?5) AND ${roleIn("i.role_id", 6, o.scope)}
      ORDER BY i.id DESC LIMIT ?3`,
   )
-    .bind(nowIso, filter, limit, o.before ?? 0, (o.email ?? "").toLowerCase())
+    .bind(nowIso, filter, limit, o.before ?? 0, (o.email ?? "").toLowerCase(), scopeBind(o.scope))
     .all<InviteRow>();
-  const counts = await env.DB.prepare(`SELECT ${STATUS_SQL} AS status, COUNT(*) AS n FROM invites i GROUP BY 1`)
-    .bind(nowIso)
+  const counts = await env.DB.prepare(`SELECT ${STATUS_SQL} AS status, COUNT(*) AS n FROM invites i WHERE ${roleIn("i.role_id", 2, o.scope)} GROUP BY 1`)
+    .bind(nowIso, scopeBind(o.scope))
     .all<{ status: string; n: number }>();
   const c: Record<string, number> = { pending: 0, used: 0, expired: 0, revoked: 0 };
   for (const r of counts.results) c[r.status] = r.n;
   return { rows: rows.results, counts: c };
 }
 
-export async function invitesPage(env: Env, url: URL, who: string, L: I18n, message: string | Html = "", status = 200): Promise<Response> {
+export async function invitesPage(env: Env, url: URL, who: string, L: I18n, message: string | Html = "", status = 200, scope?: Scope): Promise<Response> {
   const f = url.searchParams.get("status") ?? "pending";
   const filter = isInviteFilter(f) ? f : "pending";
-  const { rows: inviteList, counts } = await inviteRows(env, filter, 1000);
+  const { rows: inviteList, counts } = await inviteRows(env, filter, 1000, { scope });
   const rows = { results: inviteList };
   const count = (s: string) => counts[s] ?? 0;
-  const options = await roleOptions(env);
+  const options = await roleOptions(env, undefined, scope);
   const cfg = config(env);
   const inviteWord = (s: string) => (INVITE_KEY[s] ? L.t(INVITE_KEY[s]) : s);
 
   const now = Date.now();
   const body = html`<div class="hero"><p class="eyebrow">${L.t("enrollment.eyebrow")}</p><h1>${L.t("nav.invites")}</h1>
 <p class="lead">${L.t("invites.lead")}</p></div>
+${scope && scope.roles.length === 0 ? note(L.t("scope.none"), "s-warn") : ""}
 ${note(message, tone(status))}
 <h2 id="new">${L.t("invites.new")}</h2>
 ${options.value ? html`<form method="post" action="/admin/invites"><div class="panel"><div class="cols">
@@ -397,7 +448,7 @@ export async function createInviteBatch(
   env: Env,
   who: string,
   input: { emails: string; roleId: number; days: number; note: string },
-  opts: { maxBulk?: number; extra?: AuditExtra } = {},
+  opts: { maxBulk?: number; extra?: AuditExtra; scope?: Scope } = {},
 ): Promise<OpResult<{ issued: Issued[]; role: string; days: number }>> {
   const cfg = config(env);
   const maxBulk = Math.min(opts.maxBulk ?? MAX_BULK, MAX_BULK);
@@ -405,7 +456,10 @@ export async function createInviteBatch(
   const roleId = input.roleId;
   const days = input.days;
   const noteText = cleanLine(input.note, 200);
-  const role = Number.isInteger(roleId) ? await env.DB.prepare("SELECT id, name FROM roles WHERE id = ?").bind(roleId).first<{ id: number; name: string }>() : null;
+  // A role outside the scope is as good as none.
+  const role = Number.isInteger(roleId) && roleAllowed(opts.scope, roleId)
+    ? await env.DB.prepare("SELECT id, name FROM roles WHERE id = ?").bind(roleId).first<{ id: number; name: string }>()
+    : null;
   const problems: Msg[] = [];
   if (!role) problems.push(msg("err.pickRole"));
   if (bad.length) problems.push(msg("err.notEmails", { list: `${bad.slice(0, 20).join(", ")}${bad.length > 20 ? "…" : ""}` }));
@@ -428,7 +482,7 @@ export async function createInviteBatch(
   return { ok: true, issued, role: role!.name, days };
 }
 
-export async function createInvites(env: Env, req: Request, url: URL, who: string, form: FormData, L: I18n): Promise<Response> {
+export async function createInvites(env: Env, req: Request, url: URL, who: string, form: FormData, L: I18n, scope?: Scope): Promise<Response> {
   const cfg = config(env);
   const daysIn = Number(form.get("days") || cfg.inviteDays);
   const days = Number.isFinite(daysIn) && daysIn >= 1 && daysIn <= 90 ? Math.floor(daysIn) : cfg.inviteDays;
@@ -437,8 +491,8 @@ export async function createInvites(env: Env, req: Request, url: URL, who: strin
     roleId: Number(form.get("role_id")),
     days,
     note: String(form.get("note") ?? ""),
-  });
-  if (!r.ok) return invitesPage(env, url, who, L, errorList(L, "invites.nothingCreated", r.errors), 400);
+  }, { scope });
+  if (!r.ok) return invitesPage(env, url, who, L, errorList(L, "invites.nothingCreated", r.errors), 400, scope);
   const n = r.issued.length;
   return issuedPage(env, req, who, L, r.issued, n === 1 ? L.s("issued.one") : L.s("issued.many", { n }));
 }
@@ -457,10 +511,11 @@ export async function revokeInviteOp(env: Env, who: string, id: number, extra: A
   return { ok: true, email: inv.email };
 }
 
-export async function revokeInvite(env: Env, url: URL, who: string, id: number, L: I18n): Promise<Response> {
+// revokeInvite / reissueInvite: index.ts checks the scope first (scope.inviteVisible).
+export async function revokeInvite(env: Env, url: URL, who: string, id: number, L: I18n, scope?: Scope): Promise<Response> {
   const r = await revokeInviteOp(env, who, id);
-  if (!r.ok) return invitesPage(env, url, who, L, L.m(r.errors[0]), r.status);
-  return invitesPage(env, url, who, L, L.t("invites.revoked", { id }));
+  if (!r.ok) return invitesPage(env, url, who, L, L.m(r.errors[0]), r.status, scope);
+  return invitesPage(env, url, who, L, L.t("invites.revoked", { id }), 200, scope);
 }
 
 export async function reissueInviteOp(env: Env, who: string, id: number, extra: AuditExtra = {}): Promise<OpResult<{ issued: Issued }>> {
@@ -486,9 +541,9 @@ export async function reissueInviteOp(env: Env, who: string, id: number, extra: 
   return { ok: true, issued: n };
 }
 
-export async function reissueInvite(env: Env, req: Request, url: URL, who: string, id: number, L: I18n): Promise<Response> {
+export async function reissueInvite(env: Env, req: Request, url: URL, who: string, id: number, L: I18n, scope?: Scope): Promise<Response> {
   const r = await reissueInviteOp(env, who, id);
-  if (!r.ok) return invitesPage(env, url, who, L, L.m(r.errors[0]), r.status);
+  if (!r.ok) return invitesPage(env, url, who, L, L.m(r.errors[0]), r.status, scope);
   return issuedPage(env, req, who, L, [r.issued], L.s("issued.reissued"), html`<p class="muted">${L.t("issued.oldGone", { id })}</p>`);
 }
 
@@ -522,7 +577,7 @@ export async function enrollmentOf(env: Env, id: string): Promise<EnrollmentRow 
     .first<EnrollmentRow>();
 }
 
-export async function enrollmentSection(L: I18n, env: Env, id: string, e: EnrollmentRow | null, now: Date): Promise<Html> {
+export async function enrollmentSection(L: I18n, env: Env, id: string, e: EnrollmentRow | null, now: Date, scope?: Scope): Promise<Html> {
   const linkForm = html`<h2>${L.t("enr.linkTitle")}</h2>
 <div class="panel"><p class="muted">${L.t("enr.linkText")}</p>
 <div class="actions"><form method="post" action="${machineLink(id)}/report-link"><button>${L.t("enr.linkIssue")}</button></form>
@@ -532,7 +587,7 @@ export async function enrollmentSection(L: I18n, env: Env, id: string, e: Enroll
     env.DB.prepare("SELECT * FROM machine_waivers WHERE install_id = ? ORDER BY removed_at IS NOT NULL, until DESC LIMIT 200")
       .bind(id)
       .all<{ id: number; check_id: string; until: string; reason: string; created_at: string; created_by: string; removed_at: string | null; removed_by: string | null }>(),
-    roleOptions(env, e.role_id),
+    roleOptions(env, e.role_id, scope),
   ]);
   const t = today(now);
   const active = waivers.results.filter((w) => !w.removed_at && w.until >= t).length;
@@ -718,24 +773,26 @@ export interface AuditRow {
 // "mcp (read-only)"), or through the REST API ("api" or "api (read-only)").
 export type AuditFilter = "all" | "mcp" | "api";
 
-// auditRows: newest first. `before` (an audit id) is where a cursor resumes.
-export async function auditRows(env: Env, limit: number, filter: AuditFilter = "all", before = 0): Promise<AuditRow[]> {
+// auditRows: newest first. `before` (an audit id) is where a cursor resumes;
+// `byWho` keeps only one actor's rows (a named admin sees only their own).
+export async function auditRows(env: Env, limit: number, filter: AuditFilter = "all", before = 0, byWho = ""): Promise<AuditRow[]> {
   const [a, b] = filter === "api" ? [API_ACTOR, API_READ_ACTOR] : [MCP_ACTOR, MCP_READ_ACTOR];
   const rows = await env.DB.prepare(
-    "SELECT id, at, who, action, target, detail FROM audit WHERE (?1 = 0 OR who IN (?2, ?3)) AND (?5 = 0 OR id < ?5) ORDER BY id DESC LIMIT ?4",
-  ).bind(filter === "all" ? 0 : 1, a, b, limit, before).all<AuditRow>();
+    "SELECT id, at, who, action, target, detail FROM audit WHERE (?1 = 0 OR who IN (?2, ?3)) AND (?5 = 0 OR id < ?5) AND (?6 = '' OR who = ?6) ORDER BY id DESC LIMIT ?4",
+  ).bind(filter === "all" ? 0 : 1, a, b, limit, before, byWho.slice(0, 200)).all<AuditRow>();
   return rows.results;
 }
 
 const isAutomation = (who: string) => who === MCP_ACTOR || who === MCP_READ_ACTOR || who === API_ACTOR || who === API_READ_ACTOR;
 
-export async function auditPage(env: Env, url: URL, who: string, L: I18n): Promise<Response> {
+// auditPage: a named admin (scope set) sees only the entries they made.
+export async function auditPage(env: Env, url: URL, who: string, L: I18n, scope?: Scope): Promise<Response> {
   const w = url.searchParams.get("who");
-  const filter: AuditFilter = w === "mcp" || w === "api" ? w : "all";
-  const rows = { results: await auditRows(env, 500, filter) };
+  const filter: AuditFilter = !scope && (w === "mcp" || w === "api") ? w : "all";
+  const rows = { results: await auditRows(env, 500, filter, 0, scope ? who : "") };
   const body = html`<div class="hero"><p class="eyebrow">${L.t("audit.eyebrow")}</p><h1>${L.t("audit.title")}</h1>
-<p class="lead">${L.t("audit.lead")}</p></div>
-<div class="toolbar"><nav class="seg" aria-label="${L.s("audit.thWho")}"><a class="${filter === "all" ? "on" : ""}" href="/admin/audit">${L.t("audit.all")}</a><a class="${filter === "mcp" ? "on" : ""}" href="/admin/audit?who=mcp">${L.t("audit.mcpOnly")}</a><a class="${filter === "api" ? "on" : ""}" href="/admin/audit?who=api">${L.t("audit.apiOnly")}</a></nav></div>
+<p class="lead">${scope ? L.t("audit.leadOwn") : L.t("audit.lead")}</p></div>
+${scope ? "" : html`<div class="toolbar"><nav class="seg" aria-label="${L.s("audit.thWho")}"><a class="${filter === "all" ? "on" : ""}" href="/admin/audit">${L.t("audit.all")}</a><a class="${filter === "mcp" ? "on" : ""}" href="/admin/audit?who=mcp">${L.t("audit.mcpOnly")}</a><a class="${filter === "api" ? "on" : ""}" href="/admin/audit?who=api">${L.t("audit.apiOnly")}</a></nav></div>`}
 <div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("audit.thWhen")}</th><th>${L.t("audit.thWho")}</th><th>${L.t("audit.thAction")}</th><th>${L.t("audit.thTarget")}</th><th>${L.t("audit.thDetail")}</th></tr></thead><tbody>
 ${rows.results.map(
     (a) => html`<tr><td class="nowrap">${L.when(a.at)}</td><td class="wrap">${isAutomation(a.who) ? pill("s-error", a.who) : a.who}</td><td class="nowrap"><code>${a.action}</code></td><td class="wrap">${
