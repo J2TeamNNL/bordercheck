@@ -74,7 +74,7 @@ func TestHardeningChecksPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	o := p.Checks.OSUpdates
-	if o.MinOSVersions["macos"] != "26" || o.MinOSVersions["ubuntu"] != "" || o.MinOSVersions["windows"] != "26100" ||
+	if o.MinOSVersions["macos"] != "26" || o.MinOSVersions["ubuntu"] != "" || o.MinOSVersions["windows"] != "19045" ||
 		o.MaxPendingDays != 7 || o.MaxCheckAgeDays != 14 || *o.CheckBrowsers || !*o.RequireAutoUpdate {
 		t.Errorf("os-updates: %+v", o)
 	}

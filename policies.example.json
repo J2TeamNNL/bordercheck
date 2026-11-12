@@ -131,7 +131,7 @@
     "os-updates": {
       "min_os_versions": {
         "macos": "15",
-        "windows": "26100",
+        "windows": "19045",
         "ubuntu": "22.04",
         "debian": "12",
         "fedora": "43"

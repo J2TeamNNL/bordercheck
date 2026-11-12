@@ -50,7 +50,7 @@
     },
     "ai-agents": { "tokens": true, "guardrails": true, "user_ignore": true },
     "os-updates": {
-      "min_os_versions": { "macos": "15", "windows": "26100", "ubuntu": "22.04" },
+      "min_os_versions": { "macos": "15", "windows": "19045", "ubuntu": "22.04" },
       "require_auto_update": true,
       "max_check_age_days": 14,
       "max_pending_days": 14,

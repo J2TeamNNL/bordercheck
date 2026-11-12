@@ -337,7 +337,7 @@ disk.
 
 | Field | Default | |
 |---|---|---|
-| `min_os_versions` | `{"macos": "15", "windows": "26100", "ubuntu": "22.04", "debian": "12", "fedora": "43"}` | Oldest version allowed. Keys: `macos`, `windows` (a build number: 26100 is Windows 11 24H2) or a Linux `/etc/os-release` ID. **Merges** with the defaults; `""` removes one. |
+| `min_os_versions` | `{"macos": "15", "windows": "19045", "ubuntu": "22.04", "debian": "12", "fedora": "43"}` | Oldest version allowed. Keys: `macos`, `windows` (a build number: 19045 is Windows 10 22H2, 26100 is Windows 11 24H2) or a Linux `/etc/os-release` ID. **Merges** with the defaults; `""` removes one. |
 | `require_auto_update` | `true` | The OS checks for and installs security updates by itself. |
 | `max_check_age_days` | `14` | Days since the OS last looked for updates. |
 | `max_pending_days` | `14` | Days an update the OS has found may wait to be installed. |

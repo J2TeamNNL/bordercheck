@@ -272,7 +272,7 @@ type SecretPattern struct {
 // no network: day limits of 0 turn that rule off.
 type OSUpdates struct {
 	Common
-	// MinOSVersions maps "macos", "windows" (a build number such as "26100") or a
+	// MinOSVersions maps "macos", "windows" (a build number such as "19045") or a
 	// Linux os-release ID ("ubuntu", "debian", "fedora"…) to the oldest version
 	// allowed. Keys merge with the defaults; "" removes a minimum.
 	MinOSVersions      map[string]string `json:"min_os_versions"`
@@ -428,7 +428,7 @@ func Default() Policy {
 				SampleRules: slices.Clone(SampleRuleNames),
 			},
 			OSUpdates: OSUpdates{
-				MinOSVersions:     map[string]string{"macos": "15", "windows": "26100", "ubuntu": "22.04", "debian": "12", "fedora": "43"},
+				MinOSVersions:     map[string]string{"macos": "15", "windows": "19045", "ubuntu": "22.04", "debian": "12", "fedora": "43"},
 				RequireAutoUpdate: ptr(true), MaxCheckAgeDays: 14, MaxPendingDays: 14, MaxDaysSinceUpdate: 45,
 				CheckBrowsers: ptr(true), MaxBrowserAgeDays: 60, MinBrowserVersions: map[string]string{},
 			},

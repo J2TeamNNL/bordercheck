@@ -135,11 +135,11 @@ func TestWinUpdateFacts(t *testing.T) {
 		t.Errorf("current: got %s %q", r.Status, r.Summary)
 	}
 	// Windows 10, service disabled, paused, restart pending, no patch since July.
-	out = "build=19045\nubr=6093\ndisplay_version=22H2\nno_auto_update=1\nwuauserv_start=Disabled\n" +
+	out = "build=19044\nubr=6093\ndisplay_version=21H2\nno_auto_update=1\nwuauserv_start=Disabled\n" +
 		"pause_until=2026-12-01T10:00:00Z\nreboot_required=True\nlast_search=2026-08-01T07:00:00Z\nlast_hotfix=2026-07-09\n"
 	f = winUpdateFacts(kvLines(out))
 	r = evalOSUpdates(f, nil, opts, mustTime(t, "2026-11-10T12:00:00Z"))
-	for _, want := range []string{"Windows 10 22H2 (build 19045.6093) is older than the minimum version build 26100",
+	for _, want := range []string{"Windows 10 21H2 (build 19044.6093) is older than the minimum version build 19045",
 		"Automatic updates are off. The Windows Update service is disabled. A policy turns automatic updates off.", "paused until 1 Dec 2026",
 		"last checked for updates 101 days ago", "need a restart", "No OS update has been installed for 124 days"} {
 		if !strings.Contains(r.Summary, want) {
