@@ -225,8 +225,10 @@ func parsePowercfg(out string) (ac, dc int, ok bool) {
 	return int(a), int(d), err1 == nil && err2 == nil
 }
 
-// winLockScript reads the screen saver (with its policy override) and the
-// machine inactivity limit; powercfg is run separately.
+// winLockScript reads the screen saver (with its policy override), the machine
+// inactivity limit, and two more places the sign-in on wake is kept: the Group
+// Policy override of CONSOLELOCK, and the "if you've been away" interval that
+// Settings writes on PCs without classic sleep. powercfg is run separately.
 const winLockScript = `$ErrorActionPreference = 'SilentlyContinue'
 $d = Get-ItemProperty 'HKCU:\Control Panel\Desktop'
 $p = Get-ItemProperty 'HKCU:\Software\Policies\Microsoft\Windows\Control Panel\Desktop'
@@ -234,11 +236,20 @@ foreach ($n in 'ScreenSaveActive','ScreenSaverIsSecure','ScreenSaveTimeOut','SCR
   $v = $p.$n; if ($null -eq $v) { $v = $d.$n }
   "$n=$v"
 }
-"InactivityTimeoutSecs=$((Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System').InactivityTimeoutSecs)"`
+"InactivityTimeoutSecs=$((Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System').InactivityTimeoutSecs)"
+"DelayLockInterval=$($d.DelayLockInterval)"
+$w = Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Power\PowerSettings\0e796bdb-100d-47d6-a2d5-f7d2daa51f51'
+"LockPolicyAC=$($w.ACSettingIndex)"
+"LockPolicyDC=$($w.DCSettingIndex)"`
 
 // winLockFacts: Windows locks when a secure screen saver starts, when the
 // machine inactivity limit passes, or on wake from sleep if a password is
 // required on wakeup (CONSOLELOCK). Turning the display off does not lock.
+//
+// CONSOLELOCK comes from powercfg, with Group Policy over it. Where powercfg
+// does not show it, the "if you've been away" interval stands in. If none of
+// them can be read, whether a password is needed stays unknown, but a machine
+// with no secure screen saver that never sleeps is still known never to lock.
 func winLockFacts(kv map[string]string, sleepIdle, consoleLock string) lockFacts {
 	f := lockFacts{Family: "windows"}
 	var candidates []time.Duration
@@ -255,18 +266,45 @@ func winLockFacts(kv map[string]string, sleepIdle, consoleLock string) lockFacts
 	}
 	lockAC, lockDC, lockOK := parsePowercfg(consoleLock)
 	sleepAC, sleepDC, sleepOK := parsePowercfg(sleepIdle)
+	polAC, errAC := strconv.Atoi(kv["LockPolicyAC"])
+	polDC, errDC := strconv.Atoi(kv["LockPolicyDC"])
+	if errAC == nil && (lockOK || errDC == nil) {
+		lockAC = polAC
+	}
+	if errDC == nil && (lockOK || errAC == nil) {
+		lockDC = polDC
+	}
+	lockOK = lockOK || (errAC == nil && errDC == nil)
+	var grace time.Duration // from the screen going off to sign-in being needed
 	if lockOK {
 		on := lockAC != 0 && lockDC != 0
 		f.PasswordOnWake = &on
 		f.Details = append(f.Details, fmt.Sprintf("Sign-in on wake: %s plugged in, %s on battery", onOff(lockAC != 0), onOff(lockDC != 0)))
+	} else if away, err := strconv.ParseInt(kv["DelayLockInterval"], 10, 64); err == nil {
+		// A DWORD in seconds; 0xffffffff (read as -1 by some PowerShells) is never.
+		on := away >= 0 && away < 0xffffffff
+		f.PasswordOnWake = &on
+		lockOK = true
+		lockAC, lockDC = 0, 0
+		switch {
+		case !on:
+			f.Details = append(f.Details, "Sign-in after being away: never")
+		case away == 0:
+			lockAC, lockDC = 1, 1
+			f.Details = append(f.Details, "Sign-in after being away: every time")
+		default:
+			lockAC, lockDC = 1, 1
+			grace = time.Duration(away) * time.Second
+			f.Details = append(f.Details, "Sign-in after being away: after "+minutesText(grace))
+		}
+	} else {
+		f.Details = append(f.Details, "Sign-in on wake: could not be read")
 	}
 	if sleepOK {
 		f.Details = append(f.Details, fmt.Sprintf("Sleep: %s plugged in, %s on battery", secsText(sleepAC), secsText(sleepDC)))
 	}
-	if !lockOK || !sleepOK {
-		if len(candidates) == 0 {
-			return f // LockKnown stays false
-		}
+	if len(candidates) == 0 && (!sleepOK || (!lockOK && sleepAC > 0 && sleepDC > 0)) {
+		return f // LockKnown stays false: sleep may or may not lock
 	}
 	f.LockKnown = true
 	var worst time.Duration
@@ -274,7 +312,7 @@ func winLockFacts(kv map[string]string, sleepIdle, consoleLock string) lockFacts
 		idle := time.Duration(0)
 		cs := candidates
 		if sleepOK && lockOK && src.sleep > 0 && src.lock != 0 {
-			cs = append(cs[:len(cs):len(cs)], time.Duration(src.sleep)*time.Second)
+			cs = append(cs[:len(cs):len(cs)], time.Duration(src.sleep)*time.Second+grace)
 		}
 		for _, d := range cs {
 			if idle == 0 || d < idle {

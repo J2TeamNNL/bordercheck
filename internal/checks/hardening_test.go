@@ -312,6 +312,39 @@ func TestWinLockFacts(t *testing.T) {
 	if r := evalScreenLock(winLockFacts(noSaver, "", ""), opts); r.Status != check.Error {
 		t.Errorf("powercfg failed: got %s %q", r.Status, r.Summary)
 	}
+
+	// powercfg shows sleep but not CONSOLELOCK (seen on a Windows 11 laptop).
+	// Sleep never when plugged in and no screen saver: it never locks, whatever the sign-in setting.
+	acNever := strings.Replace(winStandby, "0x00000708", "0x00000000", 1)
+	r = evalScreenLock(winLockFacts(noSaver, acNever, ""), opts)
+	if r.Status != check.Fail || !strings.Contains(r.Summary, "never locks") || !strings.Contains(strings.Join(r.Evidence, "\n"), "could not be read") {
+		t.Errorf("no consolelock output, never sleeps: got %s %q %q", r.Status, r.Summary, r.Evidence)
+	}
+	// It does sleep, so whether that locks is not known.
+	if r := evalScreenLock(winLockFacts(noSaver, winStandby, ""), opts); r.Status != check.Error {
+		t.Errorf("no consolelock output, sleeps: got %s %q", r.Status, r.Summary)
+	}
+	// The "if you've been away" interval stands in: every time, after a while, never.
+	away := func(v string) map[string]string {
+		return kvLines("ScreenSaveActive=0\nDelayLockInterval=" + v + "\n")
+	}
+	short := strings.NewReplacer("0x00000708", "0x0000012c", "0x00000180", "0x0000012c").Replace(winStandby) // 5 minutes
+	if r := evalScreenLock(winLockFacts(away("0"), short, ""), opts); r.Status != check.Pass || !strings.Contains(r.Summary, "5 minutes") {
+		t.Errorf("away every time: got %s %q", r.Status, r.Summary)
+	}
+	if f := winLockFacts(away("60"), short, ""); f.LockAfter != 6*time.Minute || f.PasswordOnWake == nil || !*f.PasswordOnWake {
+		t.Errorf("away after a minute: %+v", f)
+	}
+	for _, never := range []string{"4294967295", "-1"} {
+		if r := evalScreenLock(winLockFacts(away(never), short, ""), opts); r.Status != check.Fail || !strings.Contains(r.Summary, "No password") {
+			t.Errorf("away never (%s): got %s %q", never, r.Status, r.Summary)
+		}
+	}
+	// Group Policy wins over the power plan.
+	forced := kvLines("ScreenSaveActive=0\nLockPolicyAC=1\nLockPolicyDC=1\n")
+	if f := winLockFacts(forced, short, noLock); f.PasswordOnWake == nil || !*f.PasswordOnWake || f.LockAfter != 5*time.Minute {
+		t.Errorf("policy over plan: %+v", f)
+	}
 }
 
 func TestLinuxLockFacts(t *testing.T) {

@@ -60,6 +60,9 @@ func screenLockOS(ctx context.Context) (lockFacts, error) {
 	}
 	sleep, _ := sysx.Run(ctx, "powercfg.exe", "/q", "SCHEME_CURRENT", "SUB_SLEEP", "STANDBYIDLE")
 	lock, _ := sysx.Run(ctx, "powercfg.exe", "/q", "SCHEME_CURRENT", "SUB_NONE", "CONSOLELOCK")
+	if _, _, ok := parsePowercfg(lock); !ok { // some PCs hide the setting from /q
+		lock, _ = sysx.Run(ctx, "powercfg.exe", "/qh", "SCHEME_CURRENT", "SUB_NONE", "CONSOLELOCK")
+	}
 	return winLockFacts(kvLines(out), sleep, lock), nil
 }
 
