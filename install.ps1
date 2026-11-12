@@ -6,8 +6,8 @@ every hour (a per-user scheduled task; no administrator rights).
 .DESCRIPTION
 Uses OpenSSL with Ed25519 support, when available, to verify the signed
 checksum manifest before executing the downloaded binary. Otherwise an
-install warns and uses the downloaded binary to check its own signature.
-Dry runs never execute the binary and warn when only the checksum was checked.
+install has the downloaded binary check the signature, after its checksum matched.
+Dry runs never execute the binary and say so when only the checksum was checked.
 
 .EXAMPLE
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/policies.json
@@ -71,11 +71,11 @@ function Fetch([string]$url, [string]$file) {
     Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $file
 }
 
-# SubjectPublicKeyInfo prefix for a raw 32-byte Ed25519 public key.
 function Test-ReleaseSignature([string]$OpenSSL, [string]$Message, [byte[]]$PublicKey, [byte[]]$Signature) {
     if ($PublicKey.Length -ne 32 -or $Signature.Length -ne 64) { return $false }
     $derPath = Join-Path $tmp 'key.der'
     $sigPath = Join-Path $tmp 'sig.bin'
+    # SubjectPublicKeyInfo prefix for a raw 32-byte Ed25519 public key.
     [byte[]]$der = @(0x30,0x2a,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x03,0x21,0x00) + $PublicKey
     [IO.File]::WriteAllBytes($derPath, $der)
     [IO.File]::WriteAllBytes($sigPath, $Signature)
@@ -112,7 +112,7 @@ try {
                 $signature = [Convert]::FromBase64String([IO.File]::ReadAllText($sig))
             } catch { Fail 'The release key or signature is not base64.' }
             if (-not (Test-ReleaseSignature $openssl.Source $sums $keyBytes $signature)) {
-                Fail 'OpenSSL could not verify SHA256SUMS with the trusted release key.'
+                Fail 'SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team.'
             }
             $sigChecked = $true
             Say 'SHA256SUMS is signed by the release key (checked with OpenSSL).'
@@ -141,14 +141,14 @@ try {
         if ($KeySet) { $installArgs += @('-update-key', $Key) }
     }
     if ($DryRun) {
-        if (-not $sigChecked) { Write-Warning 'No capable OpenSSL; only the checksum was checked. The release signature was not verified.' }
+        if (-not $sigChecked) { Say 'Note: no OpenSSL with ed25519 was found, so only the checksum was checked; the release signature was not verified.' }
         Say "Dry run ($tag): would now run: bordercheck $($installArgs -join ' ')"
         return
     }
     if (-not $sigChecked) {
-        Write-Warning 'No capable OpenSSL; running the downloaded binary to check its own release signature. This is not independent verification.'
         & $exe verify -key $Key $sums $sig $exe | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail 'SHA256SUMS is NOT signed by the bordercheck release key.' }
+        if ($LASTEXITCODE -ne 0) { Fail 'SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team.' }
+        Say 'SHA256SUMS is signed by the release key (checked by the downloaded binary; no OpenSSL with ed25519 was found).'
     }
     if (-not ((& $exe -version) -match [regex]::Escape($tag))) { Fail "$asset does not report version $tag." }
 

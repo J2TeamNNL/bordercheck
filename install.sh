@@ -16,7 +16,7 @@
 #   --repo owner/name      install from a fork (with --key, the fork's release key); with an
 #                          invite link, the installed copy also takes its updates from there
 #   --key BASE64           the ed25519 public key that must sign SHA256SUMS
-#   --dry-run              download and verify, then stop before installing
+#   --dry-run              download and check, then stop before installing (never runs the download)
 #
 # What it checks before running anything it downloaded:
 #   1. SHA256SUMS.sig is a valid ed25519 signature of SHA256SUMS by the key
@@ -224,7 +224,7 @@ main() {
 	fi
 	if [ "$dry_run" = yes ]; then
 		if [ "$sig_checked" = no ]; then
-			say "WARNING: no capable OpenSSL; only the checksum was checked. The release signature was not verified."
+			say "Note: OpenSSL 3 was not found, so only the checksum was checked; the release signature was not verified."
 		fi
 		say "Dry run ($tag): would now run: bordercheck $*"
 		return 0
@@ -233,7 +233,6 @@ main() {
 
 	# 3. Without OpenSSL 3, the binary checks the signature with the key this script pins.
 	if [ "$sig_checked" = no ]; then
-		say "WARNING: no capable OpenSSL; running the downloaded binary to check its own release signature. This is not independent verification."
 		"$tmp/$asset" verify -key "$key" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.sig" "$tmp/$asset" >/dev/null ||
 			die "SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team."
 		say "SHA256SUMS is signed by the release key (checked by the downloaded binary; OpenSSL 3 was not found)."

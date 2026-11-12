@@ -116,7 +116,7 @@ func TestWindowsInstallScriptDryRun(t *testing.T) {
 	}
 	otherKey, _, _ := ed25519.GenerateKey(nil)
 	if out, err := run(os.Getenv("PATH"), base64.StdEncoding.EncodeToString(otherKey)); err == nil ||
-		!strings.Contains(out, "could not verify SHA256SUMS") || strings.Contains(out, "Downloading bordercheck") {
+		!strings.Contains(out, "NOT signed") || strings.Contains(out, "Downloading bordercheck") {
 		t.Fatalf("wrong signing key: %v\n%s", err, out)
 	}
 }

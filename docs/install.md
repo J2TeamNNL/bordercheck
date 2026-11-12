@@ -121,7 +121,7 @@ and treat reports as unauthenticated.
 |---|---|---|
 | `--email an@acme.com` | `-Email an@acme.com` | Don't ask for the email (scripted rollouts; not with an invite link) |
 | `--version v1.2.3` | `-Version v1.2.3` | Install that release instead of the latest |
-| `--dry-run` | `-DryRun` | Download and verify, then stop before installing |
+| `--dry-run` | `-DryRun` | Download and check, then stop before installing; never runs the downloaded binary |
 | `--repo owner/name` | `-Repo owner/name` | Install from a fork; with an invite link, the installed copy also takes its [updates](#updates) from there |
 | `--key <base64>` | `-Key <base64>` | The fork's ed25519 release key that must sign `SHA256SUMS` |
 
@@ -308,9 +308,9 @@ Before it runs anything it downloaded, the script checks that:
 2. the binary matches its line in `SHA256SUMS`.
 
 Both scripts use OpenSSL to verify the release signature when it supports Ed25519. Without a capable
-OpenSSL (for example on stock macOS or Windows), an install warns and uses the downloaded binary
-to check the signature after the checksum matches. Dry runs never execute that binary. Without a
-capable OpenSSL, a dry run checks only the checksum and warns that the release signature is unverified.
+OpenSSL (for example on stock macOS or Windows), an install has the downloaded binary
+check the signature after the checksum matches. Dry runs never execute that binary. Without a
+capable OpenSSL, a dry run checks only the checksum and says that the release signature was not verified.
 
 What that does and does not prove:
 
