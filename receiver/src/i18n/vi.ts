@@ -444,6 +444,7 @@ export const vi: Catalog = {
   "rep.for": "Của [b]{email}[/b] trên máy [b]{host}[/b], kiểm tra lúc {when}.",
   "rep.okText": "Máy tính này đáp ứng các yêu cầu kiểm tra của tổ chức. Bạn không cần làm gì thêm.",
   "rep.fixText": "Mỗi mục bên dưới cho biết vấn đề và cách khắc phục. bordercheck sẽ tự kiểm tra lại, nên kết quả sau khi sửa sẽ hiện ở đây sau lần chạy kế tiếp.",
+  "rep.skippedTitle": "Mục kiểm tra đã bỏ qua ({n})",
   "rep.passed": "[b]{n}[/b] mục đạt hoặc không áp dụng",
   "rep.exempted": "[b]{n}[/b] mục tạm miễn trừ",
   "rep.userIgnored": "[b]{n}[/b] mục bạn đã bỏ qua",

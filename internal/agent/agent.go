@@ -170,9 +170,9 @@ func compromiseWatch(ctx context.Context, env Env, cfg Config, pol policy.Policy
 	return !slices.Equal(rep.CompromiseLines(), st.CompromiseFound)
 }
 
-// allChecks is checks.AllWith; tests replace it so a run does not depend on
+// allChecks is checks.ForReport; tests replace it so a run does not depend on
 // the machine it runs on.
-var allChecks = checks.AllWith
+var allChecks = checks.ForReport
 
 // Local is what the person at this computer has set in the install folder
 // dir: the secrets they marked as not sensitive. A list that cannot be read
@@ -470,6 +470,9 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 	found := rep.CompromiseLines() // before evidence is left out: the details tell one sign from another
 	st.CompromiseFound = found
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID
+	if pol.Report.OmitHostname {
+		rep.Host.Hostname = ""
+	}
 	if pol.Report.IncludeIPs {
 		rep.Host.IPs = hostinfo.IPs()
 	}

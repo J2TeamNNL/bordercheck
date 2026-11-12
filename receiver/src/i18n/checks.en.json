@@ -57,6 +57,7 @@
   "backup.unknown.mac": "Could not tell whether Time Machine is set up (reading its settings may need Full Disk Access).",
   "backup.unsupported": "Not checked on {os}: there is no standard backup or device-finding service to read.",
   "backup.win.notRead": "Windows backups (File History, Windows Backup, OneDrive) are not checked.",
+  "check.disabledByPolicy": "Disabled by the organisation’s policy.",
   "check.interrupted": "Interrupted before it finished.",
   "check.moreAllowed": "{n} more allowed by policy.",
   "check.timeout": "Did not finish within {after:dur} and was stopped; the other checks are unaffected.",

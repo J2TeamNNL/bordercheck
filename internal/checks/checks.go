@@ -35,6 +35,15 @@ func All(p policy.Policy) []check.Check { return AllWith(p, Local{}) }
 
 // AllWith is All with what the person at the computer has set.
 func AllWith(p policy.Policy, local Local) []check.Check {
+	return allWith(p, local, false)
+}
+
+// ForReport includes an explicit skip for each check disabled by IT.
+func ForReport(p policy.Policy, local Local) []check.Check {
+	return allWith(p, local, true)
+}
+
+func allWith(p policy.Policy, local Local, includeDisabled bool) []check.Check {
 	c := p.Checks
 	all := []struct {
 		check.Check
@@ -78,6 +87,11 @@ func AllWith(p policy.Policy, local Local) []check.Check {
 	for _, a := range all {
 		if a.IsEnabled() {
 			out = append(out, withOnProblem(a.Check, a.OnProblem))
+		} else if includeDisabled {
+			a.Run = func(context.Context) check.Result {
+				return check.SkippedMsg(msg.Of("check.disabledByPolicy"))
+			}
+			out = append(out, a.Check)
 		}
 	}
 	return out

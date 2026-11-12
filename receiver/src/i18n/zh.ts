@@ -443,6 +443,7 @@ export const zh: Catalog = {
   "rep.for": "设备 [b]{host}[/b]（[b]{email}[/b]），检查时间 {when}。",
   "rep.okText": "这台电脑符合公司的各项检查要求，你无需任何操作。",
   "rep.fixText": "下面每一项都说明了问题所在及修复方法。bordercheck 会自动重新检查，修复后的结果将在下次运行后显示在这里。",
+  "rep.skippedTitle": "已跳过的检查（{n}）",
   "rep.passed": "[b]{n}[/b] 项通过或不适用",
   "rep.exempted": "[b]{n}[/b] 项暂时豁免",
   "rep.userIgnored": "[b]{n}[/b] 项已被你忽略",

@@ -13,6 +13,7 @@
 import type { CheckCatalog } from "../checktext";
 
 export const checksVi: CheckCatalog = {
+  "check.disabledByPolicy": "Đã tắt theo chính sách của tổ chức.",
   "check.unsupported": "Chưa hỗ trợ trên {os}.",
   "check.timeout": "Không chạy xong trong {after:dur} nên đã bị dừng; các mục kiểm tra khác không bị ảnh hưởng.",
   "check.interrupted": "Bị ngắt trước khi chạy xong.",

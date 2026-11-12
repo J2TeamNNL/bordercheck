@@ -15,10 +15,11 @@ func pl(one, other string) Entry { return Entry{One: one, Other: other} }
 // receiver/README.md for how a new key reaches the portal's translations.
 var Catalog = map[string]Entry{
 	// ---- Any check ----
-	"check.unsupported": s("Not supported on {os} yet."),
-	"check.timeout":     s("Did not finish within {after:dur} and was stopped; the other checks are unaffected."),
-	"check.interrupted": s("Interrupted before it finished."),
-	"check.moreAllowed": s("{n} more allowed by policy."),
+	"check.disabledByPolicy": s("Disabled by the organisation’s policy."),
+	"check.unsupported":      s("Not supported on {os} yet."),
+	"check.timeout":          s("Did not finish within {after:dur} and was stopped; the other checks are unaffected."),
+	"check.interrupted":      s("Interrupted before it finished."),
+	"check.moreAllowed":      s("{n} more allowed by policy."),
 
 	// ---- Signs of compromise (check.Indicator): what was found, without the item ----
 	"compromise.startupDownloadRun": s("A program set to start automatically downloads code from the internet and runs it."),

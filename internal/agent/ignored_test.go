@@ -58,7 +58,13 @@ func TestReportCarriesUserIgnoredWithoutEvidence(t *testing.T) {
 	if len(raw) != 1 {
 		t.Fatalf("%d reports", len(raw))
 	}
-	res := raw[0]["results"].([]any)[0].(map[string]any)
+	var res map[string]any
+	for _, item := range raw[0]["results"].([]any) {
+		result := item.(map[string]any)
+		if result["id"] == "secrets" {
+			res = result
+		}
+	}
 	ign, _ := res["user_ignored"].([]any)
 	if res["id"] != "secrets" || res["status"] != "warn" || res["evidence"] != nil || len(ign) != 1 {
 		t.Fatalf("result: %v", res)

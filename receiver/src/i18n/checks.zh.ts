@@ -15,6 +15,7 @@
 import type { CheckCatalog } from "../checktext";
 
 export const checksZh: CheckCatalog = {
+  "check.disabledByPolicy": "已根据组织策略禁用。",
   "check.unsupported": "尚不支持 {os}。",
   "check.timeout": "未能在 {after:dur}内完成，已被停止；其他检查项不受影响。",
   "check.interrupted": "在完成前被中断。",

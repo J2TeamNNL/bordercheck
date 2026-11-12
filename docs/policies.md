@@ -55,6 +55,7 @@ Used only by an installed copy. A plain `bordercheck` never sends anything.
 | `headers` | `{}` | Extra request headers, e.g. `{"Authorization": "Bearer …"}` for your own endpoint: a token that can only submit reports. Not used with invite links: an enrolled install sends its own token, and the portal strips any `Authorization` header from a role. |
 | `interval` | `"24h"` | Go duration between reports, at least `15m`. The service wakes hourly and sends when this much time has passed since the last report that got through, so a failed send retries the next hour. |
 | `check_interval` | `""` | Check the machine more often than it reports, e.g. `"24h"` with `"interval": "168h"`: the person at the machine is told about a new problem within a day, IT gets one report a week. At least `15m`, not longer than `interval`. `""` checks only when a report is due. Needs bordercheck v0.3.1 or later: an older one rejects a policy with this field. |
+| `omit_hostname` | `false` | Omit the hostname from installed reports. Enrollment still sends its initial hostname before the agent receives policy. Previous reports and enrollment records are unaffected. Set only on roles whose agents understand this field. |
 | `include_evidence` | `false` | Also send evidence: file paths, ports, variable names, container names. Off, the report carries only status, severity, summary and fix. |
 | `email_domains` | `[]` | With a static `policies.json`, the email typed at install must be in one of these domains. Empty = any. |
 | `include_ips` | `false` | Also send `host.ips`: the addresses of the machine's own network interfaces that are up (IPv4 and IPv6, without loopback and link-local; at most 16), read locally. bordercheck never asks a "what is my IP" service. |
@@ -223,6 +224,9 @@ loads the rules, a plain run says it cannot tell and skips; `sudo bordercheck -o
 
 No options. FileVault (macOS); LUKS/dm-crypt under `/` and `/home`, or ZFS encryption (Linux); BitLocker on the
 system drive (Windows).
+
+Installed reports mark checks disabled by IT (`enabled: false`) as skipped with a policy reason.
+The standalone CLI continues to list and run only enabled checks.
 
 ### listeners
 
