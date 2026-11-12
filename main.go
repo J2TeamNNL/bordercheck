@@ -37,7 +37,7 @@ const usage = `Usage:
                                                      enroll with an invite link from IT (no email question);
                                                      run again without the link to finish an interrupted install
   bordercheck status                                 show the install and the last report sent
-  bordercheck notifications                          macOS: let macOS ask whether bordercheck may show its own
+  bordercheck notifications                          macOS: let macOS ask whether BorderCheck may show its own
                                                      notifications (install asks when run in a terminal)
   bordercheck send [-force]                          what the service runs; -force sends a report now
   bordercheck update                                 refresh the policy and install a newer signed release now
@@ -63,7 +63,7 @@ func main() { os.Exit(run(os.Args[1:])) }
 
 // help is what a person at the machine can run, in plain words; usage (-h)
 // lists every option.
-const help = `bordercheck %s: checks this computer for open doors and says how to close each one.
+const help = `BorderCheck %s: checks this computer for open doors and says how to close each one.
 
 Everyday
   bordercheck                    check this computer now and show what to fix (sends nothing)
@@ -71,8 +71,8 @@ Everyday
   bordercheck fix                what to fix and how, written for an AI coding assistant to follow with you
   bordercheck send -force        check now and send a fresh report to your organisation
   bordercheck update             get the newest policy and the newest version now
-  bordercheck notifications      macOS: let bordercheck show notifications under its own name
-  bordercheck uninstall          remove bordercheck from this computer (stops the reports too)
+  bordercheck notifications      macOS: let BorderCheck show notifications under its own name
+  bordercheck uninstall          remove BorderCheck from this computer (stops the reports too)
 
 Secrets that are not sensitive
   bordercheck ignore ~/proj/.env -reason "local test database"

@@ -116,7 +116,7 @@ export function chunk(lines: string[], limit: number): string[][] {
 export function payload(format: Format, text: string, extra: Record<string, unknown> = {}): unknown {
   switch (format) {
     case "discord":
-      return { username: "bordercheck", content: text, allowed_mentions: { parse: [] } };
+      return { username: "BorderCheck", content: text, allowed_mentions: { parse: [] } };
     case "slack":
       return { text: slackEscape(text) };
     default:
@@ -213,7 +213,7 @@ export async function sendPending(
   for (const [i, g] of groups.entries()) {
     if (i >= MAX_MESSAGES_PER_RUN) break; // the rest go next hour
     const ids = lines.slice(offset, offset + g.length).map((l) => l.id);
-    const head = i === 0 ? `**bordercheck**: ${live.length} new alert${live.length === 1 ? "" : "s"}\n` : "";
+    const head = i === 0 ? `**BorderCheck**: ${live.length} new alert${live.length === 1 ? "" : "s"}\n` : "";
     const text = (format === "slack" ? head.replace(/\*\*/g, "*") : format === "json" ? head.replace(/\*\*/g, "") : head) + g.join("\n");
     try {
       await send(env.ALERT_WEBHOOK_URL, payload(format, text, { alerts: live.filter((a) => ids.includes(a.id)).map(publicAlert) }));
@@ -244,7 +244,7 @@ export async function digestText(env: Env, now: Date, format: Format): Promise<s
   ).all<{ check_id: string; n: number }>();
   const bold = format === "discord" ? "**" : format === "slack" ? "*" : "";
   const lines = [
-    `${bold}bordercheck digest${bold}: ${t?.n ?? 0} machines, ${t?.failing ?? 0} non-compliant (${t?.high ?? 0} with a high-severity fail), ${t?.silent ?? 0} silent for more than ${config(env).silentDays} days`,
+    `${bold}BorderCheck digest${bold}: ${t?.n ?? 0} machines, ${t?.failing ?? 0} non-compliant (${t?.high ?? 0} with a high-severity fail), ${t?.silent ?? 0} silent for more than ${config(env).silentDays} days`,
   ];
   if (t?.compromised) lines.push(`🚨 ${t.compromised} reporting signs of compromise`);
   if (top.results.length) lines.push("Most failing: " + top.results.map((r) => `${lit(r.check_id, 40)} ${r.n}`).join(", "));

@@ -1,9 +1,9 @@
-# bordercheck
+# BorderCheck
 
 **Finds the open doors on your work laptop and tells you how to close them.**
 
 One stolen password or one bad download can let someone onto a laptop. How much damage they do next depends
-on what was left open. bordercheck looks for:
+on what was left open. BorderCheck looks for:
 
 - programs that accept connections from other machines
 - API keys and passwords saved as plain text
@@ -71,7 +71,7 @@ macOS. macOS binaries are signed and notarized; Windows binaries are not Authent
 
 ## For organisations
 
-Each machine runs bordercheck every hour as a per-user service and reports to you. Two ways to set that up:
+Each machine runs BorderCheck every hour as a per-user service and reports to you. Two ways to set that up:
 
 - **The portal** (recommended). Deploy [`receiver/`](receiver), a Cloudflare Worker, on your own account. Give
   each role (Dev, Support, Sales…) a policy, create an invite per person, and send them one command:
@@ -86,7 +86,7 @@ Each machine runs bordercheck every hour as a per-user service and reports to yo
   file beside the binary and only run it by hand.
 
 <p align="center">
-<img src="docs/img/portal-invite.png" width="560" alt="The invite page an employee opens: what bordercheck is, and the one command to install it on this Mac.">
+<img src="docs/img/portal-invite.png" width="560" alt="The invite page an employee opens: what BorderCheck is, and the one command to install it on this Mac.">
 <img src="docs/img/portal-report-phone.png" width="250" alt="The report page a person sees for their own machine, on a phone: 3 things to fix, each with how to fix it.">
 </p>
 
@@ -111,7 +111,7 @@ A policy only needs what it changes:
 
 ## Guides
 
-- [Installing bordercheck on laptops](docs/install.md): invite links, a static `policies.json`, the service,
+- [Installing BorderCheck on laptops](docs/install.md): invite links, a static `policies.json`, the service,
   notifications, updates, uninstall, what is stored and sent, what the install script proves.
 - [Running your own portal](docs/portal.md): deploy, sign in, roles, invites, alerts, custom domain, MCP,
   upgrading.

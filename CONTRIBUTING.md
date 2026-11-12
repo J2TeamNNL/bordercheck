@@ -3,7 +3,7 @@
 ## Reporting a problem or a false positive
 
 Open an issue at [github.com/ptrinh/bordercheck/issues](https://github.com/ptrinh/bordercheck/issues). Say which
-OS and version, the bordercheck version (`bordercheck -version`), and what you expected.
+OS and version, the BorderCheck version (`bordercheck -version`), and what you expected.
 
 For a check that is wrong about your machine, include its result:
 
@@ -51,7 +51,7 @@ printf '%s' '{"v":1,"title":"t","link":"https://r.example.com/r/x","allowed_host
 The icon is drawn by `macos/notifier/Icon/make-icon.swift` (the portal's mark from `receiver/src/html.ts`) at build
 time. Don't launch the app in `status`, `authorize` or `post` mode on a machine whose owner did not expect it:
 `authorize` puts macOS's permission question on screen, and `post` shows a notification. An ad hoc build is
-refused by bordercheck anyway; to try the whole thing, sign it with a Developer ID (`--sign`) and install it with
+refused by BorderCheck anyway; to try the whole thing, sign it with a Developer ID (`--sign`) and install it with
 `bordercheck install … -notifier-zip <zip>` or `bordercheck notifications -notifier-zip <zip>`.
 
 The receiver (`receiver/`, TypeScript on Cloudflare Workers):
@@ -115,7 +115,7 @@ These are how the code already works; please keep to them.
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`: build → sign and notarize the macOS binaries →
 `SHA256SUMS` and its signature (after code signing, which changes the files) → check the release against the key
-built into bordercheck → GitHub release with the binaries, `SHA256SUMS`, `SHA256SUMS.sig` and a rendered
+built into BorderCheck → GitHub release with the binaries, `SHA256SUMS`, `SHA256SUMS.sig` and a rendered
 Homebrew formula `bordercheck.rb`.
 
 Installed copies only update to releases whose `SHA256SUMS` is signed with the release key, and the install
@@ -163,7 +163,7 @@ using Script Editor for notifications.
 Apple Developer setup for the app: nothing beyond the Developer ID Application certificate already used for the
 binaries. Posting local notifications needs no entitlement and no provisioning profile, and a Developer ID app's
 bundle ID does not have to be registered (registering `io.github.ptrinh.bordercheck.notifier` under Identifiers
-is harmless and reserves it). Only the app's Team ID matters to bordercheck: it is pinned at first install, so
+is harmless and reserves it). Only the app's Team ID matters to BorderCheck: it is pinned at first install, so
 signing a later release with another team would make installed copies refuse the update and keep the old app.
 A bare binary cannot be stapled, so Gatekeeper looks its notarization up online. Windows binaries are not
 Authenticode-signed.

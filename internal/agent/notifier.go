@@ -49,7 +49,7 @@ const ntfError = "error"
 
 // errNotificationsOff means the person turned bordercheck's notifications off:
 // nothing is shown, and nothing else is tried.
-var errNotificationsOff = errors.New("notifications are turned off for bordercheck in System Settings")
+var errNotificationsOff = errors.New("notifications are turned off for BorderCheck in System Settings")
 
 func notifierFor(env Env, cfg Config) notifier.Helper {
 	return notifier.Helper{Dir: env.Dir, TeamID: cfg.NotifierTeam, Digest: cfg.NotifierDigest, Run: ntfRun, Verify: ntfVerify}
@@ -94,8 +94,8 @@ func ownNotification(ctx context.Context, env Env, st *State, m notify.Message, 
 	if !h.Ready() {
 		return false, nil
 	}
-	// The banner already says "bordercheck" above the title.
-	title := strings.TrimPrefix(m.Title, "bordercheck: ")
+	// The banner already says "BorderCheck" above the title.
+	title := strings.TrimPrefix(m.Title, "BorderCheck: ")
 	req, err := notifier.NewRequest(title, m.Body, link, host)
 	if err != nil {
 		return false, err
@@ -124,7 +124,7 @@ func showMessage(ctx context.Context, env Env, st *State, m notify.Message, now 
 	case errors.Is(err, errNotificationsOff):
 		return err
 	case err != nil:
-		fmt.Fprintf(env.Out, "%s bordercheck's notification app failed, using Script Editor: %v\n", now.Format(time.RFC3339), err)
+		fmt.Fprintf(env.Out, "%s BorderCheck's notification app failed, using Script Editor: %v\n", now.Format(time.RFC3339), err)
 	}
 	return showNotification(ctx, m)
 }
@@ -192,18 +192,18 @@ func askNotifications(ctx context.Context, env Env, cfg Config, st *State) {
 	h := notifierFor(env, cfg)
 	s, err := h.Status(ctx)
 	if err == nil && s == notifier.NotDetermined {
-		fmt.Fprintln(env.Out, "\nbordercheck shows a notification when it finds a new problem on this computer; clicking it opens your report page.\n"+
-			`macOS will now ask whether "bordercheck" may send notifications. Choose Allow to get them.`)
+		fmt.Fprintln(env.Out, "\nBorderCheck shows a notification when it finds a new problem on this computer; clicking it opens your report page.\n"+
+			`macOS will now ask whether "BorderCheck" may send notifications. Choose Allow to get them.`)
 		s, err = h.Authorize(ctx)
 	}
 	recordNotifications(st, s, err, now)
 	switch {
 	case err != nil:
-		fmt.Fprintf(env.Out, "Notifications: bordercheck's own are not working (%v); notifications come through Script Editor instead.\n", err)
+		fmt.Fprintf(env.Out, "Notifications: BorderCheck's own are not working (%v); notifications come through Script Editor instead.\n", err)
 	case s == notifier.Authorized:
-		fmt.Fprintln(env.Out, "Notifications: allowed. To change that: System Settings → Notifications → bordercheck.")
+		fmt.Fprintln(env.Out, "Notifications: allowed. To change that: System Settings → Notifications → BorderCheck.")
 	case s == notifier.Denied:
-		fmt.Fprintln(env.Out, "Notifications: turned off for bordercheck, so it shows none; it still reports to IT. To turn them on: System Settings → Notifications → bordercheck.")
+		fmt.Fprintln(env.Out, "Notifications: turned off for BorderCheck, so it shows none; it still reports to IT. To turn them on: System Settings → Notifications → BorderCheck.")
 	default:
 		fmt.Fprintf(env.Out, "Notifications: no answer yet; macOS keeps the question in Notification Center. Until you allow them, notifications come through Script Editor. To be asked again, run:\n  %s\n", notificationsCommand(env))
 	}
@@ -218,7 +218,7 @@ func setUpNotifications(ctx context.Context, env Env, cfg *Config, pol policy.Po
 		return
 	}
 	if err := ensureNotifier(ctx, env, cfg, zipPath); err != nil {
-		fmt.Fprintf(env.Out, "\nNotifications come through Script Editor: bordercheck's own notification app is not available (%v).\n", err)
+		fmt.Fprintf(env.Out, "\nNotifications come through Script Editor: BorderCheck's own notification app is not available (%v).\n", err)
 		return
 	}
 	if !pol.Notify.Enabled {
@@ -229,7 +229,7 @@ func setUpNotifications(ctx context.Context, env Env, cfg *Config, pol policy.Po
 	_ = readJSON(statePath, &st)
 	if env.Term == nil {
 		recordNotifications(&st, notifier.NotDetermined, nil, time.Now())
-		fmt.Fprintf(env.Out, "\nbordercheck shows a notification when it finds a new problem. There is no terminal, so macOS was not asked whether \"bordercheck\" may send them; until it is, they come through Script Editor. To be asked, run:\n  %s\n",
+		fmt.Fprintf(env.Out, "\nBorderCheck shows a notification when it finds a new problem. There is no terminal, so macOS was not asked whether \"BorderCheck\" may send them; until it is, they come through Script Editor. To be asked, run:\n  %s\n",
 			notificationsCommand(env))
 	} else {
 		askNotifications(ctx, env, *cfg, &st)
@@ -244,17 +244,17 @@ func setUpNotifications(ctx context.Context, env Env, cfg *Config, pol policy.Po
 func Notifications(ctx context.Context, env Env, zipPath string) error {
 	var cfg Config
 	if err := readJSON(filepath.Join(env.Dir, "config.json"), &cfg); err != nil {
-		return fmt.Errorf("bordercheck is not installed (%w); run: bordercheck install", err)
+		return fmt.Errorf("BorderCheck is not installed (%w); run: bordercheck install", err)
 	}
 	if !macNotifier {
-		fmt.Fprintln(env.Out, "Notifications need no setting up on this system; bordercheck shows them with what the system provides.")
+		fmt.Fprintln(env.Out, "Notifications need no setting up on this system; BorderCheck shows them with what the system provides.")
 		return nil
 	}
 	if env.Term == nil {
 		return errors.New("run bordercheck notifications in a terminal: macOS asks the person at the Mac")
 	}
 	if err := ensureNotifier(ctx, env, &cfg, zipPath); err != nil {
-		return fmt.Errorf("bordercheck's notification app could not be installed (%w); notifications come through Script Editor", err)
+		return fmt.Errorf("BorderCheck's notification app could not be installed (%w); notifications come through Script Editor", err)
 	}
 	statePath := filepath.Join(env.Dir, "state.json")
 	var st State
@@ -288,20 +288,20 @@ func refreshNotifier(ctx context.Context, env Env, version string, now time.Time
 // Mac. It asks the app (which never asks the person) for the current answer,
 // so a switch flipped in System Settings shows at once.
 func notificationsNote(ctx context.Context, env Env, cfg Config) string {
-	scriptEditor := "through Script Editor (osascript); for bordercheck's own, run: bordercheck notifications"
+	scriptEditor := "through Script Editor (osascript); for BorderCheck's own, run: bordercheck notifications"
 	h := notifierFor(env, cfg)
 	if !h.Ready() {
 		return scriptEditor
 	}
 	s, err := h.Status(ctx)
 	if err != nil {
-		return "through Script Editor (osascript); bordercheck's own are not working: " + err.Error()
+		return "through Script Editor (osascript); BorderCheck's own are not working: " + err.Error()
 	}
 	switch s {
 	case notifier.Authorized:
-		return "bordercheck's own (allowed in System Settings); clicking one opens your report page"
+		return "BorderCheck's own (allowed in System Settings); clicking one opens your report page"
 	case notifier.Denied:
-		return "turned off for bordercheck in System Settings; none are shown (System Settings → Notifications → bordercheck to turn them on)"
+		return "turned off for BorderCheck in System Settings; none are shown (System Settings → Notifications → BorderCheck to turn them on)"
 	}
-	return "through Script Editor (osascript) until you allow bordercheck's own; run: bordercheck notifications"
+	return "through Script Editor (osascript) until you allow BorderCheck's own; run: bordercheck notifications"
 }

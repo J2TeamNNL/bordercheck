@@ -84,7 +84,7 @@ func evalAdminRights(f adminFacts, opts policy.AdminRights) check.Result {
 			p.add(false, msg.Of("admin.builtinAdmin"), msg.P("admin.fix.builtinAdmin"))
 		}
 		if f.Elevated {
-			evidence = append(evidence, "bordercheck ran elevated")
+			evidence = append(evidence, "BorderCheck ran elevated")
 		}
 	}
 	// Being an administrator is how most people's own laptop is set up: on

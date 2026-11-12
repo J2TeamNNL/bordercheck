@@ -267,7 +267,7 @@ export default {
     const url = new URL(req.url);
     const path = url.pathname;
     if (path === "/report") {
-      if (req.method !== "POST") return json({ error: "POST a bordercheck report here" }, 405, { allow: "POST" });
+      if (req.method !== "POST") return json({ error: "POST a BorderCheck report here" }, 405, { allow: "POST" });
       return handleReport(req, env, undefined, undefined, ctx ? { waitUntil: (p) => ctx.waitUntil(p) } : {});
     }
     if (path === "/enroll") {

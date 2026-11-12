@@ -31,7 +31,7 @@ import { hit } from "./ratelimit";
 export const MODERN_VERSIONS = ["2026-07-28"];
 export const LEGACY_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
 export const SUPPORTED_VERSIONS = [...MODERN_VERSIONS, ...LEGACY_VERSIONS];
-const SERVER_INFO = { name: "bordercheck-receiver", title: "bordercheck fleet", version: "1.0.0" };
+const SERVER_INFO = { name: "bordercheck-receiver", title: "BorderCheck fleet", version: "1.0.0" };
 // A role policy may be 256 KB; leave room for the JSON-RPC envelope.
 export const MAX_MCP_BYTES = 320 * 1024;
 
@@ -39,7 +39,7 @@ const META_VERSION = "io.modelcontextprotocol/protocolVersion";
 const META_CAPS = "io.modelcontextprotocol/clientCapabilities";
 
 const INSTRUCTIONS =
-  "bordercheck fleet administration: laptops' security-posture reports, roles (policies), invites, per-machine waivers, revoking machines, alerts and the audit trail. " +
+  "BorderCheck fleet administration: laptops' security-posture reports, roles (policies), invites, per-machine waivers, revoking machines, alerts and the audit trail. " +
   UNTRUSTED_NOTE +
   " Write tools take explicit ids from the read tools and act on one item per call; confirm revokes, waivers and role changes with the person before calling them. " +
   "Every write is recorded in the audit trail with its arguments.";

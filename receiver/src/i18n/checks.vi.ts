@@ -51,7 +51,7 @@ export const checksVi: CheckCatalog = {
   "firewall.linux.fix":
     "Ubuntu/Debian: [code]sudo ufw enable[/code] (chặn kết nối đến, cho phép kết nối đi). Fedora/RHEL/openSUSE: [code]sudo systemctl enable --now firewalld[/code].",
   "firewall.linux.rootOnly":
-    "Service {services} có nạp luật tường lửa, nhưng chỉ root mới đọc được các luật này, nên bordercheck không biết chúng có chặn kết nối đến hay không. Chạy [code]sudo bordercheck -only firewall[/code] để kiểm tra.",
+    "Service {services} có nạp luật tường lửa, nhưng chỉ root mới đọc được các luật này, nên BorderCheck không biết chúng có chặn kết nối đến hay không. Chạy [code]sudo bordercheck -only firewall[/code] để kiểm tra.",
   "firewall.linux.unknown":
     "Không xác định được khi không có quyền root: không có cấu hình ufw và systemd không cho biết service tường lửa nào đang chạy. Chạy [code]sudo bordercheck -only firewall[/code] để kiểm tra các luật.",
   "firewall.linux.noneUfwOff":
@@ -218,7 +218,7 @@ export const checksVi: CheckCatalog = {
   "updates.fix.arch.pending": "[code]sudo pacman -Syu[/code]",
   "updates.fix.generic": "Cài các bản cập nhật mới nhất bằng trình quản lý gói của bản phân phối, rồi khởi động lại.",
 
-  "screenlock.noDesktop": "Không có môi trường desktop nào mà bordercheck đọc được thiết lập khoá màn hình (hỗ trợ GNOME và KDE Plasma).",
+  "screenlock.noDesktop": "Không có môi trường desktop nào mà BorderCheck đọc được thiết lập khoá màn hình (hỗ trợ GNOME và KDE Plasma).",
   "screenlock.unknown": "Không xác định được có cần mật khẩu sau khi máy ngủ hay khi màn hình khoá hay không.",
   "screenlock.passwordUnknown": "Không xác định được có cần mật khẩu sau khi máy ngủ hay không.",
   "screenlock.noPassword": "Không cần mật khẩu để vào lại máy sau khi máy ngủ hoặc sau trình bảo vệ màn hình.",

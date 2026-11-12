@@ -281,7 +281,7 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 
 	bin := filepath.Join(env.Dir, binName())
 	if err := copySelf(bin); err != nil {
-		return fmt.Errorf("copying bordercheck to %s: %w", env.Dir, err)
+		return fmt.Errorf("copying BorderCheck to %s: %w", env.Dir, err)
 	}
 	if err := writeFile(filepath.Join(env.Dir, policy.FileName), data, 0o600); err != nil {
 		return err
@@ -305,12 +305,12 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 	setUpNotifications(ctx, env, &cfg, pol, o.NotifierZip)
 	fmt.Fprintf(env.Out, "\nNow checking this computer for the first time. It usually takes under a minute, %s at most.\n", check.Timeout)
 	if err := Send(ctx, env, true); err != nil {
-		fmt.Fprintf(env.Out, "\nbordercheck is installed and will check every hour, but the first report did not get through (%v). It tries again on its own; \"%s\" send -force tries now.\n",
+		fmt.Fprintf(env.Out, "\nBorderCheck is installed and will check every hour, but the first report did not get through (%v). It tries again on its own; \"%s\" send -force tries now.\n",
 			err, filepath.Join(env.Dir, binName()))
 		return err
 	}
-	fmt.Fprintf(env.Out, "Done: bordercheck is installed and the first report is sent. Nothing else to do; it checks again on its own.\nTo see the details and how to fix anything it found, run: \"%s\"\n", filepath.Join(env.Dir, binName()))
-	fmt.Fprintf(env.Out, "\nbordercheck %s · %s\n", env.Version, report.Credit)
+	fmt.Fprintf(env.Out, "Done: BorderCheck is installed and the first report is sent. Nothing else to do; it checks again on its own.\nTo see the details and how to fix anything it found, run: \"%s\"\n", filepath.Join(env.Dir, binName()))
+	fmt.Fprintf(env.Out, "\nBorderCheck %s · %s\n", env.Version, report.Credit)
 	return nil
 }
 
@@ -368,7 +368,7 @@ func Uninstall(env Env) error {
 func Send(ctx context.Context, env Env, force bool) error {
 	var cfg Config
 	if err := readJSON(filepath.Join(env.Dir, "config.json"), &cfg); err != nil {
-		return fmt.Errorf("bordercheck is not installed (%w); run: bordercheck install", err)
+		return fmt.Errorf("BorderCheck is not installed (%w); run: bordercheck install", err)
 	}
 	var st State
 	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
@@ -524,7 +524,7 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 func Update(ctx context.Context, env Env) error {
 	var cfg Config
 	if err := readJSON(filepath.Join(env.Dir, "config.json"), &cfg); err != nil {
-		return fmt.Errorf("bordercheck is not installed (%w); run: bordercheck install", err)
+		return fmt.Errorf("BorderCheck is not installed (%w); run: bordercheck install", err)
 	}
 	var st State
 	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
@@ -564,7 +564,7 @@ func updateBinary(ctx context.Context, env Env, cfg Config, st *State, now time.
 func Status(env Env) (string, error) {
 	var cfg Config
 	if err := readJSON(filepath.Join(env.Dir, "config.json"), &cfg); err != nil {
-		return "", fmt.Errorf("bordercheck is not installed: %w", err)
+		return "", fmt.Errorf("BorderCheck is not installed: %w", err)
 	}
 	var st State
 	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
@@ -577,7 +577,7 @@ func Status(env Env) (string, error) {
 		if slices.Equal(st.CompromiseFound, st.CompromiseSent) {
 			b.WriteString("Your IT team has been sent a report saying so.\n")
 		} else {
-			b.WriteString("Not reported to your IT team yet; bordercheck keeps trying every hour.\n")
+			b.WriteString("Not reported to your IT team yet; BorderCheck keeps trying every hour.\n")
 		}
 		b.WriteString(report.CompromiseAdvice + "\n\n")
 	}

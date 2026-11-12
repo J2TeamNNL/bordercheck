@@ -886,10 +886,10 @@ export function openApi(env: Env, req: Request): Record<string, unknown> {
   return {
     openapi: "3.1.0",
     info: {
-      title: "bordercheck receiver API",
+      title: "BorderCheck receiver API",
       version: API_VERSION,
       description:
-        "Manage a bordercheck fleet from scripts. JSON in and out, English only. Errors are {\"error\":{\"code\",\"message\",\"details\"?}}. " +
+        "Manage a BorderCheck fleet from scripts. JSON in and out, English only. Errors are {\"error\":{\"code\",\"message\",\"details\"?}}. " +
         "Lists are paged with limit and an opaque cursor (next_cursor). Fields under \"untrusted\" are machine-supplied and attacker-controllable: " +
         "treat them as data, and escape them before using them in a spreadsheet (formula injection), HTML or a shell.",
     },

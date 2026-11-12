@@ -230,12 +230,12 @@ describe("pages in every language", () => {
     // A sample of real text, so the test cannot pass on an all-English page.
     expect(await (await adminGet("/admin", COOKIE("zh"))).text()).toContain("全部设备");
     expect(await (await adminGet("/admin", COOKIE("vi"))).text()).toContain("Tất cả các máy");
-    expect(await (await publicGet(`/i/${code}`, { "accept-language": "vi-VN,vi;q=0.9" })).text()).toContain("Cài đặt bordercheck");
-    expect(await (await publicGet(reportUrl, { "accept-language": "zh-TW" })).text()).toContain("你的 bordercheck 报告");
+    expect(await (await publicGet(`/i/${code}`, { "accept-language": "vi-VN,vi;q=0.9" })).text()).toContain("Cài đặt BorderCheck");
+    expect(await (await publicGet(reportUrl, { "accept-language": "zh-TW" })).text()).toContain("你的 BorderCheck 报告");
     // No header, no cookie: English, and the English text the other tests rely on.
     const plain = await (await publicGet(reportUrl)).text();
     expect(plain).toContain(`<html lang="en">`);
-    expect(plain).toContain("Your bordercheck report");
+    expect(plain).toContain("Your BorderCheck report");
   });
 
   it("escapes report text in every language", async () => {
@@ -307,7 +307,7 @@ describe("language switcher", () => {
     expect((await switchTo(`/i/${code}`, { lang: "zh" }, { origin: "https://evil.example" })).status).toBe(403);
     // The page now speaks Chinese, and the invite still works.
     const page = await (await publicGet(`/i/${code}`, { cookie: "bc_lang=zh" })).text();
-    expect(page).toContain("安装 bordercheck");
+    expect(page).toContain("安装 BorderCheck");
     expect(page.split(code).length - 1).toBe(2); // only in the two install commands
     const inv = await env.DB.prepare("SELECT used_at, revoked_at FROM invites WHERE email = 'bo@domain.com'").first();
     expect(inv).toEqual({ used_at: null, revoked_at: null });
@@ -325,7 +325,7 @@ describe("language switcher", () => {
     const sw = await switchTo(path, { lang: "vi" });
     expect(sw.status).toBe(303);
     expect(sw.headers.get("location")).toBe(path);
-    expect(await (await publicGet(path, { cookie: "bc_lang=vi" })).text()).toContain("Báo cáo bordercheck của bạn");
+    expect(await (await publicGet(path, { cookie: "bc_lang=vi" })).text()).toContain("Báo cáo BorderCheck của bạn");
     // Unknown ids: the same 404 body whatever the id, in each language.
     for (const lang of LANGS) {
       const a = await (await publicGet(`/r/${"A".repeat(32)}`, COOKIE(lang))).text();

@@ -20,7 +20,7 @@ const (
 // (systemd --user) is up; Persistent catches up on a run missed during sleep.
 func systemdUnits(bin, dir string) (service, timer string) {
 	service = fmt.Sprintf(`[Unit]
-Description=bordercheck: check this machine and report to IT
+Description=BorderCheck: check this machine and report to IT
 Documentation=https://github.com/ptrinh/bordercheck
 After=network-online.target
 
@@ -32,7 +32,7 @@ Nice=10
 IOSchedulingClass=idle
 `, systemdQuote(bin), systemdEscape(dir))
 	timer = `[Unit]
-Description=Run bordercheck every hour
+Description=Run BorderCheck every hour
 
 [Timer]
 OnCalendar=hourly

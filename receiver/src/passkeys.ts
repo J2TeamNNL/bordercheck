@@ -275,10 +275,10 @@ export async function registerOptions(env: Env, req: Request, v: Viewer, now = D
   return json(
     {
       challenge: await newChallenge(env, "register", now),
-      rp: { id: host, name: `bordercheck (${host})` },
+      rp: { id: host, name: `BorderCheck (${host})` },
       user: named
-        ? { id: userId(v.adminId), name: `${v.who}@${host}`, displayName: `bordercheck: ${v.who}` }
-        : { id: userId(), name: `admin@${host}`, displayName: "bordercheck admin" },
+        ? { id: userId(v.adminId), name: `${v.who}@${host}`, displayName: `BorderCheck: ${v.who}` }
+        : { id: userId(), name: `admin@${host}`, displayName: "BorderCheck admin" },
       exclude: existing.results.map((r) => r.credential_id),
       timeout: CLIENT_TIMEOUT,
     },

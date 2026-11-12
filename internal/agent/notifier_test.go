@@ -220,7 +220,7 @@ func TestTurnedOffShowsNothing(t *testing.T) {
 	if len(s.osascript)+len(s.opened) != 0 {
 		t.Fatalf("declined, yet osascript %v, opened %v", s.osascript, s.opened)
 	}
-	if st.Notifications != "denied" || st.Notified["firewall:fail"].IsZero() || !strings.Contains(out.String(), "turned off for bordercheck") {
+	if st.Notifications != "denied" || st.Notified["firewall:fail"].IsZero() || !strings.Contains(out.String(), "turned off for BorderCheck") {
 		t.Errorf("state %+v, log %s", st, out)
 	}
 	// An hour later, nothing new: not even a log line.
@@ -349,7 +349,7 @@ func TestInstallAsksOnceWithAPersonAtTheTerminal(t *testing.T) {
 	if !slices.Equal(f.modes, []notifier.Mode{notifier.ModeStatus, notifier.ModeAuthorize}) {
 		t.Fatalf("modes %v", f.modes)
 	}
-	if !strings.Contains(said, "shows a notification when it finds a new problem") || !strings.Contains(said, `macOS will now ask whether "bordercheck" may send notifications`) {
+	if !strings.Contains(said, "shows a notification when it finds a new problem") || !strings.Contains(said, `macOS will now ask whether "BorderCheck" may send notifications`) {
 		t.Errorf("asked before saying why:\n%s", said)
 	}
 	if !strings.Contains(out.String(), "Notifications: allowed") {
@@ -368,11 +368,11 @@ func TestInstallAsksOnceWithAPersonAtTheTerminal(t *testing.T) {
 	if err := Install(t.Context(), env, InstallOptions{Policy: srv.URL + "/policies.json", Email: "an@example.com"}); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(f.modes, []notifier.Mode{notifier.ModeStatus}) || !strings.Contains(out.String(), "turned off for bordercheck") {
+	if !slices.Equal(f.modes, []notifier.Mode{notifier.ModeStatus}) || !strings.Contains(out.String(), "turned off for BorderCheck") {
 		t.Errorf("reinstall: modes %v\n%s", f.modes, out)
 	}
 	// status shows it.
-	if s, err := Status(env); err != nil || !strings.Contains(s, "Notifications: turned off for bordercheck in System Settings") {
+	if s, err := Status(env); err != nil || !strings.Contains(s, "Notifications: turned off for BorderCheck in System Settings") {
 		t.Errorf("status: %v\n%s", err, s)
 	}
 
@@ -410,7 +410,7 @@ func TestScriptedInstallAndBackgroundNeverAsk(t *testing.T) {
 		t.Fatalf("modes %v\n%s", f.modes, out)
 	}
 	s, _ := Status(env)
-	if !strings.Contains(s, "Notifications: through Script Editor (osascript) until you allow bordercheck's own; run: bordercheck notifications") {
+	if !strings.Contains(s, "Notifications: through Script Editor (osascript) until you allow BorderCheck's own; run: bordercheck notifications") {
 		t.Errorf("status:\n%s", s)
 	}
 	// Hourly runs, in every state the app can be in: never authorize.

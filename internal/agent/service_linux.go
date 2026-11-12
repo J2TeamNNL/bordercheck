@@ -69,7 +69,7 @@ func registerService(bin, dir string) error {
 	}
 	if _, err := exec.LookPath("crontab"); err != nil {
 		return errors.New("this login has no systemd user session (systemctl --user cannot reach it) and there is " +
-			"no crontab command, so there is nothing to run bordercheck every hour. Log in to a desktop session, " +
+			"no crontab command, so there is nothing to run BorderCheck every hour. Log in to a desktop session, " +
 			"or install cron, and run bordercheck install again")
 	}
 	return setCron(cronLine(bin, time.Now().Minute()))
@@ -90,7 +90,7 @@ func canRegisterService() error {
 	}
 	if _, err := exec.LookPath("crontab"); err != nil {
 		return errors.New("this login has no systemd user session and no crontab command, so there is nothing " +
-			"to run bordercheck every hour. Log in to a desktop session, or install cron")
+			"to run BorderCheck every hour. Log in to a desktop session, or install cron")
 	}
 	return nil
 }

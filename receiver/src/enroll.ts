@@ -118,7 +118,7 @@ export async function handleEnroll(req: Request, env: Env, now = new Date()): Pr
     : null;
   if (!inv) return enrollError("invalid_code", 404, "This invite code is not valid. Check the link, or ask IT for a new invite.");
   if (inv.revoked_at) return enrollError("revoked", 410, "This invite was cancelled. Ask IT for a new one.");
-  if (inv.used_at) return enrollError("used", 409, "This invite has already been used to install bordercheck. Ask IT for a new invite to install on another machine.");
+  if (inv.used_at) return enrollError("used", 409, "This invite has already been used to install BorderCheck. Ask IT for a new invite to install on another machine.");
   return enrollError("expired", 410, "This invite has expired. Ask IT for a new one.");
 }
 

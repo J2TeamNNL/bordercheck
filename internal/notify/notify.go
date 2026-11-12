@@ -89,15 +89,15 @@ const (
 // When a problem shows signs of compromise, the notification says so first,
 // with what the signs are (never which item), and to stop and tell IT.
 func Compose(due []check.Result) Message {
-	title := "bordercheck: 1 problem on this computer"
+	title := "BorderCheck: 1 problem on this computer"
 	if len(due) != 1 {
-		title = fmt.Sprintf("bordercheck: %d problems on this computer", len(due))
+		title = fmt.Sprintf("BorderCheck: %d problems on this computer", len(due))
 	}
 	var lines []string
 	for _, r := range due {
 		for _, ind := range r.Compromise {
 			if len(lines) == 0 {
-				title = "bordercheck: this computer may be compromised"
+				title = "BorderCheck: this computer may be compromised"
 			}
 			if len(lines) < maxLines {
 				lines = append(lines, clean(r.ID)+": "+clip(clean(ind.What.English()), maxSummary))

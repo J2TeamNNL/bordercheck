@@ -77,7 +77,7 @@ func Load(dir string) ([]Entry, error) {
 		return nil, fmt.Errorf("%s is not valid: %w", FileName, err)
 	}
 	if f.Version != fileVersion {
-		return nil, fmt.Errorf("%s has version %d; this bordercheck reads version %d", FileName, f.Version, fileVersion)
+		return nil, fmt.Errorf("%s has version %d; this BorderCheck reads version %d", FileName, f.Version, fileVersion)
 	}
 	var out []Entry
 	for _, e := range f.Entries {

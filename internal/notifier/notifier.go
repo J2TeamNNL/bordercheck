@@ -105,7 +105,7 @@ const (
 )
 
 // ErrNotInstalled means there is no helper, or none recorded at install.
-var ErrNotInstalled = errors.New("bordercheck's notification app is not installed")
+var ErrNotInstalled = errors.New("BorderCheck's notification app is not installed")
 
 // Path is where the helper lives in the install folder dir.
 func Path(dir string) string { return filepath.Join(dir, AppName) }
@@ -220,22 +220,22 @@ type answer struct {
 // can give is an error, so a broken or tampered helper is treated as missing.
 func Parse(mode Mode, data []byte) (Status, error) {
 	if len(data) > MaxAnswer {
-		return "", fmt.Errorf("bordercheck's notification app wrote more than %d bytes", MaxAnswer)
+		return "", fmt.Errorf("BorderCheck's notification app wrote more than %d bytes", MaxAnswer)
 	}
 	if len(bytes.TrimSpace(data)) == 0 {
-		return "", errors.New("bordercheck's notification app gave no answer")
+		return "", errors.New("BorderCheck's notification app gave no answer")
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	var a answer
 	if err := dec.Decode(&a); err != nil {
-		return "", errors.New("bordercheck's notification app's answer is not valid JSON")
+		return "", errors.New("BorderCheck's notification app's answer is not valid JSON")
 	}
 	if dec.More() {
-		return "", errors.New("bordercheck's notification app wrote more than one answer")
+		return "", errors.New("BorderCheck's notification app wrote more than one answer")
 	}
 	if a.V != 1 {
-		return "", fmt.Errorf("bordercheck's notification app answered in format %d; this bordercheck reads 1", a.V)
+		return "", fmt.Errorf("BorderCheck's notification app answered in format %d; this BorderCheck reads 1", a.V)
 	}
 	switch s := Status(a.Status); {
 	case s == Denied || s == NotDetermined:
@@ -243,9 +243,9 @@ func Parse(mode Mode, data []byte) (Status, error) {
 	case s == Authorized && mode != ModePost, s == Posted && mode == ModePost:
 		return s, nil
 	case a.Status == "error" || a.Status == "invalid":
-		return "", fmt.Errorf("bordercheck's notification app: %s (%s)", a.Status, plain(a.Error, 200))
+		return "", fmt.Errorf("BorderCheck's notification app: %s (%s)", a.Status, plain(a.Error, 200))
 	}
-	return "", fmt.Errorf("bordercheck's notification app answered %.32q to %s", plain(a.Status, 32), mode)
+	return "", fmt.Errorf("BorderCheck's notification app answered %.32q to %s", plain(a.Status, 32), mode)
 }
 
 // Runner launches the helper app in mode, with stdin read from the file in
@@ -303,7 +303,7 @@ func Codesign(ctx context.Context, app, teamID string) (string, error) {
 	defer cancel()
 	if out, err := exec.CommandContext(ctx, "/usr/bin/codesign", "--verify", "--strict", "--deep",
 		"--test-requirement", "="+Requirement(teamID), app).CombinedOutput(); err != nil {
-		return "", fmt.Errorf("bordercheck's notification app is not signed by bordercheck's Developer ID: %s", firstLine(out))
+		return "", fmt.Errorf("BorderCheck's notification app is not signed by BorderCheck's Developer ID: %s", firstLine(out))
 	}
 	out, err := exec.CommandContext(ctx, "/usr/bin/codesign", "--display", "--verbose=2", app).CombinedOutput()
 	if err != nil {
@@ -522,7 +522,7 @@ func (h Helper) run(ctx context.Context, mode Mode, request []byte) (Status, err
 		return "", fmt.Errorf("%s is not a folder", app)
 	}
 	if d, err := Digest(app); err != nil || d != h.Digest {
-		return "", errors.New("bordercheck's notification app has changed since bordercheck installed it; not running it (run bordercheck notifications to reinstall it)")
+		return "", errors.New("BorderCheck's notification app has changed since BorderCheck installed it; not running it (run bordercheck notifications to reinstall it)")
 	}
 	if _, err := h.Verify(ctx, app, h.TeamID); err != nil {
 		return "", err
@@ -556,7 +556,7 @@ func (h Helper) run(ctx context.Context, mode Mode, request []byte) (Status, err
 	defer cancel()
 	if err := h.Run(rctx, app, mode, in, out); err != nil {
 		if rctx.Err() != nil {
-			return "", fmt.Errorf("bordercheck's notification app did not answer within %s", Timeout(mode))
+			return "", fmt.Errorf("BorderCheck's notification app did not answer within %s", Timeout(mode))
 		}
 		return "", err
 	}

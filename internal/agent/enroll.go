@@ -56,7 +56,7 @@ type Enrollment struct {
 const TokenFile = "token"
 
 // ErrRevoked is what the portal's 401 {"error": "revoked"} means.
-var ErrRevoked = errors.New("IT has revoked bordercheck on this machine; ask IT for a new invite, or run bordercheck uninstall")
+var ErrRevoked = errors.New("IT has revoked BorderCheck on this machine; ask IT for a new invite, or run bordercheck uninstall")
 
 // revokedRetry is how often a revoked install asks the portal again.
 const revokedRetry = 24 * time.Hour
@@ -118,7 +118,7 @@ func (b *bearer) allows(target string) error {
 func noRedirects(client *http.Client) *http.Client {
 	c := *client
 	c.CheckRedirect = func(*http.Request, []*http.Request) error {
-		return errors.New("the portal redirected; bordercheck does not follow redirects with its token")
+		return errors.New("the portal redirected; BorderCheck does not follow redirects with its token")
 	}
 	return &c
 }
@@ -250,7 +250,7 @@ func enroll(ctx context.Context, env Env, portal, code string) (enrollResponse, 
 	}
 	// The answer holds the token: never put it, or any of it, in an error.
 	if err := json.Unmarshal(data, &enr); err != nil {
-		return enr, fmt.Errorf("%s answered the enrollment with something bordercheck cannot read; your invite may have been used, so tell IT", host)
+		return enr, fmt.Errorf("%s answered the enrollment with something BorderCheck cannot read; your invite may have been used, so tell IT", host)
 	}
 	if err := enr.validate(portal); err != nil {
 		return enrollResponse{}, fmt.Errorf("%s enrolled this machine but its answer is unusable (%v); your invite has been used, so tell IT and ask for a new one", host, err)
@@ -291,7 +291,7 @@ func enrollError(host, status string, code int, kind, message string) error {
 	case kind == "revoked":
 		msg = "IT has cancelled this invite. Ask IT for a new one."
 	case kind == "bad_request":
-		msg = "The portal could not read this enrollment request. Make sure you have the latest bordercheck, or tell IT."
+		msg = "The portal could not read this enrollment request. Make sure you have the latest BorderCheck, or tell IT."
 	case code == http.StatusTooManyRequests:
 		msg = "Too many attempts. Wait a few minutes and run the same command again."
 	default:
@@ -386,10 +386,10 @@ func installEnrolled(ctx context.Context, env Env, o InstallOptions, cfg Config,
 		return unspent(fmt.Errorf("cannot write to %s: %w", env.Dir, err))
 	}
 	if err := services.check(); err != nil {
-		return unspent(fmt.Errorf("this machine cannot run bordercheck's hourly service: %w", err))
+		return unspent(fmt.Errorf("this machine cannot run BorderCheck's hourly service: %w", err))
 	}
 	if err := copySelf(bin); err != nil {
-		return unspent(fmt.Errorf("copying bordercheck to %s: %w", env.Dir, err))
+		return unspent(fmt.Errorf("copying BorderCheck to %s: %w", env.Dir, err))
 	}
 
 	var token string
@@ -487,7 +487,7 @@ func notifyRevoked(ctx context.Context, env Env, st *State, now time.Time, force
 	if st.RevokedNotified {
 		return
 	}
-	msg := notify.Message{Title: "bordercheck: IT has revoked this install",
+	msg := notify.Message{Title: "BorderCheck: IT has revoked this install",
 		Body: "This computer no longer reports to IT. Ask IT for a new invite, or run bordercheck uninstall."}
 	if force {
 		fmt.Fprintf(env.Out, "\n%s\n%s\n\n", msg.Title, indent(msg.Body))

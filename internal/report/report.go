@@ -176,7 +176,7 @@ func (r Report) WriteText(w io.Writer, color bool) {
 		}
 		return code + s + "\x1b[0m"
 	}
-	fmt.Fprintf(w, "%s %s · %s/%s · %s · policy: %s\n\n", paint("\x1b[1m", r.Tool), r.Version, r.Host.OS, r.Host.Arch, r.Host.Hostname, r.Policy)
+	fmt.Fprintf(w, "%s %s · %s/%s · %s · policy: %s\n\n", paint("\x1b[1m", "BorderCheck"), r.Version, r.Host.OS, r.Host.Arch, r.Host.Hostname, r.Policy)
 	if r.Compromised {
 		fmt.Fprintln(w, paint("\x1b[1;31m", "Signs that this computer may be compromised:"))
 		for _, l := range r.CompromiseLines() {
@@ -233,7 +233,7 @@ func (r Report) WriteText(w io.Writer, color bool) {
 		}
 	}
 	fmt.Fprintln(w, strings.Join(parts, " · "))
-	fmt.Fprintln(w, paint("\x1b[90m", r.Tool+" "+r.Version+" · "+Credit))
+	fmt.Fprintln(w, paint("\x1b[90m", "BorderCheck "+r.Version+" · "+Credit))
 }
 
 // IgnoredLine shows one ignored finding: file, what it is, the reason and since when.

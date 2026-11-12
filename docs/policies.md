@@ -5,7 +5,7 @@ installed copies update and when people are notified. This page lists every fiel
 
 ## Where the policy comes from
 
-| How bordercheck runs | Policy |
+| How BorderCheck runs | Policy |
 |---|---|
 | A plain run | `-policy <file>`, else `$BORDERCHECK_POLICY`, else `policies.json` beside the binary (or beside the target of a symlink to it, as with Homebrew), else the built-in one |
 | Installed from a `policies.json` URL | that file, refreshed from `update.policy_url` every hour |
@@ -54,13 +54,13 @@ Used only by an installed copy. A plain `bordercheck` never sends anything.
 | `url` | `""` | HTTPS endpoint that receives a `POST` of the JSON report (`http://localhost` and `http://127.0.0.1` are allowed for testing). `bordercheck install` refuses a policy without one. With an invite link the portal fills it in. |
 | `headers` | `{}` | Extra request headers, e.g. `{"Authorization": "Bearer …"}` for your own endpoint: a token that can only submit reports. Not used with invite links: an enrolled install sends its own token, and the portal strips any `Authorization` header from a role. |
 | `interval` | `"24h"` | Go duration between reports, at least `15m`. The service wakes hourly and sends when this much time has passed since the last report that got through, so a failed send retries the next hour. |
-| `check_interval` | `""` | Check the machine more often than it reports, e.g. `"24h"` with `"interval": "168h"`: the person at the machine is told about a new problem within a day, IT gets one report a week. At least `15m`, not longer than `interval`. `""` checks only when a report is due. Needs bordercheck v0.3.1 or later: an older one rejects a policy with this field. |
+| `check_interval` | `""` | Check the machine more often than it reports, e.g. `"24h"` with `"interval": "168h"`: the person at the machine is told about a new problem within a day, IT gets one report a week. At least `15m`, not longer than `interval`. `""` checks only when a report is due. Needs BorderCheck v0.3.1 or later: an older one rejects a policy with this field. |
 | `include_evidence` | `false` | Also send evidence: file paths, ports, variable names, container names. Off, the report carries only status, severity, summary and fix. |
 | `email_domains` | `[]` | With a static `policies.json`, the email typed at install must be in one of these domains. Empty = any. |
-| `include_ips` | `false` | Also send `host.ips`: the addresses of the machine's own network interfaces that are up (IPv4 and IPv6, without loopback and link-local; at most 16), read locally. bordercheck never asks a "what is my IP" service. |
+| `include_ips` | `false` | Also send `host.ips`: the addresses of the machine's own network interfaces that are up (IPv4 and IPv6, without loopback and link-local; at most 16), read locally. BorderCheck never asks a "what is my IP" service. |
 | `include_location` | `false` | Meant to send a device position. **It has no effect today**: no OS gives one without a permission prompt, admin rights or a lookup with a third party, so no location is sent. See [Location](#location). |
-| `fix_prompt` | `true` | Allow `bordercheck fix`, which prints this machine's findings with rules an AI coding assistant can follow to fix them together with its user, and let the portal's report page offer the one-line prompt that starts it. `false` turns both off. Needs bordercheck v0.5.0 or later on every machine of the role (older ones reject the unknown field). |
-| `compromise_alert` | `true` | Mark a report **compromised** when a finding is a sign that hostile code is already on the machine (see [Signs of compromise](#signs-of-compromise)), and send it as soon as a check finds a new sign, or the signs clear, whatever `interval` says. `false`: no mark and no early report; those findings report as ordinary fails. Needs a bordercheck with this feature on every machine of the role: an older one rejects the unknown field and keeps its last good policy. |
+| `fix_prompt` | `true` | Allow `bordercheck fix`, which prints this machine's findings with rules an AI coding assistant can follow to fix them together with its user, and let the portal's report page offer the one-line prompt that starts it. `false` turns both off. Needs BorderCheck v0.5.0 or later on every machine of the role (older ones reject the unknown field). |
+| `compromise_alert` | `true` | Mark a report **compromised** when a finding is a sign that hostile code is already on the machine (see [Signs of compromise](#signs-of-compromise)), and send it as soon as a check finds a new sign, or the signs clear, whatever `interval` says. `false`: no mark and no early report; those findings report as ordinary fails. Needs a BorderCheck with this feature on every machine of the role: an older one rejects the unknown field and keeps its last good policy. |
 
 ### Signs of compromise
 
@@ -73,7 +73,7 @@ already happened. Those findings carry a **sign of compromise**, and only these,
 | `extensions` | An installed extension (even disabled) matches the policy's `block` list | IT has declared it malicious or forbidden. An extension from outside a store, or one not on the `allow` list, is an ordinary finding. |
 | `cracked-software` | A crack tool is installed (KMSpico, AutoKMS), or Windows or Office activates against a KMS server on the machine itself (a KMS emulator) | A program from the crack scene that runs with the system's rights, and the usual carrier of bundled malware. A hosts-file line that blocks Adobe's or Autodesk's licence servers is an ordinary finding: it runs nothing. |
 
-This is a small set of strong signs that bordercheck already sees, not malware detection: bordercheck is not an
+This is a small set of strong signs that BorderCheck already sees, not malware detection: BorderCheck is not an
 antivirus, and a machine without these signs is not proven clean. A sign counts only on a result that fails: a
 waived result, a disabled check and a finding the person ignored with `bordercheck ignore` (which these checks do
 not offer) never mark a report.
@@ -102,7 +102,7 @@ What a report contains, and what the receiver sees regardless of these switches,
 ### Location
 
 `report.include_location` would send a position only where the OS can supply one without a prompt, admin rights
-or bordercheck contacting a third party. None can:
+or BorderCheck contacting a third party. None can:
 
 - macOS: Core Location needs an app bundle with a usage description and a Location Services prompt; a bare
   command-line binary run by launchd can't use it.
@@ -139,7 +139,7 @@ OS: [the agent guide](install.md#notifications).
 | `statuses` | `["fail"]` | Which results notify: `"fail"` and/or `"warn"`. |
 | `severities` | `["high", "medium"]` | And of which severity (`"low"`, `"medium"`, `"high"`). A result without a severity counts as medium. |
 | `remind_every` | `"24h"` | Announce a problem that is still there again after this long; `"0"` = never; otherwise at least `1h`. |
-| `open_report` | `true` | When a notification announces a high-severity problem for the first time and the receiver returned a link to the machine's report page, open it in the browser by itself. Reminders of the same problem do not open it again. Not needed, and so not done, on a Mac where bordercheck's own notifications are allowed: there every notification opens the page when clicked ([details](install.md#report-page)). Windows, Linux and Macs still on Script Editor notifications are unchanged. |
+| `open_report` | `true` | When a notification announces a high-severity problem for the first time and the receiver returned a link to the machine's report page, open it in the browser by itself. Reminders of the same problem do not open it again. Not needed, and so not done, on a Mac where BorderCheck's own notifications are allowed: there every notification opens the page when clicked ([details](install.md#report-page)). Windows, Linux and Macs still on Script Editor notifications are unchanged. |
 
 With `enabled` true, `statuses` and `severities` must not be empty; set `enabled` to `false` to turn
 notifications off.
@@ -158,20 +158,20 @@ A waiver exempts one machine from one check for a while, without loosening the r
 | Field | |
 |---|---|
 | `check` | Required. A check ID (`bordercheck -list`). |
-| `email`, `install_id` | Which machine; at least one. `email` is the one bordercheck was installed with (or that IT set in the invite). `install_id` is in the machine's reports and in `bordercheck status`. A portal adds waivers keyed by `install_id` for enrolled machines. |
+| `email`, `install_id` | Which machine; at least one. `email` is the one BorderCheck was installed with (or that IT set in the invite). `install_id` is in the machine's reports and in `bordercheck status`. A portal adds waivers keyed by `install_id` for enrolled machines. |
 | `hostname` | Optional. Narrows the waiver to one of that person's machines: the report's `host.hostname`, ignoring case and a trailing `.local`. Never enough alone, since people set their own hostname. |
 | `until` | Required, `YYYY-MM-DD`: the last day it applies, by the machine's local date. At most a year ahead; a waiver without an end is rejected. |
 | `reason` | Required. Shown to the person and sent in the report. |
 
 Every field given must match. While a waiver applies, a `fail` or `warn` from that check reports as `waived`:
 it keeps its severity, summary and fix, gains `"waived": {"until": "2026-12-01", "reason": "…"}` in the JSON,
-counts under `counts.waived`, does not make bordercheck exit `1` and does not notify. A pass stays a pass. If
+counts under `counts.waived`, does not make BorderCheck exit `1` and does not notify. A pass stays a pass. If
 several waivers match, the one ending last wins. The text report shows waived results as `WAIV`, says when a
 waiver ends within 14 days, and says when a waiver for a failing check has ended; an ended waiver changes
 nothing else.
 
 The installed service matches on its email, install ID and hostname. A plain `bordercheck` run uses the same
-identity when this user has installed bordercheck (it reads `config.json` in the install folder and writes
+identity when this user has installed BorderCheck (it reads `config.json` in the install folder and writes
 nothing), so what the person sees matches what IT sees. Without an install there is no email or install ID, so
 no waiver applies.
 
@@ -215,7 +215,7 @@ notifications. When the firewall itself is off, the result asks only to turn it 
 
 macOS: Application Firewall and stealth mode. Windows: Windows Firewall on for every profile. Linux: ufw or
 firewalld on, or nftables/iptables rules. Without root Linux shows only firewall configuration, not live
-rules: bordercheck passes ufw when `/etc/ufw/ufw.conf` enables it and firewalld when its service runs (and warns
+rules: BorderCheck passes ufw when `/etc/ufw/ufw.conf` enables it and firewalld when its service runs (and warns
 about zones such as FedoraWorkstation that open ports 1025–65535). When only an nftables or iptables service
 loads the rules, a plain run says it cannot tell and skips; `sudo bordercheck -only firewall` reads the rules.
 
@@ -262,7 +262,7 @@ reachable. Tailscale Funnel and Serve are judged by `tunnels`.
 |---|---|---|
 | `allow` | `[]` | Tools that may accept incoming connections: `tailscale`, `zerotier`, `netbird`, `wireguard`, `nebula`, `hamachi`. They are listed as allowed instead. |
 
-`mesh-vpn` and its fields need a client that knows them (bordercheck v0.5.0 or later): an older one rejects a policy that sets
+`mesh-vpn` and its fields need a client that knows them (BorderCheck v0.5.0 or later): an older one rejects a policy that sets
 them, so roll the client out to every machine of a role before adding `mesh-vpn` to its policy.
 
 **`checks.tailscale`** (clients up to v0.4 had a separate `tailscale` check) is still accepted and applies to
@@ -299,7 +299,7 @@ private key, matches a `high` extra pattern, or is marked production. Values are
 | `walk_depth` | `5` | How many folders below home are searched for `.env` and key files, 0–20. Files and folders kept only in iCloud Drive or another cloud provider (placeholders, not on this disk) are not read, since reading one downloads it; apps, media libraries and disk-image bundles are skipped. |
 | `extra_patterns` | `[]` | Your own token formats: `{"kind": "Sample token", "regex": "\\bsample_[A-Za-z0-9]{32}\\b", "high": true, "show_tail": true}`. `kind` and a valid Go regular expression are required; `high` makes a match fail; `show_tail` is safe only for long random tokens. They are tried before the built-in rules. |
 | `locations` | all `true` | Credential stores read format by format; each switches off alone. |
-| `user_ignore` | `true` | Let the person at the machine mark findings as not sensitive with `bordercheck ignore <path> [-name VAR] -reason "…"` ([how](install.md#secrets-that-are-not-sensitive)); `ai-agents` and `ssh-keys` have the same switch. Ignored findings stop counting toward this check, but every report lists them with the reason in the result's `user_ignored`, also when `include_evidence` is off; the portal shows them on the machine's page. A finding marked `[production]` can be ignored too, and is listed for IT as production. `false`: `bordercheck ignore` refuses and existing entries are not applied (the summary says so). Needs bordercheck v0.5.0 or later on every machine of the role when set (older ones reject the unknown field); leaving it out keeps the default on new clients and works with old ones. |
+| `user_ignore` | `true` | Let the person at the machine mark findings as not sensitive with `bordercheck ignore <path> [-name VAR] -reason "…"` ([how](install.md#secrets-that-are-not-sensitive)); `ai-agents` and `ssh-keys` have the same switch. Ignored findings stop counting toward this check, but every report lists them with the reason in the result's `user_ignored`, also when `include_evidence` is off; the portal shows them on the machine's page. A finding marked `[production]` can be ignored too, and is listed for IT as production. `false`: `bordercheck ignore` refuses and existing entries are not applied (the summary says so). Needs BorderCheck v0.5.0 or later on every machine of the role when set (older ones reject the unknown field); leaving it out keeps the default on new clients and works with old ones. |
 | `sample_rules` | `["git-tracked", "sdk", "sample-dir"]` | Which rules set a finding aside as a likely sample key ([what each does](install.md#sample-keys)): `git-tracked` (tracked by a git repository below the home folder and unchanged from what its index records; read without running git), `sdk` (files an SDK ships to every user, such as Tizen Studio's certificates), `sample-dir` (a folder named like `demo`, `samples`, `examples`, `fixtures`, `testdata`, `mocks`). A likely sample stops counting toward the check, and every report lists it in the result's `likely_samples` (path, name or kind, rule; never a value), also when `include_evidence` is off; the portal shows it on the machine's page. `[]` turns this off; an unknown rule is an error. Never set aside: findings marked `[production]`, files inside `.git`, and by `sample-dir` alone a live-looking provider token. Caveat: a real secret committed to a repository also matches `git-tracked`; that is why the list goes to IT and production-marked findings are excluded. Needs a client that knows the field on every machine of the role when set (older ones reject the unknown field); leaving it out keeps the default on new clients and works with old ones. |
 
 `locations`:
@@ -393,7 +393,7 @@ Desktop / Windows App) are not judged. Not recognised yet: Parsec, LogMeIn, NoMa
 Jump Desktop Connect. Helpers registered through macOS's Background Task Management (`SMAppService`) are only
 seen while they run. None of this counts as a sign of compromise: it is an open door.
 
-`third_party` and the app names in `allow` need a client that knows them (bordercheck v0.5.0 or later); an older client
+`third_party` and the app names in `allow` need a client that knows them (BorderCheck v0.5.0 or later); an older client
 rejects a policy that sets them, so update every machine of a role first.
 
 ### ssh-keys
@@ -603,7 +603,7 @@ tool when the certificate's name matches.
 | macOS | `security dump-trust-settings` for the user and admin domains (Apple's roots are not listed), `security find-certificate` for the fingerprint and expiry, `scutil --proxy`. None of these shows a dialog. Certificates trusted for one host name only (for example a remote desktop's) are counted in a note, not flagged. |
 | Windows | The current user's own Root store (`HKCU\Software\Microsoft\SystemCertificates\Root`; Windows asks before a root is added there), and `ProxyEnable`, `ProxyServer`, `AutoConfigURL` under Internet Settings |
 | Linux | `/usr/local/share/ca-certificates`, `/etc/pki/ca-trust/source/anchors`, `/etc/ca-certificates/trust-source/anchors`; GNOME's proxy settings (`gsettings`). Browsers' own NSS databases are not read. |
-| Every OS | `http_proxy`, `https_proxy`, `all_proxy` (either case) in bordercheck's environment |
+| Every OS | `http_proxy`, `https_proxy`, `all_proxy` (either case) in BorderCheck's environment |
 
 A proxy on the machine itself (`127.0.0.1`, `localhost`) is usually a local tool such as a VPN client and is only
 noted. Evidence shows the certificate's common name, SHA-256 fingerprint and expiry, and the proxy's host and port
@@ -648,7 +648,7 @@ flagged: Go removed that flag in 1.17.
 
 What starts at login or on a schedule, as an inventory with a light touch: not an antivirus. Most items are only
 counted ("28 items start at login or on a schedule; nothing unusual"). Commands are judged but never shown, since
-they can hold tokens; evidence shows the source, file, label and program path. bordercheck's own service is never
+they can hold tokens; evidence shows the source, file, label and program path. BorderCheck's own service is never
 counted or flagged.
 
 | OS | Read |

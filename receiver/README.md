@@ -1,15 +1,15 @@
-# bordercheck receiver
+# BorderCheck receiver
 
-**The other end of `report.url`: a Cloudflare Worker that stores bordercheck reports, shows them to IT, and
+**The other end of `report.url`: a Cloudflare Worker that stores BorderCheck reports, shows them to IT, and
 alerts when something goes wrong.**
 
-- `POST /report` takes the report each enrolled bordercheck sends, authenticated with that machine's own token.
+- `POST /report` takes the report each enrolled BorderCheck sends, authenticated with that machine's own token.
 - `/admin` is a dashboard: every machine with its email, hostname, OS, version, last report and fail/warn
   counts; a filter for non-compliant and silent machines; each machine's failing checks with summary, fix,
   evidence and since when, and the findings the person marked as not sensitive with their reasons; and which
   checks fail most across the organisation.
 - An hourly cron posts alerts to Discord, Slack or any webhook: a machine **newly** fails a high-severity
-  check, a machine has been **silent** for more than `SILENT_DAYS` (someone who uninstalls bordercheck
+  check, a machine has been **silent** for more than `SILENT_DAYS` (someone who uninstalls BorderCheck
   otherwise just disappears), and optionally a digest.
 - **Enrollment portal**: give each person an invite, each machine gets its own token and the policy of its
   role (Dev, Support, Sales…), with per-machine waivers. See [Enrollment](#enrollment).
@@ -19,7 +19,7 @@ alerts when something goes wrong.**
   export the fleet, check posture from CI, with an OpenAPI document ([REST API](#rest-api-script-the-fleet)).
 - Each report records the **public IP and Cloudflare's IP-based location**, and the machine's own local
   addresses and position if it sends them. This is personal data: read [What is stored](#what-is-stored).
-- Each accepted report gets a **login-free link** to that machine's own results, which bordercheck can open for
+- Each accepted report gets a **login-free link** to that machine's own results, which BorderCheck can open for
   the person at the machine ([Report links](#report-links)).
 
 Storage is one D1 database. No framework, no build step beyond what Wrangler does.
@@ -66,7 +66,7 @@ no shared report token and no shared `policies.json` endpoint.
    command can't be shown again: **Re-issue** the invite (the old code stops working). Invites are listed as
    pending, used, expired or revoked, so you can see who hasn't installed. `INSTALL_SH_URL` /
    `INSTALL_PS1_URL` point the commands at your own copy of the scripts.
-3. The person runs the command. bordercheck exchanges the code for a token for **that machine**; the code then
+3. The person runs the command. BorderCheck exchanges the code for a token for **that machine**; the code then
    stops working. Opening the link in a browser shows the same instructions (and doesn't use it up).
 4. **Machines** (→ a machine's page): role, the invite and email it came from, **Revoke** (its token stops
    working at once; history stays; **Restore** undoes it), **Change role**, and **Waivers**: pick a check, an end
@@ -75,20 +75,20 @@ no shared report token and no shared `policies.json` endpoint.
    when, what) and every enrollment; **MCP only** filters to what a model did.
 
 What the role check catches and doesn't: it is a JSON object; top-level fields, and those in `report`, `update`,
-`notify` and `waivers`, are ones bordercheck knows; check names exist; `enabled`/`on_problem` have the right
-types; durations parse and meet bordercheck's minimums; role waivers have a check, email or install_id, a reason
+`notify` and `waivers`, are ones BorderCheck knows; check names exist; `enabled`/`on_problem` have the right
+types; durations parse and meet BorderCheck's minimums; role waivers have a check, email or install_id, a reason
 and an end within a year; no report token in `report.headers`. It does not check the settings inside each check
-(globs, regexes, versions, lists). bordercheck validates the whole file and keeps its last good policy if one is
+(globs, regexes, versions, lists). BorderCheck validates the whole file and keeps its last good policy if one is
 invalid, so try a role locally first: `bordercheck -policy role.json -print-policy`.
 
-Waivable checks are the ones bordercheck's policy knows (`firewall`, `disk-encryption`, `listeners`,
+Waivable checks are the ones BorderCheck's policy knows (`firewall`, `disk-encryption`, `listeners`,
 `mesh-vpn`, `tailscale` (its former name, still accepted), `docker`, `secrets`, `ssh-keys`, `tunnels`, `ai-agents`, `os-updates`, `screen-lock`,
-`remote-access`). An unknown check ID would make bordercheck reject the whole policy, so the portal offers only
-these; a check added to bordercheck later needs this list updated (`POLICY_CHECKS` in `src/roles.ts`).
+`remote-access`). An unknown check ID would make BorderCheck reject the whole policy, so the portal offers only
+these; a check added to BorderCheck later needs this list updated (`POLICY_CHECKS` in `src/roles.ts`).
 
 ### Wire contract
 
-What bordercheck and this receiver exchange. `<host>` is the deployment's origin.
+What BorderCheck and this receiver exchange. `<host>` is the deployment's origin.
 
 **Invite link**: `https://<host>/i/<code>`, `<code>` = 32 random bytes, base64url without padding (43
 characters). `GET` returns an HTML page with the install commands; it never consumes the code.
@@ -130,7 +130,7 @@ token, and `401 {"error": "unauthorized"}` for anything that isn't an enrolled m
 report answers `{"ok": true, "fail": n, "warn": n,
 "report_url": "https://<host>/r/<id>"}` (`report_url` only while `REPORT_LINKS` is on).
 
-Optional report fields, accepted from any bordercheck: `host.ips` (array of the machine's interface addresses;
+Optional report fields, accepted from any BorderCheck: `host.ips` (array of the machine's interface addresses;
 invalid entries are dropped, at most 32 kept) and `location` (`{"lat", "lon", "accuracy_m", "source",
 "time"}`; dropped whole if lat/lon are missing or out of range).
 
@@ -164,11 +164,11 @@ invalid entries are dropped, at most 32 kept) and `location` (`{"lat", "lon", "a
 
 Each accepted report's response carries `report_url`, `https://<host>/r/<id>`: a page, with no login, showing
 **that machine's latest results** for the person at it: what fails or warns, severity, summary and fix,
-waived items and their end date, when it was checked, and its email and hostname. bordercheck can open it when
+waived items and their end date, when it was checked, and its email and hostname. BorderCheck can open it when
 it announces a new high-severity problem.
 
 It never shows evidence (file paths, port numbers, container names: a map of the machine for whoever holds the
-link; the person at the machine sees them by running bordercheck), other machines, admin controls, the audit
+link; the person at the machine sees them by running BorderCheck), other machines, admin controls, the audit
 trail, IPs or locations. Of the findings the person marked as not sensitive (`bordercheck ignore`) it shows only
 how many; the files and reasons are on the machine's page in `/admin`. Pages are script-free, `no-store`, `noindex`, `no-referrer`, and unknown, expired and
 revoked links all get the same 404.
@@ -317,7 +317,7 @@ dashboard shows them in the admin's language and MCP in English.
 ### Check summaries and fixes
 
 The built-in checks' titles are translated by check ID (`checkTitle.*` in the catalogues). Their summaries
-and fixes are translated by message key: bordercheck 0.4+ sends, next to each result's English `summary` and
+and fixes are translated by message key: BorderCheck 0.4+ sends, next to each result's English `summary` and
 `fix`, the same text as `summary_parts` / `fix_parts` (a list of `{"key", "params"}`, see
 [docs/install.md](../docs/install.md#what-is-sent)). `src/checktext.ts` renders them:
 
@@ -471,7 +471,7 @@ every check" must not work. What the server does about it:
 - Results are structured JSON, never prose assembled from report text. Every machine-supplied string sits in
   an object named `untrusted`, length-capped, with control and invisible formatting characters (zero-width,
   bidi overrides) removed; every read result and the server instructions say those fields are data, not
-  instructions. Check IDs bordercheck doesn't know, unknown statuses and severities go there too. Tool
+  instructions. Check IDs BorderCheck doesn't know, unknown statuses and severities go there too. Tool
   descriptions and error messages never contain report text.
 - Evidence is only in `get_machine`, and only with `include_evidence`; so are the findings the person marked as
   not sensitive (`user_ignored`, under `untrusted`), while `user_ignored_count` is always there, and the secrets set
@@ -481,7 +481,7 @@ every check" must not work. What the server does about it:
   stored).
 - Write tools take explicit ids (install_id, role_id, invite_id, waiver_id); nothing matches "the machine
   that…" on the server. Revoke, waiver and role changes act on one machine per call.
-- Guard rails that don't depend on the model behaving: waivers only for checks bordercheck knows and at most
+- Guard rails that don't depend on the model behaving: waivers only for checks BorderCheck knows and at most
   a year ahead (as in the dashboard); 50 invites per call. Through MCP a role can't set or change
   `report.url`, `report.headers`, `update.policy_url`, `update.repo` or `update.public_key` (a role pointing
   updates at another repo and key would run someone else's binary on every laptop), can't carry role-level
@@ -684,7 +684,7 @@ them; after 7 days of failures they are dropped. Values from reports appear insi
 messages are sent with mentions disabled, so a hostname like `@everyone` or a markdown link can't ping or
 phish your channel. The **Alerts** page lists recent alerts and their delivery, webhook or not.
 
-A **compromised** report comes from a bordercheck that found a sign that hostile code is already on the machine
+A **compromised** report comes from a BorderCheck that found a sign that hostile code is already on the machine
 (a startup item that downloads and runs code, an extension on the block list, a crack tool or KMS emulator: see
 [docs/policies.md](../docs/policies.md#signs-of-compromise)); it is a small set of strong signs, not malware
 detection. Only a literal `"compromised": true` counts, so a report from an older client never does. The

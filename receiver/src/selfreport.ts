@@ -74,7 +74,7 @@ function fixAllowed(rolePolicy: string): boolean {
 
 function notFound(L: I18n): Response {
   return page(
-    layout(L, L.s("common.notFound"), null, html`<div class="center-card"><span class="mark lg">${MARK}</span><p class="eyebrow">bordercheck</p><h1>${L.t("rep.badTitle")}</h1>
+    layout(L, L.s("common.notFound"), null, html`<div class="center-card"><span class="mark lg">${MARK}</span><p class="eyebrow">BorderCheck</p><h1>${L.t("rep.badTitle")}</h1>
 <p class="lead">${L.t("rep.badLead")}</p></div>`, undefined, SELF),
     404,
     CAPABILITY_HEADERS,
@@ -142,7 +142,7 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   const body = html`<div class="status-mark ${tone}">${problems.length === 0 ? GLYPH_OK : GLYPH_ATTENTION}</div>
 <p class="eyebrow">${L.t("rep.eyebrow")}</p>${compBanner}<h1>${headline}</h1>
 <p class="lead">${L.t("rep.for", { email: row.email || L.s("common.noEmail"), host: row.hostname || L.s("common.noHostname"), when: L.when(row.last_seen) })}${L.lang === "zh" ? "" : " "}${problems.length === 0 ? L.t("rep.okText") : L.t("rep.fixText")}</p>
-<div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}${userIgnored ? html`<span class="chip">${L.t("rep.userIgnored", { n: userIgnored })}</span>` : ""}${likelySamples ? html`<span class="chip">${L.t("rep.likelySamples", { n: likelySamples })}</span>` : ""}${version ? html`<span class="chip">bordercheck <b>${version}</b></span>` : ""}</div>
+<div class="chips"><span class="chip">${L.t("rep.passed", { n: okCount })}</span>${waived.length ? html`<span class="chip">${L.t("rep.exempted", { n: waived.length })}</span>` : ""}${userIgnored ? html`<span class="chip">${L.t("rep.userIgnored", { n: userIgnored })}</span>` : ""}${likelySamples ? html`<span class="chip">${L.t("rep.likelySamples", { n: likelySamples })}</span>` : ""}${version ? html`<span class="chip">BorderCheck <b>${version}</b></span>` : ""}</div>
 ${fixPrompt}
 ${problems.length === 0
     ? ""

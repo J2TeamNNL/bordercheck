@@ -440,7 +440,7 @@ ${note(L.t("machine.noReportYet", { ago: L.ago(e.enrolled_at, now) }))}
 
   const body = html`<div class="hero">${crumb}<h1>${m.hostname || L.s("common.noHostname")}</h1>
 <p class="lead">${m.email || L.s("common.noEmail")}</p>
-<div class="chips">${state(L, m, silentBefore)}${enrollment?.revoked_at ? pill("s-fail", L.t("state.revoked")) : ""}<span class="chip">${m.os}/${m.arch}</span><span class="chip">bordercheck <b>${m.version}</b></span><span class="chip" title="${L.when(m.last_seen)}">${L.t("machine.reported", { ago: L.ago(m.last_seen, now) })}</span></div></div>
+<div class="chips">${state(L, m, silentBefore)}${enrollment?.revoked_at ? pill("s-fail", L.t("state.revoked")) : ""}<span class="chip">${m.os}/${m.arch}</span><span class="chip">BorderCheck <b>${m.version}</b></span><span class="chip" title="${L.when(m.last_seen)}">${L.t("machine.reported", { ago: L.ago(m.last_seen, now) })}</span></div></div>
 ${comp}
 ${silent ? note(L.t("machine.silentNote", { age: L.age(m.last_seen, now) }), "s-warn") : ""}
 ${unreadable ? note(L.t("machine.unreadable"), "s-fail") : ""}
@@ -455,7 +455,7 @@ ${fine.length
       )}</div>`
     : html`<div class="panel"><p class="muted">${L.t("common.none")}</p></div>`}
 <h2>${L.t("machine.details")}</h2>
-<div class="panel"><dl class="facts"><div><dt>${L.t("machine.os")}</dt><dd>${m.os}/${m.arch}</dd></div><div><dt>bordercheck</dt><dd>${m.version}</dd></div><div><dt>${L.t("machine.policy")}</dt><dd>${m.policy}</dd></div>
+<div class="panel"><dl class="facts"><div><dt>${L.t("machine.os")}</dt><dd>${m.os}/${m.arch}</dd></div><div><dt>BorderCheck</dt><dd>${m.version}</dd></div><div><dt>${L.t("machine.policy")}</dt><dd>${m.policy}</dd></div>
 <div><dt>${L.t("machine.lastReport")}</dt><dd>${L.when(m.last_seen)}<br><span class="muted small">${L.t("machine.clock", { ago: L.ago(m.last_seen, now), when: L.when(m.report_time) || L.s("common.nothing") })}</span></dd></div>
 <div><dt>${L.t("machine.firstSeen")}</dt><dd>${L.when(m.first_seen)}</dd></div><div><dt>${L.t("machine.installId")}</dt><dd><code>${m.install_id}</code></dd></div></dl></div>
 <h2>${L.t("machine.history")}</h2>

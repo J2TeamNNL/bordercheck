@@ -503,10 +503,10 @@ export function layout(L: I18n, title: string, who: string | null, body: Html, a
   return html`<html lang="${L.htmlLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark"><meta name="theme-color" content="#000000">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="theme-color" content="#000000">
-<title>${title} · bordercheck</title><style>${new Html(STYLE)}</style></head><body class="${who ? "admin" : "public"}">
+<title>${title} · BorderCheck</title><style>${new Html(STYLE)}</style></head><body class="${who ? "admin" : "public"}">
 <header class="top">${
     who
-      ? html`<a class="brand" href="/admin"><span class="mark">${MARK}</span>bordercheck</a><nav class="nav" aria-label="${L.s("nav.sections")}">${NAV.filter(([item]) => (item !== "Passkeys" && item !== "Admins") || sessionViewer(who, L)).map(
+      ? html`<a class="brand" href="/admin"><span class="mark">${MARK}</span>BorderCheck</a><nav class="nav" aria-label="${L.s("nav.sections")}">${NAV.filter(([item]) => (item !== "Passkeys" && item !== "Admins") || sessionViewer(who, L)).map(
           ([item, href, key]) => html`<a href="${href}"${item === active ? html` class="on" aria-current="page"` : ""}>${L.t(key)}</a>`,
         )}</nav>
 <div class="who">${langs}<span class="id">${who}</span>${
@@ -514,7 +514,7 @@ export function layout(L: I18n, title: string, who: string | null, body: Html, a
             ? html`<form method="post" action="/admin/logout"><button class="sm ghost">${L.t("nav.signOut")}</button></form>`
             : ""
         }</div>`
-      : html`<span class="brand"><span class="mark">${MARK}</span>bordercheck</span>${langs}`
+      : html`<span class="brand"><span class="mark">${MARK}</span>BorderCheck</span>${langs}`
   }</header>
 <main>${body}</main><footer class="credit">© Phil Trinh - SENPRINTS</footer>${
     opts.copy ? html`<span id="copy-status" class="sr-only" aria-live="polite"></span><script>${new Html(COPY_SCRIPT)}</script>` : ""

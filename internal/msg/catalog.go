@@ -64,7 +64,7 @@ var Catalog = map[string]Entry{
 	"firewall.linux.noDrop":          s("No firewall drops incoming connections: no nftables or iptables input chain defaults to drop."),
 	"firewall.linux.fix": s("Ubuntu/Debian: [code]sudo ufw enable[/code] (it blocks incoming connections and allows outgoing). " +
 		"Fedora/RHEL/openSUSE: [code]sudo systemctl enable --now firewalld[/code]."),
-	"firewall.linux.rootOnly": s("The {services} service loads firewall rules, but they can only be read as root, so bordercheck " +
+	"firewall.linux.rootOnly": s("The {services} service loads firewall rules, but they can only be read as root, so BorderCheck " +
 		"cannot tell whether they block incoming connections. Run [code]sudo bordercheck -only firewall[/code] to check them."),
 	"firewall.linux.unknown": s("Could not tell without root: there is no ufw configuration and systemd did not say which " +
 		"firewall services run. Run [code]sudo bordercheck -only firewall[/code] to check the rules."),
@@ -258,7 +258,7 @@ var Catalog = map[string]Entry{
 	"updates.fix.generic":        s("Install the latest updates with your distribution's package manager, and restart."),
 
 	// ---- screen-lock ----
-	"screenlock.noDesktop":       s("No desktop whose screen lock bordercheck can read (GNOME and KDE Plasma are supported)."),
+	"screenlock.noDesktop":       s("No desktop whose screen lock BorderCheck can read (GNOME and KDE Plasma are supported)."),
 	"screenlock.unknown":         s("Could not tell whether a password is needed after sleep or when the screen locks."),
 	"screenlock.passwordUnknown": s("Could not tell whether a password is needed after sleep."),
 	"screenlock.noPassword":      s("No password is needed to get back in after sleep or the screen saver."),

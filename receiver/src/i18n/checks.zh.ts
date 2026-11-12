@@ -53,7 +53,7 @@ export const checksZh: CheckCatalog = {
   "firewall.linux.fix":
     "Ubuntu/Debian：[code]sudo ufw enable[/code]（阻止传入连接，允许传出连接）。Fedora/RHEL/openSUSE：[code]sudo systemctl enable --now firewalld[/code]。",
   "firewall.linux.rootOnly":
-    "{services} 服务会加载防火墙规则，但这些规则只有 root 才能读取，因此 bordercheck 无法判断它们是否阻止传入连接。运行 [code]sudo bordercheck -only firewall[/code] 进行检查。",
+    "{services} 服务会加载防火墙规则，但这些规则只有 root 才能读取，因此 BorderCheck 无法判断它们是否阻止传入连接。运行 [code]sudo bordercheck -only firewall[/code] 进行检查。",
   "firewall.linux.unknown":
     "没有 root 权限无法判断：没有 ufw 配置，systemd 也未说明正在运行哪些防火墙服务。运行 [code]sudo bordercheck -only firewall[/code] 检查规则。",
   "firewall.linux.noneUfwOff":
@@ -216,7 +216,7 @@ export const checksZh: CheckCatalog = {
   "updates.fix.arch.pending": "[code]sudo pacman -Syu[/code]",
   "updates.fix.generic": "使用发行版的包管理器安装最新更新，然后重启。",
 
-  "screenlock.noDesktop": "没有 bordercheck 能读取锁屏设置的桌面环境（支持 GNOME 和 KDE Plasma）。",
+  "screenlock.noDesktop": "没有 BorderCheck 能读取锁屏设置的桌面环境（支持 GNOME 和 KDE Plasma）。",
   "screenlock.unknown": "无法判断睡眠后或锁屏时是否需要密码。",
   "screenlock.passwordUnknown": "无法判断睡眠后是否需要密码。",
   "screenlock.noPassword": "睡眠或屏幕保护程序启动后，无需密码即可重新进入。",

@@ -4,8 +4,8 @@
 <dict>
 	<key>CFBundleIdentifier</key><string>io.github.ptrinh.bordercheck.notifier</string>
 	<!-- The name in the notification banner and in System Settings → Notifications. -->
-	<key>CFBundleName</key><string>bordercheck</string>
-	<key>CFBundleDisplayName</key><string>bordercheck</string>
+	<key>CFBundleName</key><string>BorderCheck</string>
+	<key>CFBundleDisplayName</key><string>BorderCheck</string>
 	<key>CFBundleExecutable</key><string>bordercheck-notifier</string>
 	<key>CFBundleIconFile</key><string>AppIcon</string>
 	<key>CFBundlePackageType</key><string>APPL</string>

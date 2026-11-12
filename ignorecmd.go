@@ -161,7 +161,7 @@ func ignoreAdd(env ignoreEnv, checkID, path, name, reason string) error {
 	case len(inFile) == 0 && checkID != "":
 		return fmt.Errorf("the %s check finds nothing in %s right now, so there is nothing to ignore; run: bordercheck -only %s", checkID, shown, checkID)
 	case len(inFile) == 0:
-		return fmt.Errorf("bordercheck finds nothing in %s right now that can be ignored (%s are the checks that take it); run: bordercheck -only %s",
+		return fmt.Errorf("BorderCheck finds nothing in %s right now that can be ignored (%s are the checks that take it); run: bordercheck -only %s",
 			shown, strings.Join(ignore.Checks, ", "), strings.Join(ignore.Checks, ","))
 	case len(found) > 1:
 		return fmt.Errorf("both %s find something in %s; say which with -check", strings.Join(found, " and "), shown)

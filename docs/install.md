@@ -1,6 +1,6 @@
-# Installing bordercheck on laptops
+# Installing BorderCheck on laptops
 
-Installed, bordercheck runs every hour as a per-user service (no admin rights), reports to your organisation,
+Installed, BorderCheck runs every hour as a per-user service (no admin rights), reports to your organisation,
 keeps its policy and itself up to date, and tells the person at the machine about new problems.
 
 There are two ways to set machines up:
@@ -14,7 +14,7 @@ There are two ways to set machines up:
 | Policy | chosen by the person's role, fetched with the install's token | the same file for everyone |
 | IT can cut one machine off | yes, revoke that install | no, only rotate everybody's credential |
 
-Use invite links with the bordercheck portal. Use a `policies.json` for any other report endpoint. Without any
+Use invite links with the BorderCheck portal. Use a `policies.json` for any other report endpoint. Without any
 endpoint, put `policies.json` beside the binary and people run `bordercheck` by hand: a plain run reads the
 policy and sends nothing.
 
@@ -34,7 +34,7 @@ Windows (PowerShell):
 
 Or, with the binary already there: `bordercheck install https://bordercheck.domain.com/i/<code>`.
 
-bordercheck copies itself into the [install folder](#the-service) and checks that the hourly service can be
+BorderCheck copies itself into the [install folder](#the-service) and checks that the hourly service can be
 registered, then spends the code (`POST /enroll`) and gets back this install's ID, the email and role IT set, a
 token, and the URL of the policy for that role. It fetches the policy with the token, registers the service and
 sends a first report. There is no email question; `-email` with an invite link is an error.
@@ -43,7 +43,7 @@ sends a first report. There is no email question; `-email` with an invite link i
   service), nothing is installed and the invite is still good. If something goes wrong after (the portal is
   down when the policy is fetched, the service fails to register), the enrollment is saved and the error says
   to run `<install folder>/bordercheck install` (or the same command again): that finishes the job without a new
-  invite. If the network drops while the code is being sent, bordercheck cannot know whether it was spent; run
+  invite. If the network drops while the code is being sent, BorderCheck cannot know whether it was spent; run
   the command again, and if it says the invite was used, ask IT for a new one.
 - **A new invite on an enrolled machine replaces the enrollment** (new install ID, token, email and role) once
   the new code has been accepted; until then the old one keeps working. Waivers keyed by the old install ID stop
@@ -129,7 +129,7 @@ Options go before or after the URL. `install.sh --help` lists them.
 
 ## The service
 
-Either way, install copies bordercheck and its policy to:
+Either way, install copies BorderCheck and its policy to:
 
 | OS | Install folder | Service |
 |---|---|---|
@@ -172,12 +172,12 @@ waived results and passing machines stay silent. What was announced is kept in `
 notify is set in the policy's [`notify`](policies.md#notify).
 
 A problem with [signs of compromise](policies.md#signs-of-compromise) is announced as such, and again when a fail
-turns into one: the title is "bordercheck: this computer may be compromised", the text says what the signs are
+turns into one: the title is "BorderCheck: this computer may be compromised", the text says what the signs are
 (never which item) and "Stop using it for work and tell your IT team now. Do not delete the item yourself."
 
 | OS | How | Needs |
 |---|---|---|
-| macOS | bordercheck's own app, `Bordercheck.app` in the install folder ([below](#borderchecks-notifications-on-macos)); until the person has allowed it, `osascript` `display notification` | the person's answer to macOS's question; the `osascript` fallback is listed as Script Editor in System Settings → Notifications |
+| macOS | BorderCheck's own app, `Bordercheck.app` in the install folder ([below](#borderchecks-notifications-on-macos)); until the person has allowed it, `osascript` `display notification` | the person's answer to macOS's question; the `osascript` fallback is listed as Script Editor in System Settings → Notifications |
 | Windows | a toast through Windows PowerShell 5.1 | nothing; shown while the user is logged on |
 | Linux | `notify-send`, else `gdbus` to the desktop's notification service | a desktop session |
 
@@ -186,23 +186,23 @@ up a report. `bordercheck send -force` (and the first report at install) is run 
 prints the problems there instead and the next scheduled run does not repeat them. A plain `bordercheck` never
 notifies.
 
-### bordercheck's notifications on macOS
+### BorderCheck's notifications on macOS
 
-On a Mac, bordercheck installs a small app, `Bordercheck.app`, beside itself in the install folder (bundle ID
+On a Mac, BorderCheck installs a small app, `Bordercheck.app`, beside itself in the install folder (bundle ID
 `io.github.ptrinh.bordercheck.notifier`, no Dock icon, it runs for a moment and quits). Notifications come from it,
-so they show **bordercheck**'s name and shield icon, are listed as **bordercheck** in System Settings →
+so they show **BorderCheck**'s name and shield icon, are listed as **BorderCheck** in System Settings →
 Notifications, and open the machine's report page when clicked.
 
-**What the person sees.** A banner headed "bordercheck" with "1 problem on this computer", the problems, and
+**What the person sees.** A banner headed "BorderCheck" with "1 problem on this computer", the problems, and
 "Click to open your report page." when the receiver gave this machine a [report page](#report-page). Clicking
 opens that page in the default browser. The link itself is never in the visible text.
 
-**The permission question.** macOS asks once whether "bordercheck" may send notifications. bordercheck lets it ask
+**The permission question.** macOS asks once whether "BorderCheck" may send notifications. BorderCheck lets it ask
 only while the person is at the terminal:
 
 - `bordercheck install` run in a terminal (including `curl … | sh`): after the install lines, it says
-  "bordercheck shows a notification when it finds a new problem on this computer; clicking it opens your report
-  page. macOS will now ask whether "bordercheck" may send notifications. Choose Allow to get them.", then macOS
+  "BorderCheck shows a notification when it finds a new problem on this computer; clicking it opens your report
+  page. macOS will now ask whether "BorderCheck" may send notifications. Choose Allow to get them.", then macOS
   asks, and install says what was chosen before running the first check.
 - `bordercheck notifications`, any time later, which also reinstalls the app if it is missing or changed.
 
@@ -210,14 +210,14 @@ The hourly service never asks: it posts only if the person already allowed it.
 
 | The person… | What happens | `bordercheck status` |
 |---|---|---|
-| allowed | notifications come from bordercheck; a click opens the report page | `Notifications: bordercheck's own (allowed in System Settings); …` |
-| declined, or later turned bordercheck off in System Settings | **nothing** is shown: no Script Editor fallback, no browser. Reports go on as before | `Notifications: turned off for bordercheck in System Settings; …` |
-| has not been asked (a scripted install with no terminal, an install upgraded from a version without the app) or did not answer | notifications come through Script Editor (`osascript`), as before | `Notifications: through Script Editor (osascript) until you allow bordercheck's own; run: bordercheck notifications` |
+| allowed | notifications come from BorderCheck; a click opens the report page | `Notifications: BorderCheck's own (allowed in System Settings); …` |
+| declined, or later turned BorderCheck off in System Settings | **nothing** is shown: no Script Editor fallback, no browser. Reports go on as before | `Notifications: turned off for BorderCheck in System Settings; …` |
+| has not been asked (a scripted install with no terminal, an install upgraded from a version without the app) or did not answer | notifications come through Script Editor (`osascript`), as before | `Notifications: through Script Editor (osascript) until you allow BorderCheck's own; run: bordercheck notifications` |
 
-**To turn them off or back on:** System Settings → Notifications → bordercheck. macOS asks only once, so after a
+**To turn them off or back on:** System Settings → Notifications → BorderCheck. macOS asks only once, so after a
 "Don't Allow" `bordercheck notifications` just points there. An MDM configuration profile
 (`com.apple.notificationsettings`) can allow or forbid notifications for `io.github.ptrinh.bordercheck.notifier`
-ahead of time; bordercheck then uses that answer without anyone being asked, which suits scripted installs.
+ahead of time; BorderCheck then uses that answer without anyone being asked, which suits scripted installs.
 
 **Upgrades.** A copy that updates itself from a version without the app keeps using Script Editor until the
 person runs `bordercheck notifications` (or `bordercheck install` again in a terminal); nothing pops up by
@@ -225,22 +225,22 @@ itself. Once installed, the app is replaced by the new version's after every sel
 person's answer, which belongs to the bundle ID.
 
 **Fallback.** If the release has no app, the download or checks fail, or the app fails or does not answer,
-bordercheck logs why and shows the notification through Script Editor. Uninstall removes the app; macOS may keep
-a "bordercheck" entry in System Settings → Notifications until it tidies up.
+BorderCheck logs why and shows the notification through Script Editor. Uninstall removes the app; macOS may keep
+a "BorderCheck" entry in System Settings → Notifications until it tidies up.
 
-**How the app is checked.** It is downloaded for bordercheck's own version from the pinned update source, like a
+**How the app is checked.** It is downloaded for BorderCheck's own version from the pinned update source, like a
 [binary update](#updates): only if the release's `SHA256SUMS` is signed by the trusted key and the zip matches it
 (an enrolled install ignores any update source the portal names). It is installed only if its code signature is
 valid, Developer ID, with that bundle ID; the Team ID is pinned at the first install, and a later app from
-another team is refused. A digest of every file is recorded, and before each launch bordercheck checks the digest
+another team is refused. A digest of every file is recorded, and before each launch BorderCheck checks the digest
 and the signature again; a changed app is not run (`bordercheck notifications` reinstalls it). It is started
 through `/usr/bin/open` with one fixed argument (`status`, `authorize` or `post`); the title, text and link go to
 it in a file in the install folder readable only by this user, which is deleted when it quits, never on a
-command line. Text from check results is cut to length and stripped of control characters by bordercheck and
+command line. Text from check results is cut to length and stripped of control characters by BorderCheck and
 again by the app, and treated as plain text. The app opens a link only if it is `https` on exactly the host
-reports go to (checked by bordercheck and again by the app when clicked), never anything else, and runs nothing.
+reports go to (checked by BorderCheck and again by the app when clicked), never anything else, and runs nothing.
 
-When a notification is clicked after the app has quit, macOS starts the app itself, without bordercheck's
+When a notification is clicked after the app has quit, macOS starts the app itself, without BorderCheck's
 pre-launch checks; it still runs only with a valid signature, as macOS checks it. macOS keeps a delivered
 notification, with the link it opens, in its notification database for this user until it is cleared; the link
 is otherwise in `state.json` for the same user.
@@ -248,10 +248,10 @@ is otherwise in `state.json` for the same user.
 ### Report page
 
 A receiver may answer a report with `{"report_url": "https://<host>/r/<id>"}`, a link to that
-machine's own report that needs no login. bordercheck keeps it (in `state.json`, never in the log) only if it is
+machine's own report that needs no login. BorderCheck keeps it (in `state.json`, never in the log) only if it is
 https on exactly the host reports go to, and shows it in `bordercheck status`.
 
-- **With bordercheck's own notifications on a Mac**, every notification carries the link and opens the page
+- **With BorderCheck's own notifications on a Mac**, every notification carries the link and opens the page
   when clicked. The page **does not open by itself**, whatever `notify.open_report` says: the person chooses
   when to look.
 - **Otherwise** (Windows, Linux, and a Mac whose notifications still come through Script Editor, which cannot
@@ -261,7 +261,7 @@ https on exactly the host reports go to, and shows it in `bordercheck status`.
   passed as one argument, never through a shell. Linux skips it quietly without a graphical session (a systemd
   user timer often has no `DISPLAY`). With `notify.open_report` off, or when the browser can't be opened, or on a
   reminder, the notification adds "Run bordercheck status for the link to your report page."
-- **Notifications turned off for bordercheck** on a Mac: nothing is shown and the page does not open.
+- **Notifications turned off for BorderCheck** on a Mac: nothing is shown and the page does not open.
 
 `bordercheck send -force` prints the link on the terminal instead. A receiver that sends no link changes nothing.
 Anyone who has the link can see that machine's failing checks, so treat it like a password.
@@ -437,8 +437,8 @@ bordercheck unignore ~/proj/.env [-name POSTGRES_PASSWORD] [-check secrets]
 
 The path is the one the report shows (`~/…` or absolute); `-name` is the name or the kind shown in the evidence.
 Lines are never part of an entry, since they move when the file is edited. `-check secrets|ai-agents|ssh-keys`
-says which check; without it bordercheck finds the one with a finding in that file, and asks for `-check` when
-two do (an AI config with a token can be found by both `secrets` and `ai-agents`). bordercheck runs those checks
+says which check; without it BorderCheck finds the one with a finding in that file, and asks for `-check` when
+two do (an AI config with a token can be found by both `secrets` and `ai-agents`). BorderCheck runs those checks
 first and refuses a path or name that matches nothing (it lists what it finds in that file, by name), what cannot
 be ignored (and says what to do instead), an empty reason, and a check whose policy sets `user_ignore` to `false`.
 
@@ -467,7 +467,7 @@ Never set aside: a finding marked `[production]`, anything inside a `.git` folde
 a provider token that looks live (the kinds whose last 4 characters are shown: GitHub, OpenAI, AWS…). Something
 you ignored with `bordercheck ignore` stays in your list, with your reason.
 
-To read git's records bordercheck does not run git (a repository's own settings can make git run programs): it
+To read git's records BorderCheck does not run git (a repository's own settings can make git run programs): it
 reads the index file itself. When it cannot be sure, the rule does not match and the finding counts as usual: a
 split or sparse index, an index format it does not know, a damaged index, a file over 10 MB, a repository whose
 top is your home folder itself (a dotfiles repository), a symlinked file or folder, or a file whose line endings

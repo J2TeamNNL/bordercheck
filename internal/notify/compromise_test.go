@@ -21,7 +21,7 @@ func TestComposeCompromise(t *testing.T) {
 		t.Fatalf("a fail that became a sign of compromise should be announced again: %v", ids(due))
 	}
 	m := Compose(due)
-	if m.Title != "bordercheck: this computer may be compromised" ||
+	if m.Title != "BorderCheck: this computer may be compromised" ||
 		!strings.HasPrefix(m.Body, "startup-items: A program set to start automatically downloads code") ||
 		!strings.Contains(m.Body, "Stop using it for work and tell your IT team now") || strings.Contains(m.Body, "com.x") {
 		t.Errorf("got %+v", m)

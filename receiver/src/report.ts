@@ -200,7 +200,7 @@ export function parseReport(raw: unknown): Report {
   const r = raw as Record<string, unknown>;
   if (r.tool !== "bordercheck") throw new ReportError('"tool" must be "bordercheck"');
   if (typeof r.install_id !== "string" || !INSTALL_ID.test(r.install_id)) {
-    throw new ReportError('"install_id" is missing or malformed; reports come from an installed bordercheck');
+    throw new ReportError('"install_id" is missing or malformed; reports come from an installed BorderCheck');
   }
   if (!Array.isArray(r.results)) throw new ReportError('"results" must be an array');
   if (r.results.length > MAX_RESULTS) throw new ReportError(`at most ${MAX_RESULTS} results`);

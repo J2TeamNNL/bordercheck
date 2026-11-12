@@ -86,7 +86,7 @@ func notifyUser(ctx context.Context, env Env, n policy.Notify, results []check.R
 		fmt.Fprintf(env.Out, "%s not notified of %d problem(s): %v\n", now.Format(time.RFC3339), len(due), err)
 		return
 	case err != nil:
-		fmt.Fprintf(env.Out, "%s bordercheck's notification app failed, using Script Editor: %v\n", now.Format(time.RFC3339), err)
+		fmt.Fprintf(env.Out, "%s BorderCheck's notification app failed, using Script Editor: %v\n", now.Format(time.RFC3339), err)
 	}
 	// The page opens by itself only for a high-severity problem that was not
 	// there before. A reminder of one already announced just notifies: a

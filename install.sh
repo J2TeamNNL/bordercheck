@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs bordercheck on macOS or Linux and sets it up to report to your
+# Installs BorderCheck on macOS or Linux and sets it up to report to your
 # organisation every hour (a per-user service; no root, no sudo).
 #
 #   curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh \
@@ -157,7 +157,7 @@ main() {
 	case $(uname -m) in
 	x86_64 | amd64) arch=amd64 ;;
 	arm64 | aarch64) arch=arm64 ;;
-	*) die "no bordercheck build for $(uname -m)." ;;
+	*) die "no BorderCheck build for $(uname -m)." ;;
 	esac
 	# A shell under Rosetta reports x86_64 on an Apple silicon Mac.
 	if [ "$os" = darwin ] && [ "$arch" = amd64 ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || true)" = 1 ]; then
@@ -175,7 +175,7 @@ main() {
 		# Served by GitHub's CDN, not the rate-limited API, like the updater.
 		sums_base=$releases/latest/download
 	fi
-	say "bordercheck · (c) Phil Trinh - SENPRINTS"
+	say "BorderCheck · (c) Phil Trinh - SENPRINTS"
 	say "Fetching the release list for $os/$arch from github.com/$repo ..."
 	fetch "$sums_base/SHA256SUMS" "$tmp/SHA256SUMS" || die "could not download SHA256SUMS from $sums_base"
 	fetch "$sums_base/SHA256SUMS.sig" "$tmp/SHA256SUMS.sig" ||
@@ -190,7 +190,7 @@ main() {
 			die "SHA256SUMS.sig is not base64."
 		openssl pkeyutl -verify -pubin -inkey "$tmp/key.der" -keyform DER -rawin \
 			-in "$tmp/SHA256SUMS" -sigfile "$tmp/sig.bin" >/dev/null 2>&1 ||
-			die "SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team."
+			die "SHA256SUMS is NOT signed by the BorderCheck release key. Do not install this release; tell your IT team."
 		sig_checked=yes
 		say "SHA256SUMS is signed by the release key (checked with OpenSSL)."
 	fi
@@ -234,7 +234,7 @@ main() {
 	# 3. Without OpenSSL 3, the binary checks the signature with the key this script pins.
 	if [ "$sig_checked" = no ]; then
 		"$tmp/$asset" verify -key "$key" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.sig" "$tmp/$asset" >/dev/null ||
-			die "SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team."
+			die "SHA256SUMS is NOT signed by the BorderCheck release key. Do not install this release; tell your IT team."
 		say "SHA256SUMS is signed by the release key (checked by the downloaded binary; OpenSSL 3 was not found)."
 	fi
 	"$tmp/$asset" -version | grep -qF "$tag" || die "$asset does not report version $tag."

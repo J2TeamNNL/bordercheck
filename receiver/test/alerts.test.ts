@@ -73,7 +73,7 @@ describe("cron", () => {
     await handleReport(req(report()), e, day(1));
     const r = recorder();
     await runCron(e, day(1), r.send);
-    expect(r.calls[0].body.text).toContain("*bordercheck*: 1 new alert");
+    expect(r.calls[0].body.text).toContain("*BorderCheck*: 1 new alert");
     expect(r.calls[0].body.content).toBeUndefined();
   });
 

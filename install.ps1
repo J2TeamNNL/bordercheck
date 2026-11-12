@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Installs bordercheck on Windows and sets it up to report to your organisation
+Installs BorderCheck on Windows and sets it up to report to your organisation
 every hour (a per-user scheduled task; no administrator rights).
 
 .DESCRIPTION
@@ -63,7 +63,7 @@ if (-not $arch) { $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCH
 switch -Regex ($arch) {
     '^(X64|AMD64)$' { $arch = 'amd64'; break }
     '^(Arm64|ARM64)$' { $arch = 'arm64'; break }
-    default { Fail "There is no bordercheck build for $arch." }
+    default { Fail "There is no BorderCheck build for $arch." }
 }
 
 function Fetch([string]$url, [string]$file) {
@@ -93,7 +93,7 @@ try {
     $sumsBase = if ($Version) { "$releases/download/$Version" } else { "$releases/latest/download" }
     $sums = Join-Path $tmp 'SHA256SUMS'
     $sig = Join-Path $tmp 'SHA256SUMS.sig'
-    Say "bordercheck - (c) Phil Trinh - SENPRINTS"
+    Say "BorderCheck - (c) Phil Trinh - SENPRINTS"
     Say "Fetching the release list for windows/$arch from github.com/$Repo ..."
     try { Fetch "$sumsBase/SHA256SUMS" $sums } catch { Fail "Could not download SHA256SUMS from $sumsBase ($($_.Exception.Message))." }
     try { Fetch "$sumsBase/SHA256SUMS.sig" $sig } catch { Fail 'The release has no SHA256SUMS.sig, so it cannot be verified.' }
@@ -112,7 +112,7 @@ try {
                 $signature = [Convert]::FromBase64String([IO.File]::ReadAllText($sig))
             } catch { Fail 'The release key or signature is not base64.' }
             if (-not (Test-ReleaseSignature $openssl.Source $sums $keyBytes $signature)) {
-                Fail 'SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team.'
+                Fail 'SHA256SUMS is NOT signed by the BorderCheck release key. Do not install this release; tell your IT team.'
             }
             $sigChecked = $true
             Say 'SHA256SUMS is signed by the release key (checked with OpenSSL).'
@@ -147,7 +147,7 @@ try {
     }
     if (-not $sigChecked) {
         & $exe verify -key $Key $sums $sig $exe | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail 'SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team.' }
+        if ($LASTEXITCODE -ne 0) { Fail 'SHA256SUMS is NOT signed by the BorderCheck release key. Do not install this release; tell your IT team.' }
         Say 'SHA256SUMS is signed by the release key (checked by the downloaded binary; no OpenSSL with ed25519 was found).'
     }
     if (-not ((& $exe -version) -match [regex]::Escape($tag))) { Fail "$asset does not report version $tag." }

@@ -293,7 +293,7 @@ export const en = {
 
   // Roles
   "enrollment.eyebrow": "Enrollment",
-  "roles.lead": "A role is a policy (the same JSON as bordercheck's policies.json) that enrolled machines get from [code]/policy[/code]. When served, [code]report.url[/code] and [code]update.policy_url[/code] point at this receiver, [code]report.headers[/code] never carry a token (each machine sends its own), and the machine's waivers are added.",
+  "roles.lead": "A role is a policy (the same JSON as BorderCheck's policies.json) that enrolled machines get from [code]/policy[/code]. When served, [code]report.url[/code] and [code]update.policy_url[/code] point at this receiver, [code]report.headers[/code] never carry a token (each machine sends its own), and the machine's waivers are added.",
   "roles.updated": "updated {date}",
   "roles.machines": { one: "machine", other: "machines" },
   "roles.pending": { one: " · {n} pending invite", other: " · {n} pending invites" },
@@ -305,9 +305,9 @@ export const en = {
   "roles.name": "Name",
   "roles.policy": "Policy",
   "roles.checkedHere": "Checked here",
-  "roles.checkedText": "It is a JSON object; only fields bordercheck knows at the top level and in report, update, notify and waivers; check names; types of enabled and on_problem; durations; waiver fields; no report token in headers.",
+  "roles.checkedText": "It is a JSON object; only fields BorderCheck knows at the top level and in report, update, notify and waivers; check names; types of enabled and on_problem; durations; waiver fields; no report token in headers.",
   "roles.notChecked": "Not checked here",
-  "roles.notCheckedText": "The settings inside each check (globs, regexes, versions, lists). bordercheck validates the whole file and keeps its last good policy if one is invalid, so try it locally first:",
+  "roles.notCheckedText": "The settings inside each check (globs, regexes, versions, lists). BorderCheck validates the whole file and keeps its last good policy if one is invalid, so try it locally first:",
   "roles.created": "Role [b]{name}[/b] created.",
   "roles.deleted": "Role [b]{name}[/b] deleted.",
   "roles.notSaved": "Not saved:",
@@ -388,7 +388,7 @@ export const en = {
   "issued.reissued": "Invite re-issued",
   "issued.message": "Message",
   "issued.messageSub": "to paste into an email or chat",
-  "issued.messageText": "Hi, please install bordercheck on your work computer. It checks the computer's security settings (firewall, disk encryption, updates) and tells you and IT when something needs fixing. Open this link and follow the steps:\n{link}\nThe link works once, for one computer, until {date}. Please keep it to yourself.",
+  "issued.messageText": "Hi, please install BorderCheck on your work computer. It checks the computer's security settings (firewall, disk encryption, updates) and tells you and IT when something needs fixing. Open this link and follow the steps:\n{link}\nThe link works once, for one computer, until {date}. Please keep it to yourself.",
   "copy.link": "Copy link",
   "copy.command": "Copy command",
   "copy.message": "Copy message",
@@ -410,7 +410,7 @@ export const en = {
 
   // Enrollment part of a machine page
   "enr.linkTitle": "Report link",
-  "enr.linkText": "Each accepted report gets a login-free link to that machine's own latest results, which bordercheck can open for the person at the machine. Reset to make every link issued so far stop working.",
+  "enr.linkText": "Each accepted report gets a login-free link to that machine's own latest results, which BorderCheck can open for the person at the machine. Reset to make every link issued so far stop working.",
   "enr.linkReset": "Reset report links",
   "enr.linkIssue": "Copy public report link",
   "link.title": "Public report link",
@@ -449,7 +449,7 @@ export const en = {
   "err.linksOff": "Report links are turned off on this portal.",
   "err.linkRevoked": "This machine is revoked: it has no report page.",
   "err.linkNoReport": "This machine has not sent a report yet, so there is nothing to link to.",
-  "err.waiverCheck": "Check must be one of the checks bordercheck's policy knows: {list}.",
+  "err.waiverCheck": "Check must be one of the checks BorderCheck's policy knows: {list}.",
   "err.waiverNotAdded": "Waiver not added: {problem}.",
   "err.waiverReason": "Waiver not added: a reason is required.",
   "err.noSuchWaiver": "No such waiver.",
@@ -475,9 +475,9 @@ export const en = {
   "slow.text": "Wait a few minutes and reload.",
 
   // Invite page (/i/<code>)
-  "inv.title": "Install bordercheck",
+  "inv.title": "Install BorderCheck",
   "inv.eyebrow": "An invitation from your IT team",
-  "inv.lead": "bordercheck looks at this computer's security settings, like the firewall, disk encryption and updates, and tells you and IT if something needs fixing. Setting it up is one command.",
+  "inv.lead": "BorderCheck looks at this computer's security settings, like the firewall, disk encryption and updates, and tells you and IT if something needs fixing. Setting it up is one command.",
   "inv.single": "[b]Single use[/b] · one computer",
   "inv.expires": "Expires [b]{date}[/b]",
   "inv.hereMac": "On this Mac",
@@ -494,13 +494,13 @@ export const en = {
   "inv.macCopy": "Click the command below once to select it, copy it ([kbd]⌘[/kbd] [kbd]C[/kbd]), paste it into the terminal and press [kbd]Return[/kbd].",
   "inv.linuxOpen": "Open a [b]terminal[/b] window.",
   "inv.linuxCopy": "Click the command below once to select it, copy it ([kbd]Ctrl[/kbd] [kbd]C[/kbd]), paste it into the terminal and press [kbd]Enter[/kbd].",
-  "inv.follow": "Follow what it prints. When it's done, bordercheck checks this computer in the background.",
+  "inv.follow": "Follow what it prints. When it's done, BorderCheck checks this computer in the background.",
   "inv.cmdUnix": "macOS or Linux",
   "inv.cmdTerminal": "Terminal",
   "inv.cmdWindows": "Windows",
   "inv.cmdPowerShell": "PowerShell",
   "inv.badTitle": "Invite",
-  "inv.badEyebrow": "bordercheck invite",
+  "inv.badEyebrow": "BorderCheck invite",
   "inv.badH1": "This link can't be used",
   "inv.badLead": "{state} Ask your IT team for a new one.",
   "inv.invalid": "This invite link is not valid.",
@@ -510,12 +510,12 @@ export const en = {
 
   // Report page (/r/<id>)
   "rep.title": "Your report",
-  "rep.eyebrow": "Your bordercheck report",
+  "rep.eyebrow": "Your BorderCheck report",
   "rep.allClear": "All clear",
   "rep.toFixHeadline": { one: "One thing to fix", other: "{n} things to fix" },
   "rep.for": "For [b]{email}[/b] on [b]{host}[/b], checked {when}.",
   "rep.okText": "This computer meets your organisation's checks. Nothing for you to do.",
-  "rep.fixText": "Each item below says what's wrong and how to fix it. bordercheck checks again on its own, so a fix shows up here after its next run.",
+  "rep.fixText": "Each item below says what's wrong and how to fix it. BorderCheck checks again on its own, so a fix shows up here after its next run.",
   "rep.passed": "[b]{n}[/b] passed or did not apply",
   "rep.exempted": "[b]{n}[/b] exempted for now",
   "rep.userIgnored": "[b]{n}[/b] ignored by you",
@@ -566,13 +566,13 @@ export const en = {
   "machine.compLead":
     "Since {when} its reports show signs that harmful software is already on it. Treat it as compromised: tell its user to stop using it for work, and examine it before anything is removed. After that, have them change the passwords and keys they used on it.",
   "machine.compNote":
-    "These are a few strong signs bordercheck can see, not malware detection: a machine without them is not proven clean.",
+    "These are a few strong signs BorderCheck can see, not malware detection: a machine without them is not proven clean.",
   "machine.compNoDetail": "which item it is was not sent: the policy leaves evidence out",
   "alert.compromised": "compromised",
   "alert.compromise_cleared": "compromise cleared",
   "rep.compTitle": "Stop: this computer may be compromised",
   "rep.compLead":
-    "bordercheck found signs that harmful software is already on this computer ({checks}). Stop using it for work and contact your IT team now. Do not delete or uninstall anything yourself: IT needs to see it as it is. After IT has looked at it, change the passwords you used on this computer.",
+    "BorderCheck found signs that harmful software is already on this computer ({checks}). Stop using it for work and contact your IT team now. Do not delete or uninstall anything yourself: IT needs to see it as it is. After IT has looked at it, change the passwords you used on this computer.",
   // Likely sample keys (checks.secrets.sample_rules)
   "machine.likelySamples": "Look like sample keys ({n})",
   "machine.likelySamplesNote": "Set aside at the machine because they look like samples, not real keys: they do not count toward this check. A real key committed to a repository also counts as unchanged in git, so skim the list.",

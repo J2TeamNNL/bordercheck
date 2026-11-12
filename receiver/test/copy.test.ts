@@ -46,13 +46,13 @@ describe("copy buttons", () => {
     for (const t of targets) expect(body).toContain(` id="${t}">`);
     expect(body).not.toContain("alert(1)</script>");
     expect(body).toContain("Copy message");
-    expect(body).toMatch(/Hi, please install bordercheck[^<]*\/i\/[A-Za-z0-9_-]{43}\nThe link works once, for one computer, until \d{4}-\d{2}-\d{2}\./);
+    expect(body).toMatch(/Hi, please install BorderCheck[^<]*\/i\/[A-Za-z0-9_-]{43}\nThe link works once, for one computer, until \d{4}-\d{2}-\d{2}\./);
     expect(body).toContain('data-done="Copied"');
     expect(body).toContain('aria-live="polite"');
     // Without scripts the commands are still there to select.
     expect(body.match(/<code tabindex="0"/g)?.length).toBe(8);
 
-    for (const [lang, word, msg] of [["zh", "复制消息", "你好，请在你的工作电脑上安装 bordercheck"], ["vi", "Sao chép tin nhắn", "Chào bạn, vui lòng cài bordercheck"]]) {
+    for (const [lang, word, msg] of [["zh", "复制消息", "你好，请在你的工作电脑上安装 BorderCheck"], ["vi", "Sao chép tin nhắn", "Chào bạn, vui lòng cài BorderCheck"]]) {
       const r = await issue({ emails: `c-${lang}@domain.com`, role_id: String(roleId) }, lang);
       const { body: b } = await checkScriptPage(r);
       expect(b).toContain(word);
