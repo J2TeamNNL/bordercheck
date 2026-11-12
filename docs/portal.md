@@ -35,6 +35,20 @@ invites and reports to your own domains.
 
 Open `https://<worker>.workers.dev/admin` and paste `ADMIN_TOKEN`. The session lasts 12 hours.
 
+**Passkeys (optional).** Signed in with the token, open **Passkeys**, give the passkey a name and **Add a
+passkey** (Touch ID, Face ID, Windows Hello, a security key or a password manager). From then on the sign-in
+page offers **Sign in with a passkey**, and a browser that has used one starts the prompt by itself. The token
+still works and stays your way back in. A passkey is bound to the portal's hostname: move the portal to a
+custom domain (section 7) first, or register the passkeys again afterwards.
+
+To rely on passkeys alone, sign in with a passkey, then switch **Sign-in with the admin token** off on the
+same page. If every passkey is ever lost, the Cloudflare account owner turns token sign-in back on from
+`receiver/`:
+
+```sh
+npx wrangler d1 execute bordercheck --remote --command "DELETE FROM meta WHERE key = 'admin_token_login'"
+```
+
 For a team, put `/admin` behind Cloudflare Access instead (recommended): a self-hosted Access application for
 `/admin` only, then set `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` in `wrangler.jsonc` and deploy. Leave `/report`,
 `/policy`, `/enroll`, `/i/…`, `/r/…` and `/mcp` outside it: laptops and people must reach them. Details:

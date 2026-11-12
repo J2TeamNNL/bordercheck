@@ -119,18 +119,22 @@ async function sessionKey(env: Env): Promise<CryptoKey> {
 }
 
 // A session is "<expiry>.<HMAC(expiry)>" keyed by ADMIN_TOKEN, so changing the
-// token signs everyone out.
-export async function newSession(env: Env, now = Date.now()): Promise<string> {
-  const exp = Math.floor(now / 1000) + SESSION_TTL;
-  const sig = await crypto.subtle.sign("HMAC", await sessionKey(env), enc.encode(String(exp)));
-  return `${exp}.${b64urlEncode(sig)}`;
+// token signs everyone out. A session opened with a passkey is
+// "<expiry>p.<HMAC(<expiry>p)>": the marker is signed with the rest, so a
+// token session cannot be turned into a passkey one.
+export type SessionKind = "token" | "passkey";
+
+export async function newSession(env: Env, now = Date.now(), kind: SessionKind = "token"): Promise<string> {
+  const v = String(Math.floor(now / 1000) + SESSION_TTL) + (kind === "passkey" ? "p" : "");
+  const sig = await crypto.subtle.sign("HMAC", await sessionKey(env), enc.encode(v));
+  return `${v}.${b64urlEncode(sig)}`;
 }
 
 export function sessionCookie(value: string, maxAge = SESSION_TTL): string {
   return `${SESSION_COOKIE}=${value}; Path=/admin; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Strict`;
 }
 
-function cookie(req: Request, name: string): string | null {
+export function cookie(req: Request, name: string): string | null {
   for (const part of (req.headers.get("cookie") ?? "").split(";")) {
     const [k, ...v] = part.trim().split("=");
     if (k === name) return v.join("=");
@@ -138,21 +142,40 @@ function cookie(req: Request, name: string): string | null {
   return null;
 }
 
-async function validSession(req: Request, env: Env, now: number): Promise<boolean> {
+async function validSession(req: Request, env: Env, now: number): Promise<SessionKind | null> {
   const v = cookie(req, SESSION_COOKIE);
-  const m = v && /^(\d{1,12})\.([A-Za-z0-9_-]{20,100})$/.exec(v);
-  if (!m) return false;
-  if (Number(m[1]) < now / 1000) return false;
+  const m = v && /^(\d{1,12})(p?)\.([A-Za-z0-9_-]{20,100})$/.exec(v);
+  if (!m) return null;
+  if (Number(m[1]) < now / 1000) return null;
   try {
-    return await crypto.subtle.verify("HMAC", await sessionKey(env), b64urlDecode(m[2]), enc.encode(m[1]));
+    const ok = await crypto.subtle.verify("HMAC", await sessionKey(env), b64urlDecode(m[3]), enc.encode(m[1] + m[2]));
+    return ok ? (m[2] ? "passkey" : "token") : null;
   } catch {
-    return false;
+    return null;
   }
 }
+
+// ---- Whether the admin token may sign in ----
+
+// The admin can switch sign-in with ADMIN_TOKEN off once a passkey works
+// (passkeys.ts). It is a row in meta; absent means on. Recovery when every
+// passkey is lost: delete the row with `wrangler d1 execute` (README).
+export const TOKEN_LOGIN_KEY = "admin_token_login";
+
+export async function tokenLoginOn(env: Env): Promise<boolean> {
+  const v = await env.DB.prepare("SELECT value FROM meta WHERE key = ?").bind(TOKEN_LOGIN_KEY).first<string>("value");
+  return v !== "off";
+}
+
+// Names shown in the header and written to the audit trail.
+export const TOKEN_WHO = "admin token";
+export const PASSKEY_WHO = "admin passkey";
 
 export interface Viewer {
   who: string; // shown in the page header
   via: "access" | "session" | "bearer";
+  // The session was opened with a passkey (only for via "session").
+  passkey?: boolean;
 }
 
 export function dashboardConfigured(env: Env): boolean {
@@ -164,9 +187,15 @@ export async function viewer(req: Request, env: Env, now = Date.now()): Promise<
   const who = await accessIdentity(req, env, now);
   if (who) return { who, via: "access" };
   if (!usableToken(env.ADMIN_TOKEN)) return null;
+  // With token sign-in switched off, ADMIN_TOKEN is no admin credential at
+  // all: neither as a bearer header nor through a session it opened earlier.
+  // Passkey sessions still work (their HMAC is keyed by ADMIN_TOKEN too, which
+  // stays secret).
   const b = bearer(req);
-  if (b) return (await safeEqual(b, env.ADMIN_TOKEN)) ? { who: "admin token", via: "bearer" } : null;
-  if (await validSession(req, env, now)) return { who: "admin token", via: "session" };
+  if (b) return (await safeEqual(b, env.ADMIN_TOKEN)) && (await tokenLoginOn(env)) ? { who: TOKEN_WHO, via: "bearer" } : null;
+  const s = await validSession(req, env, now);
+  if (s === "passkey") return { who: PASSKEY_WHO, via: "session", passkey: true };
+  if (s === "token" && (await tokenLoginOn(env))) return { who: TOKEN_WHO, via: "session" };
   return null;
 }
 

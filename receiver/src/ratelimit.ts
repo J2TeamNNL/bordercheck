@@ -1,5 +1,5 @@
 // Fixed-window rate limits for the unauthenticated endpoints (/enroll, /i/,
-// /r/), counted in D1 per client IP. The IP is hashed before it is used as a
+// /r/, the admin sign-in), counted in D1 per client IP. The IP is hashed before it is used as a
 // key. One upsert per request: the count and the window move together, so
 // concurrent requests can't both see a fresh window.
 
@@ -12,9 +12,9 @@ export function clientIP(req: Request): string {
   return (req.headers.get("cf-connecting-ip") ?? "").trim();
 }
 
-export async function hit(env: Env, req: Request, bucket: "enroll" | "page" | "mcp" | "api", nowMs = Date.now()): Promise<{ ok: boolean; retryAfter: number }> {
+export async function hit(env: Env, req: Request, bucket: "enroll" | "page" | "mcp" | "api" | "login", nowMs = Date.now()): Promise<{ ok: boolean; retryAfter: number }> {
   const cfg = config(env);
-  const limit = { enroll: cfg.enrollRateLimit, mcp: cfg.mcpRateLimit, api: cfg.apiRateLimit, page: cfg.pageRateLimit }[bucket];
+  const limit = { enroll: cfg.enrollRateLimit, mcp: cfg.mcpRateLimit, api: cfg.apiRateLimit, page: cfg.pageRateLimit, login: cfg.loginRateLimit }[bucket];
   const win = Math.floor(nowMs / 1000 / cfg.rateWindow);
   const key = `${bucket}:${(await sha256hex("bordercheck-rl:" + (clientIP(req) || "unknown"))).slice(0, 32)}`;
   const count = await env.DB.prepare(
