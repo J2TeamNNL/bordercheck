@@ -138,7 +138,7 @@ export const en = {
   "admins.noTable": "Named admins need the database migrations applied first: [code]npx wrangler d1 migrations apply bordercheck --remote[/code].",
   "admins.add": "Add an admin",
   "admins.nameField": "Name",
-  "admins.namePlaceholder": "e.g. Linh Tran",
+  "admins.namePlaceholder": "e.g. Phil Trinh",
   "admins.nameRule": "1 to 40 characters: letters or digits first, then letters, digits, spaces and . _ @ -",
   "admins.rolesField": "Roles they manage",
   "admins.rolesRule": "They see and manage only these roles' machines and invites. They can also create roles, which they then manage.",

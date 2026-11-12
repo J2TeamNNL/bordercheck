@@ -126,7 +126,7 @@ export const zh: Catalog = {
   "admins.noTable": "需要先应用数据库迁移才能添加管理员：[code]npx wrangler d1 migrations apply bordercheck --remote[/code]。",
   "admins.add": "添加管理员",
   "admins.nameField": "名称",
-  "admins.namePlaceholder": "例如 Linh Tran",
+  "admins.namePlaceholder": "例如 Phil Trinh",
   "admins.nameRule": "1 至 40 个字符：以字母或数字开头，其后可为字母、数字、空格及 . _ @ -",
   "admins.rolesField": "管理的角色",
   "admins.rolesRule": "他们只能查看和管理这些角色的设备和邀请。他们也可以创建角色，并管理自己创建的角色。",

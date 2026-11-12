@@ -127,7 +127,7 @@ export const vi: Catalog = {
   "admins.noTable": "Cần áp dụng migration cơ sở dữ liệu trước khi thêm quản trị viên: [code]npx wrangler d1 migrations apply bordercheck --remote[/code].",
   "admins.add": "Thêm quản trị viên",
   "admins.nameField": "Tên",
-  "admins.namePlaceholder": "vd. Trần Linh",
+  "admins.namePlaceholder": "vd. Phil Trinh",
   "admins.nameRule": "Từ 1 đến 40 ký tự: bắt đầu bằng chữ hoặc số, sau đó là chữ, số, dấu cách và . _ @ -",
   "admins.rolesField": "Vai trò được quản lý",
   "admins.rolesRule": "Họ chỉ thấy và quản lý máy và lời mời của các vai trò này. Họ cũng có thể tạo vai trò mới và sẽ quản lý luôn vai trò đó.",
