@@ -24,7 +24,8 @@
 #   2. the binary matches its line in SHA256SUMS,
 #   3. without OpenSSL 3 (stock macOS), the signature is checked by the
 #      downloaded binary itself (`bordercheck verify`) once step 2 passed.
-# Any mismatch stops the install. See docs/install.md, "What the install script proves".
+# A dry run never executes the downloaded binary. Without capable OpenSSL it
+# checks only the checksum and warns. Any mismatch stops the install. See docs/install.md, "What the install script proves".
 #
 # The whole script is one function called on the last line, so a download cut
 # short runs nothing.
@@ -214,15 +215,6 @@ main() {
 	[ "${#want}" -eq 64 ] && [ "$got" = "$want" ] ||
 		die "$asset does NOT match SHA256SUMS (expected $want, got $got). Do not install it; tell your IT team."
 	say "$asset matches SHA256SUMS."
-	chmod 755 "$tmp/$asset"
-
-	# 3. Without OpenSSL 3, the binary checks the signature with the key this script pins.
-	if [ "$sig_checked" = no ]; then
-		"$tmp/$asset" verify -key "$key" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.sig" "$tmp/$asset" >/dev/null ||
-			die "SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team."
-		say "SHA256SUMS is signed by the release key (checked by the downloaded binary; OpenSSL 3 was not found)."
-	fi
-	"$tmp/$asset" -version | grep -qF "$tag" || die "$asset does not report version $tag."
 
 	set -- install "$policy"
 	[ -z "$email" ] || set -- "$@" -email "$email"
@@ -231,9 +223,23 @@ main() {
 		[ "$key_set" != yes ] || set -- "$@" -update-key "$key"
 	fi
 	if [ "$dry_run" = yes ]; then
-		say "Verified $tag. Dry run: would now run: bordercheck $*"
+		if [ "$sig_checked" = no ]; then
+			say "WARNING: no capable OpenSSL; only the checksum was checked. The release signature was not verified."
+		fi
+		say "Dry run ($tag): would now run: bordercheck $*"
 		return 0
 	fi
+	chmod 755 "$tmp/$asset"
+
+	# 3. Without OpenSSL 3, the binary checks the signature with the key this script pins.
+	if [ "$sig_checked" = no ]; then
+		say "WARNING: no capable OpenSSL; running the downloaded binary to check its own release signature. This is not independent verification."
+		"$tmp/$asset" verify -key "$key" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.sig" "$tmp/$asset" >/dev/null ||
+			die "SHA256SUMS is NOT signed by the bordercheck release key. Do not install this release; tell your IT team."
+		say "SHA256SUMS is signed by the release key (checked by the downloaded binary; OpenSSL 3 was not found)."
+	fi
+	"$tmp/$asset" -version | grep -qF "$tag" || die "$asset does not report version $tag."
+
 	if [ "$invite" = yes ]; then
 		# Nothing to ask: the invite carries the email.
 		"$tmp/$asset" "$@" </dev/null
