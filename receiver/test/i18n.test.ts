@@ -203,7 +203,7 @@ describe("pages in every language", () => {
   it("render with the right <html lang>, no missing text, and the switcher", async () => {
     const { roleId, m, reportUrl, code } = await seed();
     const admin = ["/admin", `/admin/machine/${m.install_id}`, "/admin/checks", "/admin/checks/firewall", "/admin/checks/firewall?status=fail", "/admin/alerts",
-      "/admin/roles", `/admin/roles/${roleId}`, "/admin/invites", "/admin/invites?status=all", "/admin/audit", "/admin/nothing-here"];
+      "/admin/roles", `/admin/roles/${roleId}`, "/admin/invites", "/admin/invites?status=all", "/admin/audit", "/admin/passkeys", "/admin/nothing-here"];
     const pub = ["/admin/login", `/i/${code}`, `/i/${"A".repeat(43)}`, reportUrl, `/r/${"A".repeat(32)}`];
     for (const lang of LANGS) {
       for (const path of admin) {

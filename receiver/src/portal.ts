@@ -13,7 +13,7 @@ import { config, DAY, type Env } from "./env";
 import { COPY_HEADERS, copyButton, html, Html, layout, note, page, pill } from "./html";
 import { type I18n, type Key, type Msg, msg } from "./i18n";
 import { CHECK_ID_RE, POLICY_CHECKS, today, validateRolePolicy, waiverDateError } from "./roles";
-import { newCode, sha256hex } from "./tokens";
+import { newCode, newLinkId, sha256hex } from "./tokens";
 
 const MAX_ROLE_POLICY = 256 * 1024;
 export const MAX_BULK = 500;
@@ -525,7 +525,8 @@ export async function enrollmentOf(env: Env, id: string): Promise<EnrollmentRow 
 export async function enrollmentSection(L: I18n, env: Env, id: string, e: EnrollmentRow | null, now: Date): Promise<Html> {
   const linkForm = html`<h2>${L.t("enr.linkTitle")}</h2>
 <div class="panel"><p class="muted">${L.t("enr.linkText")}</p>
-<form method="post" action="${machineLink(id)}/reset-link"><button>${L.t("enr.linkReset")}</button></form></div>`;
+<div class="actions"><form method="post" action="${machineLink(id)}/report-link"><button>${L.t("enr.linkIssue")}</button></form>
+<form method="post" action="${machineLink(id)}/reset-link"><button>${L.t("enr.linkReset")}</button></form></div></div>`;
   if (!e) return html`<h2>${L.t("enr.title")}</h2><div class="panel"><p class="muted">${L.t("enr.none")}</p></div>${linkForm}`;
   const [waivers, options] = await Promise.all([
     env.DB.prepare("SELECT * FROM machine_waivers WHERE install_id = ? ORDER BY removed_at IS NOT NULL, until DESC LIMIT 200")
@@ -663,6 +664,43 @@ export async function machineAction(
     }
   }
   return { status: 400, error: msg("err.unknownAction") };
+}
+
+// issueReportLink makes a new login-free link to a machine's latest results
+// for an admin to pass on (the links issued to the machine itself are known
+// only to it: the portal keeps their hashes). Like those, only the hash of
+// this one is stored, so the page that follows is the one place it is shown.
+// The machine's own links keep working.
+export async function issueReportLink(env: Env, who: string, id: string, origin: string, now = new Date()): Promise<{ status: number; error?: Msg; url?: string; expires?: string }> {
+  const cfg = config(env);
+  if (!cfg.reportLinks) return { status: 409, error: msg("err.linksOff") };
+  const row = await env.DB.prepare(
+    `SELECT e.revoked_at AS revoked, (SELECT 1 FROM machines m WHERE m.install_id = e.install_id) AS reported
+     FROM enrollments e WHERE e.install_id = ?`,
+  ).bind(id).first<{ revoked: string | null; reported: number | null }>();
+  if (!row) {
+    const known = await machineExists(env, id);
+    return { status: known ? 409 : 404, error: msg(known ? "err.notEnrolled" : "err.noSuchMachine") };
+  }
+  if (row.revoked) return { status: 409, error: msg("err.linkRevoked") };
+  if (!row.reported) return { status: 409, error: msg("err.linkNoReport") };
+  const linkId = newLinkId();
+  const expires = new Date(now.getTime() + cfg.reportLinkDays * DAY).toISOString();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO report_links (link_hash, install_id, created_at, expires_at) VALUES (?, ?, ?, ?)").bind(await sha256hex(linkId), id, now.toISOString(), expires),
+    auditStmt(env, who, "machine.issue_link", id, { expires: expires.slice(0, 10) }),
+  ]);
+  return { status: 200, url: `${origin}/r/${linkId}`, expires };
+}
+
+// issuedLinkPage shows that link, once, with a Copy button.
+export function issuedLinkPage(L: I18n, who: string, id: string, url: string, expires: string): Response {
+  const body = html`<p class="eyebrow">${L.t("nav.machines")}</p><h1>${L.t("link.title")}</h1>
+${note(L.t("link.text", { date: L.day(expires.slice(0, 10)) }), "s-warn")}
+<div class="panel"><div class="cmd"><div class="cmd-h"><b>${L.t("link.title")}</b><span>${L.t("link.sub")}</span>${copyButton(L, "report-link", "copy.link")}</div><code tabindex="0" id="report-link">${url}</code></div></div>
+<div class="actions"><a class="btn" href="${machineLink(id)}">${L.t("notDone.back")}</a></div>`;
+  // Like the issued-invites page, this one carries the hashed Copy script and nothing else.
+  return page(layout(L, L.s("link.title"), who, body, "Machines", { switcher: false, copy: true }), 200, COPY_HEADERS);
 }
 
 // ---- Audit ----

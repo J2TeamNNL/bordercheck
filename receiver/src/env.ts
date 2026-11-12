@@ -33,6 +33,7 @@ export interface Env {
   RATE_WINDOW_SECONDS?: string; // (600)
   MCP_RATE_LIMIT?: string; // /mcp requests per client IP per window (300)
   API_RATE_LIMIT?: string; // /api/v1 requests per client IP per window (300)
+  LOGIN_RATE_LIMIT?: string; // admin sign-in attempts (token and passkey requests) per client IP per window (30)
 
   // Where reports come from. Personal data: see README "What is stored".
   STORE_PUBLIC_IP?: string; // "on" (default) | "off": public IP and the machine's local addresses
@@ -88,6 +89,7 @@ export const config = (env: Env) => ({
   rateWindow: num(env.RATE_WINDOW_SECONDS, 600, 10),
   mcpRateLimit: num(env.MCP_RATE_LIMIT, 300, 1),
   apiRateLimit: num(env.API_RATE_LIMIT, 300, 1),
+  loginRateLimit: num(env.LOGIN_RATE_LIMIT, 30, 1),
   storeIp: flag(env.STORE_PUBLIC_IP, true),
   storeGeo: flag(env.STORE_GEO, true),
   alertNewCountry: flag(env.ALERT_NEW_COUNTRY, false),

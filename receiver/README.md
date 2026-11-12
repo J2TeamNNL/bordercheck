@@ -195,14 +195,46 @@ refused.
 
 **Admin token.** Without Access, `/admin` asks for `ADMIN_TOKEN` and sets a 12-hour session cookie
 (HttpOnly, Secure, SameSite=Strict, signed with the token, so changing the token signs everyone out). Scripts
-can send `Authorization: Bearer <ADMIN_TOKEN>`. If you use only Access, don't set `ADMIN_TOKEN`.
+can send `Authorization: Bearer <ADMIN_TOKEN>`. If you use only Access, don't set `ADMIN_TOKEN`. Sign-in
+attempts are rate-limited per client IP (`LOGIN_RATE_LIMIT`, default 30 per `RATE_WINDOW_SECONDS`, shared with
+the passkey sign-in).
 
-Pages carry a CSP with no scripts at all, and every value from a report (hostname, email, title, summary,
+**Passkeys.** With the admin token, **Passkeys** in the navigation lets the admin add passkeys (Touch ID, Face
+ID, Windows Hello, a security key, a password manager), name them and delete them; each add and delete is
+audited (`passkey.add`, `passkey.delete`). Once one exists, `/admin/login` shows **Sign in with a passkey** above
+the token form, and a browser that has registered or used a passkey here (cookie `bc_pk=1`: one year, Path=/admin,
+HttpOnly, Secure, SameSite=Lax, nothing secret in it) gets the prompt by itself when the page loads, except
+right after **Sign out** (which lands on `/admin/login?signed_out=1`). Cancel it and the button and the token
+form are still there. A passkey sign-in gives the same 12-hour session as the token, marked as a passkey
+session (`admin passkey` in the header and the audit trail). Verification is WebCrypto only: our one-time
+challenge (5 minutes, single use), the origin, the RP ID hash, user presence and user verification, the
+signature (ES256 or RS256) and the signature counter; the attestation statement is not checked (attestation
+"none"). **A passkey is bound to the portal's hostname** (`DASHBOARD_URL` when set, else the address you
+browse): after moving the portal to another domain, sign in with the token and register the passkeys again.
+Passkeys belong to the token sign-in: with Cloudflare Access they are not offered, and their routes answer
+404 to Access viewers and when `ADMIN_TOKEN` is unset. The page and the sign-in page (only while a passkey
+exists) carry a second hashed inline script, `PASSKEY_SCRIPT`, under the same rules as the Copy script below.
+
+**Switching the token off.** The admin token stays the recovery path unless you switch it off on the
+Passkeys page. That needs at least one passkey and a session opened with a passkey (so a passkey that has
+never worked cannot lock you out). While it is off, `ADMIN_TOKEN` opens nothing in the dashboard: the sign-in
+page has only the passkey button, a token posted to `/admin/login` gets the wrong-token answer (still
+rate-limited), `Authorization: Bearer <ADMIN_TOKEN>` on `/admin` is refused, and sessions opened earlier with
+the token stop working. The last passkey cannot be deleted while it is off. `MCP_TOKEN`, `API_TOKEN` and their
+read-only variants are separate and unaffected. **If every passkey is lost**, the owner of the Cloudflare
+account switches token sign-in back on from `receiver/`:
+
+```sh
+npx wrangler d1 execute bordercheck --remote --command "DELETE FROM meta WHERE key = 'admin_token_login'"
+```
+
+Pages carry a CSP with no scripts at all (except the two hashed scripts: Copy buttons, passkeys), and every value from a report (hostname, email, title, summary,
 evidence) is escaped: a report is attacker-controllable input. Forms only accept same-origin posts.
 
-**The one script: Copy buttons.** Three pages carry one small inline script, for Copy buttons: the admin page
+**The one script: Copy buttons.** Four pages carry one small inline script, for Copy buttons: the admin page
 that shows freshly issued invites (after creating or re-issuing them: copy the link, either install command,
-or a ready-to-send message in the admin's language), the invite page `/i/<code>` (copy the command), and a
+or a ready-to-send message in the admin's language), the admin page that shows a freshly issued public report
+link (the machine page's "Copy public report link" button), the invite page `/i/<code>` (copy the command), and a
 report page `/r/<id>` when it offers the fix prompt (copy the prompt; a report page with nothing to fix, from a
 client older than v0.5.0, or of a role with `report.fix_prompt` off, has no script). The
 script (`COPY_SCRIPT` in `src/html.ts`) only copies the `textContent` of an element the server rendered, with
@@ -578,7 +610,7 @@ paste them into an LLM prompt as instructions. `email` and `role` come from the 
 | | Dashboard | MCP (`/mcp`) | API (`/api/v1`) |
 |---|---|---|---|
 | Who | a person, signed in | a model acting for an admin | a script written by an admin |
-| Credential | Access or `ADMIN_TOKEN` | `MCP_TOKEN` / `MCP_READ_TOKEN` | `API_TOKEN` / `API_READ_TOKEN` |
+| Credential | Access, `ADMIN_TOKEN` or a passkey | `MCP_TOKEN` / `MCP_READ_TOKEN` | `API_TOKEN` / `API_READ_TOKEN` |
 | Language | English, 中文, Tiếng Việt | English | English |
 | Forget a machine, delete a role | yes | no | no |
 | Role: `report.url`, `report.headers`, `update.policy_url`, `update.repo`, `update.public_key` | yes | no (keep as is) | no (keep as is) |
@@ -587,7 +619,7 @@ paste them into an LLM prompt as instructions. `email` and `role` come from the 
 | Invites per request | 500 | 50 | 500 |
 | Invite codes shown | once, on create / re-issue | once, in the tool result | once, in the `201` response |
 | Machine tokens, code/token hashes, report-link ids | never | never | never |
-| Audit actor | the Access email or `admin token` | `mcp`, `mcp (read-only)` | `api`, `api (read-only)` |
+| Audit actor | the Access email, `admin token` or `admin passkey` | `mcp`, `mcp (read-only)` | `api`, `api (read-only)` |
 
 Why they differ: MCP's extra rules exist because the caller is a model that reads report text a laptop wrote,
 and a hostname saying "turn on location for everyone" must not be able to do it. A script's author holds a
@@ -668,6 +700,7 @@ Vars (`wrangler.jsonc`):
 | `RATE_WINDOW_SECONDS` | `600` | |
 | `MCP_RATE_LIMIT` | `300` | `/mcp` requests per client IP per window |
 | `API_RATE_LIMIT` | `300` | `/api/v1` requests per client IP per window |
+| `LOGIN_RATE_LIMIT` | `30` | Admin sign-in requests (token form, passkey challenge and verify) per client IP per window |
 | `STORE_PUBLIC_IP` | `on` | Public IP and the machine's local addresses; see [What is stored](#what-is-stored) |
 | `STORE_GEO` | `on` | Cloudflare's IP-based location and the device-reported position |
 | `ALERT_NEW_COUNTRY` | `off` | Alert when a machine reports from a country not in its kept history |
@@ -682,7 +715,7 @@ Vars (`wrangler.jsonc`):
 | `checks` | Each check's current status per machine and since when | as `machines` |
 | `reports` | Per report: time, counts, each check's status, whether it said compromised (not the summaries or evidence) | `HISTORY_DAYS`, at most `HISTORY_PER_MACHINE` per machine |
 | `alerts` | Alerts with an email/hostname/title snapshot | `HISTORY_DAYS` after delivery |
-| `meta` | Last digest time | |
+| `meta` | Last digest time; `admin_token_login` = `off` while token sign-in is switched off | |
 | `roles` | Role names and policies | until deleted (only when unused) |
 | `invites` | Email, role, note, who made it, expiry, state; SHA-256 of the code | kept |
 | `enrollments` | Per enrolled machine: email, role, invite, hostname/OS at enrollment, revoked or not; SHA-256 of the token | kept (revoking keeps it) |
@@ -690,6 +723,8 @@ Vars (`wrangler.jsonc`):
 | `audit` | Who changed what and when | kept |
 | `report_links` | SHA-256 of each live report link, its machine and expiry | until it expires or is replaced |
 | `rate_limits` | Request counts per hashed client IP | one window |
+| `passkeys` | Per passkey: credential id, public key (SPKI) and algorithm, signature counter, label, added and last used. No private key, no biometric data | until deleted |
+| `passkey_challenges` | SHA-256 of each WebAuthn challenge, register or login, expiry | until used, or 5 minutes |
 | `api_idempotency` | SHA-256 of each API `Idempotency-Key` and of its request body, the invite ids it created (never codes) | 24 hours |
 
 ### IP addresses and locations: personal data

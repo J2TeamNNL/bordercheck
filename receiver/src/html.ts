@@ -1,3 +1,4 @@
+import { PASSKEY_WHO, TOKEN_WHO } from "./auth";
 import { type I18n, type Key, LANG_NAME, LANG_SHORT, LANGS } from "./i18n";
 
 // A tiny HTML template: every interpolated value is escaped unless it is
@@ -67,9 +68,10 @@ export function linkify(text: unknown): Html {
 const CSP =
   "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 
-// The portal's one script: Copy buttons, on exactly three pages (the admin page
-// showing freshly issued invites, the invite page /i/<code>, and a report page
-// /r/<id> that offers the fix prompt). Every other
+// The portal's one script: Copy buttons, on exactly four pages (the admin page
+// showing freshly issued invites, the admin page showing a freshly issued
+// report link, the invite page /i/<code>, and a report page /r/<id> that
+// offers the fix prompt). Every other
 // page is served with CSP above and runs no script at all.
 //
 // What it does: on a click on an element with data-copy="<id>", copy that
@@ -96,6 +98,43 @@ export const COPY_SCRIPT =
 export const COPY_SCRIPT_HASH = "sha256-fRZPvsKfmsR0Pg84Bsxw4Mc+qbaPX7EyEGpbV66f3vQ=";
 export const COPY_CSP = `${CSP}; script-src '${COPY_SCRIPT_HASH}'`;
 export const COPY_HEADERS = { "content-security-policy": COPY_CSP };
+
+// The passkey script, on two pages only: /admin/passkeys (add a passkey) and
+// /admin/login while at least one passkey exists (sign in with one). Same
+// rules as COPY_SCRIPT: allowed by its hash on those pages (PASSKEY_HEADERS),
+// a test recomputes it.
+//
+// What it does: finds #pk (data-mode "login" or "register"); if the browser
+// has no WebAuthn (or, to register, no getPublicKey()), it does nothing and the
+// controls stay hidden. Otherwise it shows them and, on a click on #pk-go (or
+// at load when the server rendered data-auto="1"), asks this origin for a
+// challenge, runs navigator.credentials.get/create, posts the result back as
+// JSON (base64url fields), and on success goes to /admin (login) or reloads
+// /admin/passkeys (register). On any failure it shows the data-fail text the
+// server rendered, translated, in #pk-msg (textContent, never HTML). It talks
+// only to this origin's /admin/login/passkey* and /admin/passkeys* routes.
+export const PASSKEY_SCRIPT =
+  `(function(){var box=document.getElementById("pk");if(!box)return;` +
+  `var go=document.getElementById("pk-go"),out=document.getElementById("pk-msg"),mode=box.getAttribute("data-mode");` +
+  `if(!go||!out||!window.PublicKeyCredential||!navigator.credentials||!window.fetch)return;` +
+  `if(mode==="register"&&!(window.AuthenticatorAttestationResponse&&AuthenticatorAttestationResponse.prototype.getPublicKey))return;` +
+  `box.hidden=false;var ns=document.getElementById("pk-unsupported");if(ns)ns.hidden=true;` +
+  `function b(t){t=t.replace(/-/g,"+").replace(/_/g,"/");var r=atob(t),a=new Uint8Array(r.length);for(var i=0;i<r.length;i++)a[i]=r.charCodeAt(i);return a.buffer}` +
+  `function s(x){var a=new Uint8Array(x),r="";for(var i=0;i<a.length;i++)r+=String.fromCharCode(a[i]);return btoa(r).replace(/[+]/g,"-").replace(/[/]/g,"_").replace(/=+$/,"")}` +
+  `function post(u,o){return fetch(u,{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify(o)}).then(function(r){if(!r.ok)throw 0;return r.json()})}` +
+  `var busy=false;function run(){if(busy)return;busy=true;go.disabled=true;out.textContent="";var p;` +
+  `if(mode==="login"){p=post("/admin/login/passkey/options",{}).then(function(o){return navigator.credentials.get({publicKey:{challenge:b(o.challenge),rpId:o.rpId,timeout:o.timeout,userVerification:"required",allowCredentials:[]}})}).then(function(c){var r=c.response;` +
+  `return post("/admin/login/passkey",{id:c.id,clientDataJSON:s(r.clientDataJSON),authenticatorData:s(r.authenticatorData),signature:s(r.signature)})})}` +
+  `else{p=post("/admin/passkeys/options",{}).then(function(o){return navigator.credentials.create({publicKey:{challenge:b(o.challenge),rp:o.rp,user:{id:b(o.user.id),name:o.user.name,displayName:o.user.displayName},` +
+  `pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],excludeCredentials:o.exclude.map(function(x){return{type:"public-key",id:b(x)}}),` +
+  `authenticatorSelection:{residentKey:"required",requireResidentKey:true,userVerification:"required"},attestation:"none",timeout:o.timeout}})}).then(function(c){var r=c.response,k=r.getPublicKey();if(!k)throw 0;` +
+  `var l=document.getElementById("pk-label");return post("/admin/passkeys",{label:l?l.value:"",id:c.id,clientDataJSON:s(r.clientDataJSON),authenticatorData:s(r.getAuthenticatorData()),publicKey:s(k),alg:r.getPublicKeyAlgorithm()})})}` +
+  `p.then(function(){location.assign(mode==="login"?"/admin":"/admin/passkeys")},function(){busy=false;go.disabled=false;out.textContent=box.getAttribute("data-fail")||""})}` +
+  `go.addEventListener("click",run);if(box.getAttribute("data-auto")==="1")run()})();`;
+export const PASSKEY_SCRIPT_HASH = "sha256-NsBDE8QZPy89nXGq7G6LfM4rVV96VXRAn+nOOwuymKw=";
+// connect-src: the script posts to this portal's own passkey endpoints with fetch.
+export const PASSKEY_CSP = `${CSP}; script-src '${PASSKEY_SCRIPT_HASH}'; connect-src 'self'`;
+export const PASSKEY_HEADERS = { "content-security-policy": PASSKEY_CSP };
 
 export function page(body: Html, status = 200, headers: Record<string, string> = {}): Response {
   return new Response("<!doctype html>" + body.value, {
@@ -398,7 +437,7 @@ export const MARK = new Html(
   `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.8 4.5 5.6v5.7c0 4.6 3.1 8.6 7.5 9.9 4.4-1.3 7.5-5.3 7.5-9.9V5.6L12 2.8Z" fill="rgba(255,255,255,.18)" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.6 12.1 2.4 2.4 4.5-4.7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 );
 
-export type NavItem = "Machines" | "Checks" | "Alerts" | "Roles" | "Invites" | "Audit";
+export type NavItem = "Machines" | "Checks" | "Alerts" | "Roles" | "Invites" | "Audit" | "Passkeys";
 
 const NAV: [NavItem, string, Key][] = [
   ["Machines", "/admin", "nav.machines"],
@@ -407,7 +446,12 @@ const NAV: [NavItem, string, Key][] = [
   ["Roles", "/admin/roles", "nav.roles"],
   ["Invites", "/admin/invites", "nav.invites"],
   ["Audit", "/admin/audit", "nav.audit"],
+  ["Passkeys", "/admin/passkeys", "nav.passkeys"],
 ];
+
+// Signed in with the admin token or a passkey (not Cloudflare Access): these
+// viewers get Sign out and the Passkeys page.
+export const sessionViewer = (who: string | null) => who === TOKEN_WHO || who === PASSKEY_WHO;
 
 // switcher is the language choice: a POST form with one button per language
 // (no script).
@@ -433,6 +477,8 @@ export interface LayoutOptions {
   switcher?: false | "self";
   // Include COPY_SCRIPT. The response must then carry COPY_HEADERS.
   copy?: boolean;
+  // Include PASSKEY_SCRIPT. The response must then carry PASSKEY_HEADERS.
+  passkey?: boolean;
 }
 
 // copyButton copies the text of the element with id `target`. Hidden until
@@ -453,11 +499,11 @@ export function layout(L: I18n, title: string, who: string | null, body: Html, a
 <title>${title} · bordercheck</title><style>${new Html(STYLE)}</style></head><body class="${who ? "admin" : "public"}">
 <header class="top">${
     who
-      ? html`<a class="brand" href="/admin"><span class="mark">${MARK}</span>bordercheck</a><nav class="nav" aria-label="${L.s("nav.sections")}">${NAV.map(
+      ? html`<a class="brand" href="/admin"><span class="mark">${MARK}</span>bordercheck</a><nav class="nav" aria-label="${L.s("nav.sections")}">${NAV.filter(([item]) => item !== "Passkeys" || sessionViewer(who)).map(
           ([item, href, key]) => html`<a href="${href}"${item === active ? html` class="on" aria-current="page"` : ""}>${L.t(key)}</a>`,
         )}</nav>
 <div class="who">${langs}<span class="id">${who}</span>${
-          who === "admin token"
+          sessionViewer(who)
             ? html`<form method="post" action="/admin/logout"><button class="sm ghost">${L.t("nav.signOut")}</button></form>`
             : ""
         }</div>`
@@ -465,7 +511,7 @@ export function layout(L: I18n, title: string, who: string | null, body: Html, a
   }</header>
 <main>${body}</main><footer class="credit">© Phil Trinh - SENPRINTS</footer>${
     opts.copy ? html`<span id="copy-status" class="sr-only" aria-live="polite"></span><script>${new Html(COPY_SCRIPT)}</script>` : ""
-  }</body></html>`;
+  }${opts.passkey ? html`<script>${new Html(PASSKEY_SCRIPT)}</script>` : ""}</body></html>`;
 }
 
 export function statusClass(s: string): string {

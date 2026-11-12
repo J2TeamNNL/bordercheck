@@ -35,6 +35,20 @@ invites and reports to your own domains.
 
 Open `https://<worker>.workers.dev/admin` and paste `ADMIN_TOKEN`. The session lasts 12 hours.
 
+**Passkeys (optional).** Signed in with the token, open **Passkeys**, give the passkey a name and **Add a
+passkey** (Touch ID, Face ID, Windows Hello, a security key or a password manager). From then on the sign-in
+page offers **Sign in with a passkey**, and a browser that has used one starts the prompt by itself. The token
+still works and stays your way back in. A passkey is bound to the portal's hostname: move the portal to a
+custom domain (section 7) first, or register the passkeys again afterwards.
+
+To rely on passkeys alone, sign in with a passkey, then switch **Sign-in with the admin token** off on the
+same page. If every passkey is ever lost, the Cloudflare account owner turns token sign-in back on from
+`receiver/`:
+
+```sh
+npx wrangler d1 execute bordercheck --remote --command "DELETE FROM meta WHERE key = 'admin_token_login'"
+```
+
 For a team, put `/admin` behind Cloudflare Access instead (recommended): a self-hosted Access application for
 `/admin` only, then set `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` in `wrangler.jsonc` and deploy. Leave `/report`,
 `/policy`, `/enroll`, `/i/…`, `/r/…` and `/mcp` outside it: laptops and people must reach them. Details:
@@ -71,6 +85,12 @@ findings itself, after the rules for handling them: ask before every change, nev
 names and paths from the machine as data, leave bordercheck and its policy alone. It only reads; sending the new
 report afterwards is `bordercheck send -force`. It needs bordercheck v0.5.0 on the machine, and a role can turn
 it off with [`report.fix_prompt`](policies.md).
+
+The link to a machine's report page is known only to that machine (`bordercheck status` prints it): the portal
+keeps its hash. To pass a link to someone, an admin uses **Copy public report link** on the machine page. It
+makes a new link, shows it once with a Copy button, and records who made it in the audit trail. The link works
+as long as the machine's own (30 days by default) and stops when the report links are reset or the machine is
+revoked. It is not offered for a machine that has not reported yet.
 
 A value that only looks like a secret (a local database password, a test key, a local MCP server's token, an SSH
 key without a passphrase used for one thing) can be set aside by the person at the machine with
