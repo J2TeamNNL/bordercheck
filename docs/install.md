@@ -307,9 +307,10 @@ Before it runs anything it downloaded, the script checks that:
    OpenSSL 3, as on current Linux distributions), and
 2. the binary matches its line in `SHA256SUMS`.
 
-Stock macOS (LibreSSL) and Windows PowerShell cannot check ed25519, so there the downloaded binary checks the
-signature itself (`bordercheck verify`) with the key from the script, after step 2 passed. Any mismatch stops
-the install with a message and nothing installed.
+Both scripts use OpenSSL to verify the release signature when it supports Ed25519. Without a capable
+OpenSSL (for example on stock macOS or Windows), an install warns and uses the downloaded binary
+to check the signature after the checksum matches. Dry runs never execute that binary. Without a
+capable OpenSSL, a dry run checks only the checksum and warns that the release signature is unverified.
 
 What that does and does not prove:
 
