@@ -64,7 +64,8 @@
         "ControlCenter",
         "DropboxFileProvider",
         "Dropbox",
-        "Spotify"
+        "Spotify",
+        "tailscaled"
       ]
     },
     "mesh-vpn": {

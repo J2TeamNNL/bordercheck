@@ -136,4 +136,14 @@ func TestEvalBackup(t *testing.T) {
 		!strings.Contains(r.Fix, "Privacy & security → Find my device") {
 		t.Errorf("windows: %s %q %q", r.Status, r.Summary, r.Fix)
 	}
+	// A desktop PC (no battery) is not asked for it: a pass with a note.
+	win.Desktop = true
+	if r = evalBackup(win, def, now); r.Status != check.Pass || !strings.Contains(r.Summary, "not asked of a desktop") || r.Fix != "" {
+		t.Errorf("windows desktop: %s %q %q", r.Status, r.Summary, r.Fix)
+	}
+	// With it on, a desktop says so like any other machine.
+	win.FindMy = true
+	if r = evalBackup(win, def, now); r.Status != check.Pass || strings.Contains(r.Summary, "desktop") {
+		t.Errorf("windows desktop, on: %s %q", r.Status, r.Summary)
+	}
 }

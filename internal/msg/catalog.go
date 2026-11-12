@@ -114,10 +114,10 @@ var Catalog = map[string]Entry{
 	"listeners.pass": pl("1 listening socket, on localhost.", "{n} listening sockets, all on localhost."),
 	"listeners.exposed": pl("1 port can be reached from other machines (LAN, Wi-Fi, Tailscale).",
 		"{n} ports can be reached from other machines (LAN, Wi-Fi, Tailscale)."),
-	"listeners.infoOnly": pl("1 port can be reached from other machines, held by a well-known service such as AirPlay "+
-		"Receiver or Dropbox LAN sync: listed for information, nothing to fix.",
-		"{n} ports can be reached from other machines, all held by well-known services such as AirPlay Receiver or "+
-			"Dropbox LAN sync: listed for information, nothing to fix."),
+	"listeners.infoOnly": pl("1 port can be reached from other machines, held by a well-known service (such as AirPlay "+
+		"Receiver, Dropbox LAN sync or Windows' own system services): listed for information, nothing to fix.",
+		"{n} ports can be reached from other machines, all held by well-known services (such as AirPlay Receiver, "+
+			"Dropbox LAN sync or Windows' own system services): listed for information, nothing to fix."),
 	"listeners.fix": s("Bind dev servers to 127.0.0.1 (Vite: drop [code]--host[/code]; Docker: " +
 		"[code]-p 127.0.0.1:PORT:PORT[/code]) and quit what you don't need. To share something, use a Cloudflare " +
 		"Tunnel instead of an open port."),
@@ -629,6 +629,7 @@ var Catalog = map[string]Entry{
 	"backup.unknown.mac": s("Could not tell whether Time Machine is set up (reading its settings may need Full Disk " +
 		"Access)."),
 	"backup.findMyUnknown": s("Could not tell whether the device can be located remotely."),
+	"backup.findMyDesktop": s("Remote locating is off, which is not asked of a desktop computer (it has no battery)."),
 	"backup.win.notRead":   s("Windows backups (File History, Windows Backup, OneDrive) are not checked."),
 	"backup.fix.mac.encrypt": s("System Settings → General → Time Machine → select the disk → Remove Disk, then Add " +
 		"Backup Disk again with \"Encrypt backup\" turned on (on recent macOS an existing backup cannot be encrypted " +

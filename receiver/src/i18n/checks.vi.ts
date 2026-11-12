@@ -94,7 +94,7 @@ export const checksVi: CheckCatalog = {
   "listeners.pass": "{n} socket đang lắng nghe, tất cả chỉ trên localhost.",
   "listeners.exposed": "{n} cổng có thể được truy cập từ máy khác (LAN, Wi-Fi, Tailscale).",
   "listeners.infoOnly":
-    "Có {n} cổng truy cập được từ máy khác, đều do các dịch vụ quen thuộc như AirPlay Receiver hoặc Dropbox LAN sync nắm giữ: chỉ liệt kê để biết, không cần sửa.",
+    "Có {n} cổng truy cập được từ máy khác, đều do các dịch vụ quen thuộc nắm giữ (như AirPlay Receiver, Dropbox LAN sync hoặc dịch vụ hệ thống của chính Windows): chỉ liệt kê để biết, không cần sửa.",
   "listeners.fix":
     "Cho dev server chỉ lắng nghe trên 127.0.0.1 (Vite: bỏ [code]--host[/code]; Docker: [code]-p 127.0.0.1:PORT:PORT[/code]) và tắt những gì không cần. Muốn chia sẻ thì dùng Cloudflare Tunnel thay vì mở cổng.",
   "listeners.note.mac": "Chỉ thấy được tiến trình của bạn; chạy với sudo để thấy cả service hệ thống.",
@@ -510,6 +510,7 @@ export const checksVi: CheckCatalog = {
   "backup.findMyOn.win": "Find my device đang bật.",
   "backup.unknown.mac": "Không xác định được Time Machine đã được thiết lập chưa (đọc thiết lập của nó có thể cần Full Disk Access).",
   "backup.findMyUnknown": "Không xác định được thiết bị có định vị từ xa được hay không.",
+  "backup.findMyDesktop": "Định vị từ xa đang tắt; máy để bàn (không có pin) không bị yêu cầu bật.",
   "backup.win.notRead": "Không kiểm tra sao lưu của Windows (File History, Windows Backup, OneDrive).",
   "backup.fix.mac.encrypt":
     "Mở System Settings → General → Time Machine → chọn ổ đĩa → Remove Disk, rồi Add Backup Disk lại với \"Encrypt backup\" được bật (trên macOS gần đây không thể mã hoá một bản sao lưu đang có, nên ổ đĩa sẽ bị xoá).",

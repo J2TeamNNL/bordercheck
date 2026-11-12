@@ -30,6 +30,7 @@
     "one": "1 plain-text token in AI agent / MCP configs.",
     "other": "{n} plain-text tokens in AI agent / MCP configs."
   },
+  "backup.findMyDesktop": "Remote locating is off, which is not asked of a desktop computer (it has no battery).",
   "backup.findMyOff.mac": "Find My Mac is off: a lost Mac cannot be located, locked or erased remotely.",
   "backup.findMyOff.win": "Find my device is off: a lost PC cannot be located or locked remotely.",
   "backup.findMyOn.mac": "Find My Mac is on.",
@@ -171,8 +172,8 @@
   },
   "listeners.fix": "Bind dev servers to 127.0.0.1 (Vite: drop [code]--host[/code]; Docker: [code]-p 127.0.0.1:PORT:PORT[/code]) and quit what you don't need. To share something, use a Cloudflare Tunnel instead of an open port.",
   "listeners.infoOnly": {
-    "one": "1 port can be reached from other machines, held by a well-known service such as AirPlay Receiver or Dropbox LAN sync: listed for information, nothing to fix.",
-    "other": "{n} ports can be reached from other machines, all held by well-known services such as AirPlay Receiver or Dropbox LAN sync: listed for information, nothing to fix."
+    "one": "1 port can be reached from other machines, held by a well-known service (such as AirPlay Receiver, Dropbox LAN sync or Windows' own system services): listed for information, nothing to fix.",
+    "other": "{n} ports can be reached from other machines, all held by well-known services (such as AirPlay Receiver, Dropbox LAN sync or Windows' own system services): listed for information, nothing to fix."
   },
   "listeners.note.linux": "Process names are shown only for your own processes; run with sudo to name system services.",
   "listeners.note.linuxNoSS": "ss was not found, so process names are unknown.",

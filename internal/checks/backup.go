@@ -33,6 +33,7 @@ type backupFacts struct {
 	Dests       []backupDest
 	FindMyKnown bool
 	FindMy      bool
+	Desktop     bool // no battery: not a machine that gets lost, so Find My is not asked of it
 	Notes       msg.Text
 }
 
@@ -87,7 +88,10 @@ func evalBackup(f backupFacts, p policy.Backup, now time.Time) check.Result {
 		ev = append(ev, "Time Machine: no backup disk is set up")
 		raise(check.Low)
 	}
-	if p.RequireFindMy && f.FindMyKnown && !f.FindMy {
+	var desktop msg.Text
+	if p.RequireFindMy && f.FindMyKnown && !f.FindMy && f.Desktop {
+		desktop = msg.Text{msg.P("backup.findMyDesktop")}
+	} else if p.RequireFindMy && f.FindMyKnown && !f.FindMy {
 		if mac {
 			summary = append(summary, msg.P("backup.findMyOff.mac"))
 			fix = append(fix, msg.P("backup.fix.mac.findMy"))
@@ -99,7 +103,7 @@ func evalBackup(f backupFacts, p policy.Backup, now time.Time) check.Result {
 		}
 		raise(check.Low)
 	}
-	notes := f.Notes
+	notes := append(desktop, f.Notes...)
 	if mac && !f.BackupKnown {
 		notes = append(notes, msg.P("backup.unknown.mac"))
 	}

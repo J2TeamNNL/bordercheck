@@ -33,7 +33,7 @@ LISTEN 0      4096   100.101.102.103:41641     0.0.0.0:*    users:(("tailscaled"
 	r := evalListeners(ls, nil, nil)
 	wantEv := []string{
 		"node: port 3000 on all interfaces",
-		"tailscaled: port 41641 on 100.101.102.103",
+		"tailscaled: port 41641 on 100.101.102.103 (Tailscale; reachable from your tailnet only)",
 		"unknown process: port 22 on all interfaces",
 	}
 	if r.Status != check.Warn || !slices.Equal(r.Evidence, wantEv) {

@@ -233,7 +233,7 @@ also shows ports held by system services on macOS.
 |---|---|---|
 | `allow` | `[{"process": "rapportd"}]` | Rules `{"process": "<name>", "port": "<port>"}` that may listen beyond localhost. `process` is required and compared without case; without `port`, any port. `rapportd` is Apple Handoff/Continuity. |
 
-| `info_only` | `["ControlCenter", "DropboxFileProvider", "Dropbox", "Spotify"]` | Process names (compared without case) whose open ports are **listed for information, not as a problem**, when nothing else is exposed: AirPlay Receiver (`ControlCenter`), Dropbox LAN sync, Spotify Connect. The check then passes and its evidence names them. They are well-known services, low risk on an up-to-date system, though reachable by anyone on the same network (AirPlay Receiver has had remotely exploitable bugs, fixed in system updates). With any other port exposed the check warns as usual and lists them all. `[]` makes each of them a finding again. |
+| `info_only` | `["ControlCenter", "DropboxFileProvider", "Dropbox", "Spotify", "tailscaled"]` | Process names (compared without case) whose open ports are **listed for information, not as a problem**, when nothing else is exposed: AirPlay Receiver (`ControlCenter`), Dropbox LAN sync, Spotify Connect, the Tailscale daemon (reachable from the tailnet only; the `mesh-vpn` check looks at it). On Windows the ports Windows itself keeps open on every PC are treated the same way without being listed here: the RPC endpoint mapper (135) and the dynamic RPC ports of `lsass`, `wininit`, `services`, `spoolsv` and `svchost`, SMB (139, 445), Delivery Optimization (7680) and device discovery (5040, 5357); RDP and WinRM are not among them (see `remote-access`). The check then passes and its evidence names them. They are well-known services, low risk on an up-to-date system, though reachable by anyone on the same network (AirPlay Receiver has had remotely exploitable bugs, fixed in system updates). With any other port exposed the check warns as usual and lists them all. `[]` makes each of them a finding again. |
 
 Example: `"allow": [{"process": "rapportd"}, {"process": "ControlCenter", "port": "7000"}]` (AirPlay Receiver).
 
@@ -691,7 +691,7 @@ rights or prompts; what cannot be read is said in a note.
 |---|---|---|
 | `require_backup` | `false` | Warn (low) when no Time Machine backup is set up. Off by default because many organisations back up another way. |
 | `require_encrypted` | `true` | Warn (medium) for a Time Machine backup that is not encrypted. |
-| `require_find_my` | `true` | Warn (low) when Find My Mac / Find my device is off. |
+| `require_find_my` | `true` | Warn (low) when Find My Mac / Find my device is off. Not asked of a desktop computer (one with no battery): there it is a note. |
 | `max_backup_age_days` | `0` | Warn (low) when the last backup to a destination is older than this, 0–3650; `0` = don't check. |
 
 ## A fuller example

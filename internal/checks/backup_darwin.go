@@ -2,6 +2,7 @@ package checks
 
 import (
 	"context"
+	"strings"
 
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
@@ -23,6 +24,10 @@ func gatherBackup(ctx context.Context) backupFacts {
 	nvram, nerr := sysx.Run(ctx, "/usr/sbin/nvram", "-p")
 	if (perr == nil && prefs != "") || nerr == nil {
 		f.FindMy, f.FindMyKnown = macFindMy(prefs, nvram), true
+	}
+	// A Mac without a battery (iMac, Mac mini, Mac Studio, Mac Pro) prints nothing here.
+	if out, err := sysx.Run(ctx, "/usr/sbin/ioreg", "-r", "-c", "AppleSmartBattery", "-d", "1"); err == nil {
+		f.Desktop = strings.TrimSpace(out) == ""
 	}
 	return f
 }

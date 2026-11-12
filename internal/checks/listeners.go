@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -36,6 +37,11 @@ var listenerHints = map[string]string{
 	"Spotify":             "Spotify Connect discovery",
 	"System":              "Windows file sharing (SMB) and other system services",
 	"svchost":             "Windows system service",
+	"lsass":               "Windows sign-in service (RPC)",
+	"wininit":             "Windows start-up service (RPC)",
+	"services":            "Windows service manager (RPC)",
+	"spoolsv":             "Windows print spooler (RPC)",
+	"tailscaled":          "Tailscale; reachable from your tailnet only",
 	"sshd":                "SSH server; turn it off if unused (Linux: sudo systemctl disable --now ssh; Mac: Remote Login)",
 	"kdeconnectd":         "KDE Connect",
 }
@@ -49,6 +55,32 @@ func listeners(ctx context.Context, opts policy.Listeners) check.Result {
 		return check.Errored(err)
 	}
 	return evalListenersWith(ls, note, opts.Allow, opts.InfoOnly)
+}
+
+// listenersOS is the OS the listeners were read on; tests set it.
+var listenersOS = runtime.GOOS
+
+// winSystemListener: a port every Windows PC has open out of the box, held by
+// Windows itself: the RPC endpoint mapper and the dynamic RPC ports of the
+// core services, file sharing's SMB ports, Delivery Optimization and device
+// discovery. They are listed for information like AirPlay Receiver on a Mac;
+// what is actually shared or remotely controlled is for the sharing and
+// remote-access checks (RDP on 3389 and WinRM on 5985/5986 are not in here).
+func winSystemListener(l listener) bool {
+	port, err := strconv.Atoi(l.Port)
+	if err != nil {
+		return false
+	}
+	dynamic := port >= 49152 // the range Windows hands out to RPC services
+	switch strings.ToLower(l.Proc) {
+	case "lsass", "wininit", "services", "spoolsv":
+		return dynamic
+	case "svchost":
+		return dynamic || port == 135 || port == 5040 || port == 7680
+	case "system":
+		return port == 139 || port == 445 || port == 5357
+	}
+	return false
 }
 
 func isLoopback(addr string) bool {
@@ -156,8 +188,9 @@ func evalListeners(ls []listener, note msg.Text, allow []policy.ListenerRule) ch
 
 // evalListenersWith is evalListeners with the policy's info_only list: when
 // every exposed port belongs to one of those processes (AirPlay Receiver,
-// Dropbox LAN sync and the like), the check passes and lists them for
-// information, with nothing to fix.
+// Dropbox LAN sync and the like) or, on Windows, is one Windows itself keeps
+// open (winSystemListener), the check passes and lists them for information,
+// with nothing to fix.
 func evalListenersWith(ls []listener, note msg.Text, allow []policy.ListenerRule, lower []string) check.Result {
 	var exposed []string
 	allowed := 0
@@ -177,7 +210,8 @@ func evalListenersWith(ls []listener, note msg.Text, allow []policy.ListenerRule
 		if isAnyAddr(where) {
 			where = "all interfaces"
 		}
-		if !slices.ContainsFunc(lower, func(p string) bool { return strings.EqualFold(p, l.Proc) }) {
+		if !slices.ContainsFunc(lower, func(p string) bool { return strings.EqualFold(p, l.Proc) }) &&
+			!(listenersOS == "windows" && winSystemListener(l)) {
 			onlyLower = false
 		}
 		line := fmt.Sprintf("%s: port %s on %s", proc, l.Port, where)

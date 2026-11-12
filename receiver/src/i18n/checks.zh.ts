@@ -95,7 +95,7 @@ export const checksZh: CheckCatalog = {
   "listeners.pass": "{n} 个监听套接字，全部只在 localhost 上。",
   "listeners.exposed": "{n} 个端口可被其他设备访问（局域网、Wi-Fi、Tailscale）。",
   "listeners.infoOnly":
-    "有 {n} 个端口可被其他设备访问，均由 AirPlay 接收器（AirPlay Receiver）或 Dropbox 局域网同步（LAN sync）这类常见服务占用：仅供参考，无需修复。",
+    "有 {n} 个端口可被其他设备访问，均由常见服务占用（如 AirPlay 接收器（AirPlay Receiver）、Dropbox 局域网同步（LAN sync）或 Windows 自身的系统服务）：仅供参考，无需修复。",
   "listeners.fix":
     "让开发服务器只绑定 127.0.0.1（Vite：去掉 [code]--host[/code]；Docker：[code]-p 127.0.0.1:PORT:PORT[/code]），并关闭不需要的服务。需要共享时，使用 Cloudflare Tunnel，而不是开放端口。",
   "listeners.note.mac": "只能看到你自己的进程；用 sudo 运行可包含系统服务。",
@@ -489,6 +489,7 @@ export const checksZh: CheckCatalog = {
   "backup.findMyOn.win": "Find my device 已开启。",
   "backup.unknown.mac": "无法确定是否已设置 Time Machine（读取其设置可能需要 Full Disk Access）。",
   "backup.findMyUnknown": "无法确定设备能否被远程定位。",
+  "backup.findMyDesktop": "远程定位已关闭；台式机（没有电池）不要求开启。",
   "backup.win.notRead": "未检查 Windows 备份（File History、Windows Backup、OneDrive）。",
   "backup.fix.mac.encrypt":
     "System Settings → General → Time Machine → 选择该磁盘 → Remove Disk，然后重新 Add Backup Disk 并开启 \"Encrypt backup\"（在较新的 macOS 上无法直接加密已有备份，因此磁盘会被抹掉）。",
