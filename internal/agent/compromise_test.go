@@ -55,7 +55,7 @@ func newCompromiseRig(t *testing.T, evidence bool, extra string) *compromiseRig 
 	}))
 	t.Cleanup(srv.Close)
 	dir := t.TempDir()
-	if err := writeJSON(filepath.Join(dir, "config.json"), Config{Email: "an@acme.com", InstallID: "id1", UpdateRepo: "ptrinh/bordercheck"}); err != nil {
+	if err := writeJSON(filepath.Join(dir, "config.json"), Config{Email: "an@domain.com", InstallID: "id1", UpdateRepo: "ptrinh/bordercheck"}); err != nil {
 		t.Fatal(err)
 	}
 	body := fmt.Sprintf(compromisePolicy, srv.URL+"/report", evidence, extra)

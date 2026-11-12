@@ -28,7 +28,7 @@ Keep a copy of `ADMIN_TOKEN` in your password manager. Secrets must be at least 
 Before you deploy, read the vars in `wrangler.jsonc`. By default the portal records the public IP and an
 IP-based location with every report; that is personal data about your staff. Turn off what you don't need
 (`STORE_PUBLIC_IP`, `STORE_GEO`) and see
-[What is stored](../receiver/README.md#what-is-stored). `ALLOWED_EMAIL_DOMAINS` (e.g. `"acme.com"`) keeps
+[What is stored](../receiver/README.md#what-is-stored). `ALLOWED_EMAIL_DOMAINS` (e.g. `"domain.com"`) keeps
 invites and reports to your own domains.
 
 ## 2. Sign in
@@ -189,8 +189,8 @@ Uncomment `routes` in `wrangler.jsonc` with your host, set `DASHBOARD_URL` so al
 and deploy again:
 
 ```jsonc
-"routes": [{ "pattern": "bordercheck.acme.com", "custom_domain": true }],
-"vars": { "DASHBOARD_URL": "https://bordercheck.acme.com", … }
+"routes": [{ "pattern": "bordercheck.domain.com", "custom_domain": true }],
+"vars": { "DASHBOARD_URL": "https://bordercheck.domain.com", … }
 ```
 
 Do this before you send invites: an enrolled machine sends its token only to the exact host of its invite link,
@@ -213,7 +213,7 @@ openssl rand -hex 32 | npx wrangler secret put MCP_READ_TOKEN   # read-only tool
 Then, in Claude Code:
 
 ```sh
-claude mcp add --transport http bordercheck https://bordercheck.acme.com/mcp \
+claude mcp add --transport http bordercheck https://bordercheck.domain.com/mcp \
   --header "Authorization: Bearer $BORDERCHECK_MCP_TOKEN"
 ```
 
@@ -235,7 +235,7 @@ The examples use `curl` and `jq`, with the token in an environment variable (fro
 typed into the shell):
 
 ```sh
-BC=https://bordercheck.acme.com/api/v1
+BC=https://bordercheck.domain.com/api/v1
 AUTH="Authorization: Bearer $BORDERCHECK_API_TOKEN"
 curl -fsS "$BC/roles" -H "$AUTH" | jq -r '.data[] | "\(.role_id)  \(.name)"'   # find the role id
 ```
@@ -247,7 +247,7 @@ re-issue the invite if the first answer was lost).
 ```sh
 curl -sS --fail-with-body "$BC/invites" -H "$AUTH" -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: hr-onboarding-4711' \
-  -d '{"email": "new.hire@acme.com", "role_id": 3, "note": "HR-4711"}' \
+  -d '{"email": "new.hire@domain.com", "role_id": 3, "note": "HR-4711"}' \
   | jq -r '.invites[0].install_macos_linux'
 ```
 
@@ -256,7 +256,7 @@ Send the command (or `.invite_link`) to that person only. `{"emails": [...]}` in
 **Revoke a leaver's machines.** Their token stops working at once; the history stays.
 
 ```sh
-who=leaver@acme.com
+who=leaver@domain.com
 curl -fsS "$BC/machines?search=$who&limit=200" -H "$AUTH" \
   | jq -r --arg who "$who" '.data[] | select(.email == $who) | .install_id' \
   | while read -r id; do curl -fsS -X POST "$BC/machines/$id/revoke" -H "$AUTH"; echo; done

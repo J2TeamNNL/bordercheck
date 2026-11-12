@@ -22,11 +22,11 @@ func withClock(t *testing.T) {
 func TestWaiveMatchesAndExpires(t *testing.T) {
 	p := Default()
 	p.Waivers = []Waiver{
-		{Check: "listeners", Email: "An@Acme.com", Until: "2026-12-01", Reason: "Postgres for the migration"},
-		{Check: "listeners", Email: "an@acme.com", Until: "2026-11-20", Reason: "shorter"},
+		{Check: "listeners", Email: "An@Domain.com", Until: "2026-12-01", Reason: "Postgres for the migration"},
+		{Check: "listeners", Email: "an@domain.com", Until: "2026-11-20", Reason: "shorter"},
 		{Check: "docker", InstallID: "id1", Hostname: "ans-mbp", Until: "2026-11-10", Reason: "ends today"},
-		{Check: "firewall", Email: "an@acme.com", Hostname: "ANS-MBP", Until: "2026-11-09", Reason: "ended yesterday"},
-		{Check: "tailscale", Email: "an@acme.com", Hostname: "ans-mbp", Until: "2027-01-01", Reason: "narrowed by hostname"},
+		{Check: "firewall", Email: "an@domain.com", Hostname: "ANS-MBP", Until: "2026-11-09", Reason: "ended yesterday"},
+		{Check: "tailscale", Email: "an@domain.com", Hostname: "ans-mbp", Until: "2027-01-01", Reason: "narrowed by hostname"},
 	}
 	results := []check.Result{
 		{ID: "listeners", Status: check.Warn, Severity: check.Medium, Summary: "1 port", Fix: "close it"},
@@ -35,7 +35,7 @@ func TestWaiveMatchesAndExpires(t *testing.T) {
 		{ID: "tailscale", Status: check.Pass},
 		{ID: "secrets", Status: check.Fail, Severity: check.High},
 	}
-	installed := Identity{Email: "an@acme.com", InstallID: "id1", Hostname: "ans-mbp.local"}
+	installed := Identity{Email: "an@domain.com", InstallID: "id1", Hostname: "ans-mbp.local"}
 	got := p.Waive(results, installed, today)
 
 	l := got[0]
@@ -65,11 +65,11 @@ func TestWaiveMatchesAndExpires(t *testing.T) {
 		t.Errorf("uninstalled: %+v", plain)
 	}
 	// Every identity field set must match.
-	other := p.Waive(results, Identity{Email: "an@acme.com", InstallID: "id2", Hostname: "ans-mbp"}, today)
+	other := p.Waive(results, Identity{Email: "an@domain.com", InstallID: "id2", Hostname: "ans-mbp"}, today)
 	if other[1].Status != check.Fail {
 		t.Errorf("install_id mismatch still waived: %+v", other[1])
 	}
-	if p.Waive(results, Identity{Email: "bo@acme.com"}, today)[0].Status != check.Warn {
+	if p.Waive(results, Identity{Email: "bo@domain.com"}, today)[0].Status != check.Warn {
 		t.Error("another person's waiver applied")
 	}
 }
@@ -85,21 +85,21 @@ func TestWaivedJSON(t *testing.T) {
 
 func TestWaiverValidation(t *testing.T) {
 	withClock(t)
-	ok := `{"waivers": [{"check": "listeners", "email": "an@acme.com", "until": "2027-11-10", "reason": "r"},
+	ok := `{"waivers": [{"check": "listeners", "email": "an@domain.com", "until": "2027-11-10", "reason": "r"},
 		{"check": "secrets", "install_id": "id1", "hostname": "ans-mbp", "until": "2020-01-01", "reason": "ended long ago is fine"}]}`
 	if p, err := load(t, ok); err != nil || len(p.Waivers) != 2 {
 		t.Fatalf("valid waivers: %v", err)
 	}
 	for body, want := range map[string]string{
-		`{"waivers": [{"check": "listeners", "email": "an@acme.com", "reason": "r"}]}`:                                "until",
-		`{"waivers": [{"check": "listeners", "email": "an@acme.com", "until": "2028-01-01", "reason": "r"}]}`:         "days ahead",
-		`{"waivers": [{"check": "listeners", "email": "an@acme.com", "until": "12/01/2026", "reason": "r"}]}`:         "date like",
-		`{"waivers": [{"check": "listeners", "until": "2026-12-01", "reason": "r"}]}`:                                 "which machine",
-		`{"waivers": [{"check": "listeners", "hostname": "ans-mbp", "until": "2026-12-01", "reason": "r"}]}`:          "which machine",
-		`{"waivers": [{"check": "listener", "email": "an@acme.com", "until": "2026-12-01", "reason": "r"}]}`:          "check must be",
-		`{"waivers": [{"check": "listeners", "email": "an@acme.com", "until": "2026-12-01"}]}`:                        "reason",
-		`{"waivers": [{"check": "listeners", "email": "an", "until": "2026-12-01", "reason": "r"}]}`:                  "not an email",
-		`{"waivers": [{"check": "listeners", "email": "an@acme.com", "until": "2026-12-01", "reason": "r", "x": 1}]}`: "unknown field",
+		`{"waivers": [{"check": "listeners", "email": "an@domain.com", "reason": "r"}]}`:                                "until",
+		`{"waivers": [{"check": "listeners", "email": "an@domain.com", "until": "2028-01-01", "reason": "r"}]}`:         "days ahead",
+		`{"waivers": [{"check": "listeners", "email": "an@domain.com", "until": "12/01/2026", "reason": "r"}]}`:         "date like",
+		`{"waivers": [{"check": "listeners", "until": "2026-12-01", "reason": "r"}]}`:                                   "which machine",
+		`{"waivers": [{"check": "listeners", "hostname": "ans-mbp", "until": "2026-12-01", "reason": "r"}]}`:            "which machine",
+		`{"waivers": [{"check": "listener", "email": "an@domain.com", "until": "2026-12-01", "reason": "r"}]}`:          "check must be",
+		`{"waivers": [{"check": "listeners", "email": "an@domain.com", "until": "2026-12-01"}]}`:                        "reason",
+		`{"waivers": [{"check": "listeners", "email": "an", "until": "2026-12-01", "reason": "r"}]}`:                    "not an email",
+		`{"waivers": [{"check": "listeners", "email": "an@domain.com", "until": "2026-12-01", "reason": "r", "x": 1}]}`: "unknown field",
 	} {
 		if _, err := load(t, body); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: got %v, want error containing %q", body, err, want)
@@ -163,11 +163,11 @@ func TestCheckIDsFollowChecks(t *testing.T) {
 func TestActiveWaivers(t *testing.T) {
 	at := time.Date(2026, 11, 10, 12, 0, 0, 0, time.Local)
 	p := Policy{Waivers: []Waiver{
-		{Check: "listeners", Email: "an@acme.com", Until: "2026-12-01", Reason: "db"},
-		{Check: "docker", Email: "an@acme.com", Until: "2026-11-01", Reason: "ended"},
-		{Check: "firewall", Email: "binh@acme.com", Until: "2026-12-01", Reason: "other machine"},
+		{Check: "listeners", Email: "an@domain.com", Until: "2026-12-01", Reason: "db"},
+		{Check: "docker", Email: "an@domain.com", Until: "2026-11-01", Reason: "ended"},
+		{Check: "firewall", Email: "binh@domain.com", Until: "2026-12-01", Reason: "other machine"},
 	}}
-	got := p.ActiveWaivers(Identity{Email: "AN@acme.com"}, at)
+	got := p.ActiveWaivers(Identity{Email: "AN@domain.com"}, at)
 	if len(got) != 1 || got[0].Check != "listeners" {
 		t.Errorf("got %+v", got)
 	}

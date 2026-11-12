@@ -44,14 +44,14 @@ func TestParseCrackHosts(t *testing.T) {
 
 func TestKMSEmulated(t *testing.T) {
 	for s, want := range map[string]bool{
-		"127.0.0.2":         true,
-		"127.0.0.2:1688":    true,
-		"localhost":         true,
-		"[::1]:1688":        true,
-		"0.0.0.0":           true,
-		"kms.corp.acme.com": false,
-		"10.0.0.5:1688":     false,
-		"":                  false,
+		"127.0.0.2":           true,
+		"127.0.0.2:1688":      true,
+		"localhost":           true,
+		"[::1]:1688":          true,
+		"0.0.0.0":             true,
+		"kms.corp.domain.com": false,
+		"10.0.0.5:1688":       false,
+		"":                    false,
 	} {
 		if got := kmsEmulated(s); got != want {
 			t.Errorf("kmsEmulated(%q) = %v, want %v", s, got, want)
@@ -63,7 +63,7 @@ func TestEvalCracked(t *testing.T) {
 	opts := policy.Default().Checks.CrackedSoftware
 
 	clean := crackFacts{HostsPath: "/etc/hosts", Hosts: "127.0.0.1 localhost\n",
-		KMS: map[string]string{"Windows": "kms.corp.acme.com:1688"}}
+		KMS: map[string]string{"Windows": "kms.corp.domain.com:1688"}}
 	if r := evalCracked(clean, opts); r.Status != check.Pass {
 		t.Errorf("clean machine: %+v", r)
 	}

@@ -10,7 +10,7 @@ const sha = async (s: string) =>
 describe("invites and enrollment", () => {
   it("enrolls with a code: per-machine token, server-assigned identity, nothing secret stored", async () => {
     const roleId = await makeRole("Dev");
-    const [code] = await makeInvites(["An@Acme.com"], roleId, { note: "new starter" });
+    const [code] = await makeInvites(["An@Domain.com"], roleId, { note: "new starter" });
     expect(code).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
     const res = await enroll({ code, host: HOST, version: "v0.4.0" });
@@ -18,7 +18,7 @@ describe("invites and enrollment", () => {
     const body = await res.json<Record<string, string>>();
     expect(Object.keys(body).sort()).toEqual(["email", "install_id", "policy_url", "report_url", "role", "token"]);
     expect(body.install_id).toMatch(/^[0-9a-f]{32}$/);
-    expect(body.email).toBe("an@acme.com");
+    expect(body.email).toBe("an@domain.com");
     expect(body.role).toBe("Dev");
     expect(body.policy_url).toBe(`${BASE}/policy`);
     expect(body.report_url).toBe(`${BASE}/report`);
@@ -36,14 +36,14 @@ describe("invites and enrollment", () => {
     expect(dump).toContain(await sha(body.token));
 
     const e = await env.DB.prepare("SELECT * FROM enrollments").first<Record<string, unknown>>();
-    expect(e).toMatchObject({ install_id: body.install_id, email: "an@acme.com", hostname: "an-mbp", os: "darwin", version: "v0.4.0" });
+    expect(e).toMatchObject({ install_id: body.install_id, email: "an@domain.com", hostname: "an-mbp", os: "darwin", version: "v0.4.0" });
     const audit = await env.DB.prepare("SELECT action FROM audit ORDER BY id").all<{ action: string }>();
     expect(audit.results.map((a) => a.action)).toEqual(["role.create", "invite.create", "machine.enroll"]);
   });
 
   it("fails with each machine-readable error", async () => {
     const roleId = await makeRole("Dev");
-    const [a, b, c] = await makeInvites(["a@acme.com", "b@acme.com", "c@acme.com"], roleId);
+    const [a, b, c] = await makeInvites(["a@domain.com", "b@domain.com", "c@domain.com"], roleId);
     const err = async (r: Response) => ({ status: r.status, ...(await r.json<{ error: string; message: string }>()) });
 
     expect(await err(await enroll({ code: "A".repeat(43) }))).toMatchObject({ status: 404, error: "invalid_code" });
@@ -57,17 +57,17 @@ describe("invites and enrollment", () => {
     expect(used).toMatchObject({ status: 409, error: "used" });
     expect(used.message).toBeTruthy();
 
-    const bId = (await env.DB.prepare("SELECT id FROM invites WHERE email = 'b@acme.com'").first<number>("id"))!;
+    const bId = (await env.DB.prepare("SELECT id FROM invites WHERE email = 'b@domain.com'").first<number>("id"))!;
     expect((await adminPost(`/admin/invites/${bId}/revoke`)).status).toBe(200);
     expect(await err(await enroll({ code: b }))).toMatchObject({ status: 410, error: "revoked" });
 
-    await env.DB.prepare("UPDATE invites SET expires_at = '2000-01-01T00:00:00.000Z' WHERE email = 'c@acme.com'").run();
+    await env.DB.prepare("UPDATE invites SET expires_at = '2000-01-01T00:00:00.000Z' WHERE email = 'c@domain.com'").run();
     expect(await err(await enroll({ code: c }))).toMatchObject({ status: 410, error: "expired" });
     expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM enrollments").first<number>("n")).toBe(1);
   });
 
   it("consumes a code exactly once under concurrency", async () => {
-    const [code] = await makeInvites(["an@acme.com"], await makeRole("Dev"));
+    const [code] = await makeInvites(["an@domain.com"], await makeRole("Dev"));
     const rs = await Promise.all(Array.from({ length: 6 }, (_, i) => enroll({ code, host: { ...HOST, hostname: `h${i}` } }, `198.51.100.${i}`)));
     const statuses = rs.map((r) => r.status).sort();
     expect(statuses).toEqual([200, 409, 409, 409, 409, 409]);
@@ -89,20 +89,20 @@ describe("invites and enrollment", () => {
 
   it("bulk-creates invites, refuses bad emails and other domains, re-issues", async () => {
     const roleId = await makeRole("Support");
-    const codes = await makeInvites(["a@acme.com", "b@acme.com, c@acme.com", "a@acme.com"], roleId);
+    const codes = await makeInvites(["a@domain.com", "b@domain.com, c@domain.com", "a@domain.com"], roleId);
     expect(codes).toHaveLength(3);
-    const bad = await adminPost("/admin/invites", { emails: "a@acme.com\nnot-an-email", role_id: String(roleId) });
+    const bad = await adminPost("/admin/invites", { emails: "a@domain.com\nnot-an-email", role_id: String(roleId) });
     expect(bad.status).toBe(400);
     expect(await bad.text()).toContain("not-an-email");
-    const outside = await adminPost("/admin/invites", { emails: "x@other.example", role_id: String(roleId) }, { ALLOWED_EMAIL_DOMAINS: "acme.com" });
+    const outside = await adminPost("/admin/invites", { emails: "x@other.example", role_id: String(roleId) }, { ALLOWED_EMAIL_DOMAINS: "domain.com" });
     expect(outside.status).toBe(400);
     expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM invites").first<number>("n")).toBe(3);
 
     const list = await (await adminGet("/admin/invites")).text();
-    expect(list).toContain("b@acme.com");
+    expect(list).toContain("b@domain.com");
     for (const c of codes) expect(list).not.toContain(c); // codes are shown once only
 
-    const id = (await env.DB.prepare("SELECT id FROM invites WHERE email = 'b@acme.com'").first<number>("id"))!;
+    const id = (await env.DB.prepare("SELECT id FROM invites WHERE email = 'b@domain.com'").first<number>("id"))!;
     const re = await adminPost(`/admin/invites/${id}/reissue`);
     expect(re.status).toBe(200);
     const newCode = [...(await re.text()).matchAll(/\/i\/([A-Za-z0-9_-]{43})/g)][0][1];
@@ -111,16 +111,16 @@ describe("invites and enrollment", () => {
     expect((await adminPost(`/admin/invites/${id}/reissue`)).status).toBe(409); // only once
     const enr = await enroll({ code: newCode, host: HOST });
     expect(enr.status).toBe(200);
-    expect((await enr.json<{ email: string; role: string }>())).toMatchObject({ email: "b@acme.com", role: "Support" });
+    expect((await enr.json<{ email: string; role: string }>())).toMatchObject({ email: "b@domain.com", role: "Support" });
 
     const used = await (await adminGet("/admin/invites?status=used")).text();
-    expect(used).toContain("b@acme.com");
+    expect(used).toContain("b@domain.com");
     const revoked = await (await adminGet("/admin/invites?status=revoked")).text();
     expect(revoked).toContain(`re-issued as #`);
   });
 
   it("the invite page shows the install commands without consuming the code", async () => {
-    const [code] = await makeInvites(["an@acme.com"], await makeRole("Dev"));
+    const [code] = await makeInvites(["an@domain.com"], await makeRole("Dev"));
     const res = await call(new Request(`${BASE}/i/${code}`, { headers: { "cf-connecting-ip": "203.0.113.9" } }));
     expect(res.status).toBe(200);
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
@@ -130,7 +130,7 @@ describe("invites and enrollment", () => {
     const body = await res.text();
     expect(body).toContain(`curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- ${BASE}/i/${code}`);
     expect(body).toContain(`&amp; ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) ${BASE}/i/${code}`);
-    expect(body).not.toContain("an@acme.com");
+    expect(body).not.toContain("an@domain.com");
     expect(body.replace(`<script>${COPY_SCRIPT}</script>`, "")).not.toContain("<script"); // only the hashed Copy script
     expect((await enroll({ code, host: HOST })).status).toBe(200);
     const after = await call(new Request(`${BASE}/i/${code}`));
@@ -140,7 +140,7 @@ describe("invites and enrollment", () => {
   });
 
   it("puts the visitor's own command first, judging only by the User-Agent", async () => {
-    const [code] = await makeInvites(["an@acme.com"], await makeRole("Dev"));
+    const [code] = await makeInvites(["an@domain.com"], await makeRole("Dev"));
     const open = async (ua: string) => (await call(new Request(`${BASE}/i/${code}`, { headers: { "user-agent": ua } }))).text();
     const win = await open("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0 Safari/537.36");
     expect(win.indexOf("install.ps1")).toBeLessThan(win.indexOf("install.sh"));
@@ -158,12 +158,12 @@ describe("invites and enrollment", () => {
 
   it("uses INSTALL_SH_URL / INSTALL_PS1_URL, ignoring values that are unsafe in a shell", async () => {
     const roleId = await makeRole("Dev");
-    const res = await adminPost("/admin/invites", { emails: "a@acme.com", role_id: String(roleId) }, {
-      INSTALL_SH_URL: "https://bordercheck.acme.com/install.sh",
+    const res = await adminPost("/admin/invites", { emails: "a@domain.com", role_id: String(roleId) }, {
+      INSTALL_SH_URL: "https://bordercheck.domain.com/install.sh",
       INSTALL_PS1_URL: "https://evil.example/x.ps1; rm -rf ~",
     });
     const body = await res.text();
-    expect(body).toContain("curl -fsSL https://bordercheck.acme.com/install.sh | sh -s -- ");
+    expect(body).toContain("curl -fsSL https://bordercheck.domain.com/install.sh | sh -s -- ");
     expect(body).toContain("irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1");
     expect(body).not.toContain("rm -rf");
   });
@@ -219,8 +219,8 @@ describe("GET /policy", () => {
     await makeRole("Dev", {
       ...DEV_POLICY,
       waivers: [
-        { check: "docker", email: "an@acme.com", until, reason: "migration" },
-        { check: "docker", email: "someone-else@acme.com", until, reason: "not yours" },
+        { check: "docker", email: "an@domain.com", until, reason: "migration" },
+        { check: "docker", email: "someone-else@domain.com", until, reason: "not yours" },
       ],
     });
     const m = await enrolled();
@@ -234,7 +234,7 @@ describe("GET /policy", () => {
 
     const p = await (await getPolicy(m.token)).json<any>();
     expect(p.waivers).toEqual([
-      { check: "docker", email: "an@acme.com", until, reason: "migration" },
+      { check: "docker", email: "an@domain.com", until, reason: "migration" },
       { check: "listeners", install_id: m.install_id, until, reason: "Postgres on 5432" },
     ]);
     const page = await (await adminGet(`/admin/machine/${m.install_id}`)).text();
@@ -251,13 +251,13 @@ describe("GET /policy", () => {
 describe("reports from enrolled machines", () => {
   it("takes install_id and email from the token, ignoring the body", async () => {
     const m = await enrolled();
-    const res = await post(report({ install_id: "spoofed-install-id-0001", email: "ceo@acme.com" }), { token: m.token });
+    const res = await post(report({ install_id: "spoofed-install-id-0001", email: "ceo@domain.com" }), { token: m.token });
     expect(res.status).toBe(200);
     const rows = await env.DB.prepare("SELECT install_id, email, report FROM machines").all<{ install_id: string; email: string; report: string }>();
     expect(rows.results).toHaveLength(1);
     expect(rows.results[0].install_id).toBe(m.install_id);
-    expect(rows.results[0].email).toBe("an@acme.com");
-    expect(JSON.parse(rows.results[0].report)).toMatchObject({ install_id: m.install_id, email: "an@acme.com" });
+    expect(rows.results[0].email).toBe("an@domain.com");
+    expect(JSON.parse(rows.results[0].report)).toMatchObject({ install_id: m.install_id, email: "an@domain.com" });
     // Even with no install_id in the body at all.
     const { install_id: _drop, ...noId } = report();
     expect((await post(noId, { token: m.token })).status).toBe(200);
@@ -274,15 +274,15 @@ describe("reports from enrolled machines", () => {
     const page = await (await adminGet(`/admin/machine/${m.install_id}`)).text();
     expect(page).toContain("revoked");
     const list = await (await adminGet("/admin?filter=revoked")).text();
-    expect(list).toContain("an@acme.com");
+    expect(list).toContain("an@domain.com");
   });
 
   it("does not let one machine's token write to another machine", async () => {
-    const an = await enrolled("an@acme.com");
-    const bo = await enrolled("bo@acme.com");
-    expect((await post(report({ install_id: an.install_id, email: "an@acme.com" }), { token: bo.token })).status).toBe(200);
+    const an = await enrolled("an@domain.com");
+    const bo = await enrolled("bo@domain.com");
+    expect((await post(report({ install_id: an.install_id, email: "an@domain.com" }), { token: bo.token })).status).toBe(200);
     const rows = await env.DB.prepare("SELECT install_id, email FROM machines").all<{ install_id: string; email: string }>();
-    expect(rows.results).toEqual([{ install_id: bo.install_id, email: "bo@acme.com" }]);
+    expect(rows.results).toEqual([{ install_id: bo.install_id, email: "bo@domain.com" }]);
   });
 
   it("refuses reports without an enrolled machine's token", async () => {
@@ -352,7 +352,7 @@ describe("admin portal", () => {
     const id = await makeRole("Dev");
     expect((await adminPost(`/admin/roles/${id}`, { name: "Developers", policy: '{"name":"Acme devs"}' })).status).toBe(200);
     expect(await env.DB.prepare("SELECT name FROM roles WHERE id = ?").bind(id).first<string>("name")).toBe("Developers");
-    await makeInvites(["a@acme.com"], id);
+    await makeInvites(["a@domain.com"], id);
     expect((await adminPost(`/admin/roles/${id}/delete`)).status).toBe(409);
     const unused = await makeRole("Temp");
     expect((await adminPost(`/admin/roles/${unused}/delete`)).status).toBe(200);
@@ -380,7 +380,7 @@ describe("admin portal", () => {
   it("escapes role names, notes, emails and hostnames everywhere", async () => {
     const evil = `<script>alert(1)</script>"'`;
     const roleId = await makeRole(`Dev ${evil}`, { name: evil });
-    const [code] = await makeInvites(["an@acme.com"], roleId, { note: evil });
+    const [code] = await makeInvites(["an@domain.com"], roleId, { note: evil });
     const res = await enroll({ code, host: { os: evil, arch: evil, hostname: evil }, version: evil });
     const m = await res.json<{ install_id: string; token: string }>();
     await post(report({ host: { os: "darwin", arch: "arm64", hostname: evil } }), { token: m.token });
@@ -409,10 +409,10 @@ describe("role policy helpers", () => {
       validateRolePolicy(
         {
           name: "Acme",
-          report: { interval: "24h", include_evidence: false, email_domains: ["acme.com"] },
+          report: { interval: "24h", include_evidence: false, email_domains: ["domain.com"] },
           update: { binary: true, interval: "24h", repo: "ptrinh/bordercheck", public_key: "" },
           notify: { enabled: true, statuses: ["fail"], severities: ["high", "medium"], remind_every: "24h" },
-          waivers: [{ check: "listeners", email: "an@acme.com", until: "2026-12-01", reason: "Postgres" }],
+          waivers: [{ check: "listeners", email: "an@domain.com", until: "2026-12-01", reason: "Postgres" }],
           checks: { listeners: { on_problem: "fail", allow: [{ process: "rapportd" }] }, tailscale: { enabled: false } },
         },
         now,
@@ -426,24 +426,24 @@ describe("role policy helpers", () => {
       {
         report: { headers: { Authorization: "Bearer x", "X-Other": "keep", authorization: "Bearer y" } },
         waivers: [
-          { check: "docker", email: "AN@acme.com", until: "2026-12-01", reason: "ok" },
+          { check: "docker", email: "AN@domain.com", until: "2026-12-01", reason: "ok" },
           { check: "docker", install_id: "other", until: "2026-12-01", reason: "no" },
-          { check: "docker", email: "an@acme.com", until: "2020-01-01", reason: "stale" },
+          { check: "docker", email: "an@domain.com", until: "2020-01-01", reason: "stale" },
         ],
       },
       "Dev",
-      { install_id: "abc", email: "an@acme.com" },
+      { install_id: "abc", email: "an@domain.com" },
       [
         { check_id: "firewall", until: "2026-11-09", reason: "just ended" },
         { check_id: "made-up", until: "2026-12-01", reason: "unknown check" },
       ],
-      "https://bordercheck.acme.com",
+      "https://bordercheck.domain.com",
       now,
     );
     expect(p.name).toBe("Dev");
     expect((p.report as any).headers).toEqual({ "X-Other": "keep" });
     expect(p.waivers).toEqual([
-      { check: "docker", email: "AN@acme.com", until: "2026-12-01", reason: "ok" },
+      { check: "docker", email: "AN@domain.com", until: "2026-12-01", reason: "ok" },
       { check: "firewall", install_id: "abc", until: "2026-11-09", reason: "just ended" },
     ]);
   });

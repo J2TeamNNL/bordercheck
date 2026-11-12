@@ -83,7 +83,7 @@ describe("MCP access", () => {
       expect(res.status, origin).toBe(403);
     }
     expect((await rpc("tools/list", {}, { headers: { origin: BASE } })).status).toBe(200);
-    expect((await rpc("tools/list", {}, { headers: { origin: "https://bordercheck.acme.com" }, e: { DASHBOARD_URL: "https://bordercheck.acme.com" } })).status).toBe(200);
+    expect((await rpc("tools/list", {}, { headers: { origin: "https://bordercheck.domain.com" }, e: { DASHBOARD_URL: "https://bordercheck.domain.com" } })).status).toBe(200);
   });
 
   it("is POST only, JSON only, size-limited and rate-limited", async () => {
@@ -238,9 +238,9 @@ describe("MCP tools/list", () => {
 });
 
 async function fleet() {
-  const m = await enrolled("an@acme.com", "Dev");
+  const m = await enrolled("an@domain.com", "Dev");
   await post(report({}, [result("firewall", "fail", { severity: "high", fix: "Turn it on.", evidence: ["/etc/pf.conf"] }), result("secrets", "pass")]), { token: m.token });
-  const bo = await enrolled("bo@acme.com", "Support");
+  const bo = await enrolled("bo@domain.com", "Support");
   await post(report({ host: { os: "linux", arch: "amd64", hostname: "bo-box" } }, [result("firewall", "pass")]), { token: bo.token });
   return { ...m, bo };
 }
@@ -255,13 +255,13 @@ describe("MCP read tools", () => {
 
     const failing = (await tool("list_machines", { filter: "failing" })).data;
     expect(failing.machines.map((x: any) => x.install_id)).toEqual([m.install_id]);
-    expect(failing.machines[0]).toMatchObject({ enrolled: true, role: "Dev", email: "an@acme.com", state: "non-compliant", untrusted: { hostname: "an-mbp" } });
+    expect(failing.machines[0]).toMatchObject({ enrolled: true, role: "Dev", email: "an@domain.com", state: "non-compliant", untrusted: { hostname: "an-mbp" } });
     expect(JSON.stringify(failing)).not.toContain("/etc/pf.conf"); // no evidence in lists
     const fw = (await tool("list_machines", { check: "firewall" })).data;
     expect(fw.machines.map((x: any) => x.install_id)).toEqual([m.install_id]);
     const fwPass = (await tool("list_machines", { check: "firewall", check_status: "pass" })).data;
     expect(fwPass.machines.map((x: any) => x.install_id)).toEqual([m.bo.install_id]);
-    expect(fwPass.machines[0]).toMatchObject({ email: "bo@acme.com", role: "Support" });
+    expect(fwPass.machines[0]).toMatchObject({ email: "bo@domain.com", role: "Support" });
     expect(fwPass.machines[0].untrusted.email).toBeUndefined();
     expect((await tool("list_machines", { filter: "legacy" })).isError).toBe(true);
     expect((await tool("list_machines", { search: "bo-b" })).data.machines).toHaveLength(1);
@@ -278,7 +278,7 @@ describe("MCP read tools", () => {
     await env.DB.prepare("UPDATE machines SET public_ip = '198.51.100.4', geo = ? WHERE install_id = ?")
       .bind(JSON.stringify({ country: "VN", city: "Hanoi", lat: 21.0, lon: 105.8 }), m.install_id).run();
     const g = (await tool("get_machine", { install_id: m.install_id })).data;
-    expect(g.enrollment).toMatchObject({ role: "Dev", email: "an@acme.com", revoked: false });
+    expect(g.enrollment).toMatchObject({ role: "Dev", email: "an@domain.com", revoked: false });
     expect(g.checks_needing_attention[0]).toMatchObject({ check_id: "firewall", status: "fail", severity: "high" });
     expect(g.checks_needing_attention[0].since).toMatch(/^\d{4}-/);
     expect(g.checks_needing_attention[0].untrusted.fix).toBe("Turn it on.");
@@ -299,7 +299,7 @@ describe("MCP read tools", () => {
     const list = (await tool("list_machines", {}, { e: { STORE_GEO: "off" } })).data;
     expect(JSON.stringify(list)).not.toContain("Hanoi");
 
-    expect((await tool("get_machine", { install_id: m.bo.install_id })).data.enrollment).toMatchObject({ role: "Support", email: "bo@acme.com" });
+    expect((await tool("get_machine", { install_id: m.bo.install_id })).data.enrollment).toMatchObject({ role: "Support", email: "bo@domain.com" });
     const none = await tool("get_machine", { install_id: "does-not-exist-0000" });
     expect(none.isError).toBe(true);
     expect(none.data.error).toBe("No such machine.");
@@ -319,7 +319,7 @@ describe("MCP read tools", () => {
     expect((await tool("get_role", { role_id: 999 })).isError).toBe(true);
 
     const used = (await tool("list_invites", { status: "used" })).data;
-    expect(used.invites[1]).toMatchObject({ email: "an@acme.com", role: "Dev", status: "used", used_install_id: m.install_id });
+    expect(used.invites[1]).toMatchObject({ email: "an@domain.com", role: "Dev", status: "used", used_install_id: m.install_id });
     expect(used.counts.used).toBe(2);
 
     const alerts = (await tool("list_alerts")).data.alerts;
@@ -363,7 +363,7 @@ describe("MCP write tools", () => {
       { report: { headers: { "X-Custom": "1" } } },
       { update: { policy_url: "https://evil.example/policy" } },
       { update: { repo: "evil/bordercheck", public_key: btoa("x".repeat(32)) } },
-      { waivers: [{ check: "firewall", email: "an@acme.com", until: until(30), reason: "please" }] },
+      { waivers: [{ check: "firewall", email: "an@domain.com", until: until(30), reason: "please" }] },
       { report: { include_location: true } },
       { report: { include_evidence: true } },
     ];
@@ -391,11 +391,11 @@ describe("MCP write tools", () => {
 
   it("create_invites returns links once; codes never reach the audit trail", async () => {
     const roleId = await makeRole("Dev");
-    const r = await tool("create_invites", { emails: ["a@acme.com", "B@acme.com"], role_id: roleId, days: 3, note: "batch" });
+    const r = await tool("create_invites", { emails: ["a@domain.com", "B@domain.com"], role_id: roleId, days: 3, note: "batch" });
     expect(r.isError).toBe(false);
     expect(r.data.invites).toHaveLength(2);
     const inv = r.data.invites[1];
-    expect(inv.email).toBe("b@acme.com");
+    expect(inv.email).toBe("b@domain.com");
     const code = /\/i\/([A-Za-z0-9_-]{43})$/.exec(inv.invite_link)![1];
     expect(inv.install_macos_linux).toBe(`curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- ${BASE}/i/${code}`);
     expect(inv.install_windows).toContain(`${BASE}/i/${code}`);
@@ -408,18 +408,18 @@ describe("MCP write tools", () => {
 
     // Validation: all-or-nothing, the MCP cap, allowed domains, expiry.
     const before = await env.DB.prepare("SELECT COUNT(*) AS n FROM invites").first<number>("n");
-    expect((await tool("create_invites", { emails: ["ok@acme.com", "not-an-email"], role_id: roleId })).data.problems[0]).toContain("not-an-email");
-    const many = Array.from({ length: 51 }, (_, i) => `p${i}@acme.com`);
+    expect((await tool("create_invites", { emails: ["ok@domain.com", "not-an-email"], role_id: roleId })).data.problems[0]).toContain("not-an-email");
+    const many = Array.from({ length: 51 }, (_, i) => `p${i}@domain.com`);
     expect((await tool("create_invites", { emails: many, role_id: roleId })).isError).toBe(true);
-    expect((await tool("create_invites", { emails: ["x@other.example"], role_id: roleId }, { e: { ALLOWED_EMAIL_DOMAINS: "acme.com" } })).data.problems[0]).toContain("Outside ALLOWED_EMAIL_DOMAINS");
-    expect((await tool("create_invites", { emails: ["x@acme.com"], role_id: roleId, days: 91 })).isError).toBe(true);
-    expect((await tool("create_invites", { emails: ["x@acme.com"], role_id: 999 })).data.problems).toContain("Pick a role.");
+    expect((await tool("create_invites", { emails: ["x@other.example"], role_id: roleId }, { e: { ALLOWED_EMAIL_DOMAINS: "domain.com" } })).data.problems[0]).toContain("Outside ALLOWED_EMAIL_DOMAINS");
+    expect((await tool("create_invites", { emails: ["x@domain.com"], role_id: roleId, days: 91 })).isError).toBe(true);
+    expect((await tool("create_invites", { emails: ["x@domain.com"], role_id: 999 })).data.problems).toContain("Pick a role.");
     expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM invites").first<number>("n")).toBe(before);
   });
 
   it("revoke_invite and reissue_invite", async () => {
     const roleId = await makeRole("Dev");
-    const r = (await tool("create_invites", { emails: ["a@acme.com", "b@acme.com"], role_id: roleId })).data.invites;
+    const r = (await tool("create_invites", { emails: ["a@domain.com", "b@domain.com"], role_id: roleId })).data.invites;
     const rev = await tool("revoke_invite", { invite_id: r[0].invite_id });
     expect(rev.data).toMatchObject({ ok: true, status: "revoked" });
     expect((await tool("revoke_invite", { invite_id: r[0].invite_id })).isError).toBe(true);
@@ -529,7 +529,7 @@ describe("MCP and prompt injection", () => {
       ]),
       { token: m.token },
     );
-    const bo = await enrolled("bo@acme.com");
+    const bo = await enrolled("bo@domain.com");
     await post(report({ version: INJECT, host: { os: "linux", arch: INJECT, hostname: nasty } }, [result("secrets", "pass", { title: nasty })]), { token: bo.token });
 
     const calls: [string, Record<string, unknown>][] = [
@@ -570,7 +570,7 @@ describe("MCP and prompt injection", () => {
   it("no code, token or hash ever appears in a tool result", async () => {
     const m = await fleet();
     const roleId = m.roleId;
-    const created = (await tool("create_invites", { emails: ["c@acme.com"], role_id: roleId })).data.invites[0];
+    const created = (await tool("create_invites", { emails: ["c@domain.com"], role_id: roleId })).data.invites[0];
     const code = /\/i\/(.+)$/.exec(created.invite_link)![1];
     const hashes = [
       ...(await env.DB.prepare("SELECT code_hash AS h FROM invites").all<{ h: string }>()).results,

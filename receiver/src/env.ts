@@ -14,7 +14,7 @@ export interface Env {
   // Vars (wrangler.jsonc "vars").
   ACCESS_TEAM_DOMAIN?: string; // e.g. acme.cloudflareaccess.com
   ACCESS_AUD?: string; // the Access application's AUD tag
-  DASHBOARD_URL?: string; // e.g. https://bordercheck.acme.com, for links in alerts
+  DASHBOARD_URL?: string; // e.g. https://bordercheck.domain.com, for links in alerts
   ALLOWED_EMAIL_DOMAINS?: string; // comma-separated; reports from other emails are refused
   SILENT_DAYS?: string; // alert when a machine has not reported for this many days (default 7)
   DIGEST_HOURS?: string; // hours between digests; 0 or empty = no digest

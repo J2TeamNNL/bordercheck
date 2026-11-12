@@ -54,7 +54,7 @@ describe("pages and the API", () => {
   const hostile = { path: "~/<script>alert(1)</script>/.env", name: "A&B", kind: "<b>kind</b>", reason: `"><img src=x onerror=alert(1)>`, since: "2026-11-11" };
 
   it("the machine page lists them, escaped, under a failing and under a passing check", async () => {
-    const an = await enrolled("ign-an@acme.com");
+    const an = await enrolled("ign-an@domain.com");
     await post(report({}, [result("secrets", "warn", { severity: "medium", user_ignored: [ignored[0], hostile] })]), { token: an.token });
     const body = await (await adminGet(`/admin/machine/${an.install_id}`)).text();
     expect(body).toContain("Ignored by the user (2)");
@@ -66,7 +66,7 @@ describe("pages and the API", () => {
     expect(body).not.toContain("<img src=x");
     expect(body).not.toContain("<b>kind</b>");
 
-    const bo = await enrolled("ign-bo@acme.com");
+    const bo = await enrolled("ign-bo@domain.com");
     await post(report({}, [result("secrets", "pass", { user_ignored: [ignored[1]] })]), { token: bo.token });
     const passing = await (await adminGet(`/admin/machine/${bo.install_id}`)).text();
     expect(passing).toContain("Ignored by the user (1)");
@@ -80,7 +80,7 @@ describe("pages and the API", () => {
   });
 
   it("the report page shows only the count, no paths or reasons", async () => {
-    const m = await enrolled("ign-cy@acme.com");
+    const m = await enrolled("ign-cy@domain.com");
     const res = await post(report({}, [result("firewall", "fail", { severity: "high" }), result("secrets", "pass", { user_ignored: [ignored[0], hostile] })]), { token: m.token });
     const { report_url } = await res.json<{ report_url: string }>();
     const page = await (await call(new Request(report_url.replace("https://bordercheck.example.com", BASE)))).text();
@@ -90,14 +90,14 @@ describe("pages and the API", () => {
     expect(page).not.toContain("local docker db");
     expect(page).not.toContain("alert(1)");
     // An older client's report: no chip.
-    const old = await enrolled("ign-dee@acme.com");
+    const old = await enrolled("ign-dee@domain.com");
     const r2 = await post(report(), { token: old.token });
     const p2 = await (await call(new Request((await r2.json<{ report_url: string }>()).report_url.replace("https://bordercheck.example.com", BASE)))).text();
     expect(p2).not.toContain("ignored by you");
   });
 
   it("MCP/API machine detail: the count always, the items with evidence, under untrusted", async () => {
-    const m = await enrolled("ign-ed@acme.com");
+    const m = await enrolled("ign-ed@domain.com");
     await post(report({}, [result("secrets", "pass", { user_ignored: [ignored[0], hostile] })]), { token: m.token });
     const plain = await machineDetail(env, m.install_id, {}, new Date());
     const d = plain.ok ? (plain.data as Record<string, unknown>) : {};
@@ -110,7 +110,7 @@ describe("pages and the API", () => {
     expect(items).toHaveLength(2);
     expect(items[0]).toEqual({ check_id: "secrets", untrusted: { path: "~/app/.env", name: "POSTGRES_PASSWORD", kind: "Secret-looking variable", reason: "local docker db", since: "2026-11-11" } });
 
-    const old = await enrolled("ign-fay@acme.com");
+    const old = await enrolled("ign-fay@domain.com");
     await post(report(), { token: old.token });
     const o = await machineDetail(env, old.install_id, { evidence: true }, new Date());
     expect((o.ok ? (o.data as Record<string, unknown>) : {}).user_ignored_count).toBe(0);
@@ -131,7 +131,7 @@ describe("role policies", () => {
 
 describe("ai-agents and ssh-keys", () => {
   it("each check's list shows under that check, and the report page counts each", async () => {
-    const m = await enrolled("ign-gus@acme.com");
+    const m = await enrolled("ign-gus@domain.com");
     const res = await post(
       report({}, [
         result("ai-agents", "fail", {

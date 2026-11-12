@@ -101,8 +101,8 @@ describe("dashboard pages", () => {
   });
 
   it("lists machines, filters non-compliant, shows waivers and unknown statuses", async () => {
-    const an = await enrolled("an@acme.com");
-    const boM = await enrolled("bo@acme.com");
+    const an = await enrolled("an@domain.com");
+    const boM = await enrolled("bo@domain.com");
     await post(report(), { token: an.token });
     await post(
       report({ host: { os: "linux", arch: "amd64", hostname: "bo-box" } }, [
@@ -113,14 +113,14 @@ describe("dashboard pages", () => {
       { token: boM.token },
     );
     const all = await (await adminGet("/admin")).text();
-    expect(all).toContain("an@acme.com");
-    expect(all).toContain("bo@acme.com");
+    expect(all).toContain("an@domain.com");
+    expect(all).toContain("bo@domain.com");
     const failing = await (await adminGet("/admin?filter=failing")).text();
-    expect(failing).toContain("an@acme.com");
-    expect(failing).not.toContain("bo@acme.com");
+    expect(failing).toContain("an@domain.com");
+    expect(failing).not.toContain("bo@domain.com");
     const search = await (await adminGet("/admin?q=bo-b")).text();
-    expect(search).toContain("bo@acme.com");
-    expect(search).not.toContain("an@acme.com");
+    expect(search).toContain("bo@domain.com");
+    expect(search).not.toContain("an@domain.com");
 
     const bo = await (await adminGet(`/admin/machine/${boM.install_id}`)).text();
     expect(bo).toContain("Waived until 2099-01-31");
@@ -132,8 +132,8 @@ describe("dashboard pages", () => {
     expect(checks.indexOf("firewall")).toBeLessThan(checks.indexOf("os-updates"));
     expect(checks).toContain("screen-lock");
     const fw = await (await adminGet("/admin/checks/firewall?status=fail")).text();
-    expect(fw).toContain("an@acme.com");
-    expect(fw).not.toContain("bo@acme.com");
+    expect(fw).toContain("an@domain.com");
+    expect(fw).not.toContain("bo@domain.com");
   });
 
   it("shows when a check started failing", async () => {

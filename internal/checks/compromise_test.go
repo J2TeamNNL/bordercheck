@@ -63,7 +63,7 @@ func TestCompromiseIndicators(t *testing.T) {
 		r.Compromise[1].Detail != `KMSpico (C:\Program Files\KMSpico)` {
 		t.Errorf("crack tools: %+v", r.Compromise)
 	}
-	if r := evalCracked(crackFacts{KMS: map[string]string{"Windows": "kms.corp.acme.com"}}, opts); r.Compromise != nil {
+	if r := evalCracked(crackFacts{KMS: map[string]string{"Windows": "kms.corp.domain.com"}}, opts); r.Compromise != nil {
 		t.Errorf("a company KMS server: %+v", r.Compromise)
 	}
 }

@@ -9,7 +9,7 @@
   // workers.dev URL is safe to leave on. Turn it off once you have a custom domain.
   "workers_dev": true,
   "preview_urls": false,
-  // "routes": [{ "pattern": "bordercheck.acme.com", "custom_domain": true }],
+  // "routes": [{ "pattern": "bordercheck.domain.com", "custom_domain": true }],
 
   "d1_databases": [
     {
@@ -27,10 +27,10 @@
   // Secrets are not set here. See README: ADMIN_TOKEN, ALERT_WEBHOOK_URL,
   // and optionally MCP_TOKEN / MCP_READ_TOKEN, API_TOKEN / API_READ_TOKEN.
   "vars": {
-    "DASHBOARD_URL": "",            // e.g. https://bordercheck.acme.com, for links in alerts
+    "DASHBOARD_URL": "",            // e.g. https://bordercheck.domain.com, for links in alerts
     "ACCESS_TEAM_DOMAIN": "",       // e.g. acme.cloudflareaccess.com
     "ACCESS_AUD": "",               // the Access application's AUD tag
-    "ALLOWED_EMAIL_DOMAINS": "",    // e.g. "acme.com,acme.co.uk"; empty = any
+    "ALLOWED_EMAIL_DOMAINS": "",    // e.g. "domain.com,acme.co.uk"; empty = any
     "SILENT_DAYS": "7",
     "DIGEST_HOURS": "168",          // weekly; "0" = no digest
     "HISTORY_DAYS": "180",

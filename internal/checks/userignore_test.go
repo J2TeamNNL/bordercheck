@@ -150,7 +150,7 @@ func TestUserIgnoreOnMadeUpHome(t *testing.T) {
 	writeFile(t, home, ".codex/config.toml", "sandbox_mode = \"danger-full-access\"\n", 0o600)
 	writeFile(t, home, ".ssh/aur", openSSHKey(t, "ssh-ed25519", "none"), 0o600)
 	writeFile(t, home, ".ssh/open", openSSHKey(t, "ssh-ed25519", "none"), 0o644)
-	line, _ := authorizedLine(t, "", "bob@acme.com")
+	line, _ := authorizedLine(t, "", "bob@domain.com")
 	writeFile(t, home, ".ssh/authorized_keys", line+"\n", 0o600)
 	writeFile(t, home, ".ssh/config", "Host *\n  ForwardAgent yes\n", 0o600)
 

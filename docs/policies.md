@@ -28,8 +28,8 @@ A small policy:
 ```json
 {
   "name": "Acme",
-  "report": { "url": "https://bordercheck.acme.com/report", "email_domains": ["acme.com"] },
-  "update": { "binary": true, "policy_url": "https://bordercheck.acme.com/policies.json" },
+  "report": { "url": "https://bordercheck.domain.com/report", "email_domains": ["domain.com"] },
+  "update": { "binary": true, "policy_url": "https://bordercheck.domain.com/policies.json" },
   "checks": { "listeners": { "on_problem": "fail" }, "mesh-vpn": { "enabled": false } }
 }
 ```
@@ -150,7 +150,7 @@ A waiver exempts one machine from one check for a while, without loosening the r
 
 ```json
 "waivers": [
-  { "check": "listeners", "email": "an@acme.com", "hostname": "an-mbp", "until": "2026-12-01",
+  { "check": "listeners", "email": "an@domain.com", "hostname": "an-mbp", "until": "2026-12-01",
     "reason": "Postgres on 5432 for the data migration; ticket IT-123" }
 ]
 ```
@@ -700,12 +700,12 @@ rights or prompts; what cannot be read is said in a note.
 {
   "name": "Acme",
   "report": {
-    "url": "https://bordercheck.acme.com/report",
+    "url": "https://bordercheck.domain.com/report",
     "headers": { "Authorization": "Bearer <submit-only token>" },
     "interval": "24h",
-    "email_domains": ["acme.com"]
+    "email_domains": ["domain.com"]
   },
-  "update": { "binary": true, "policy_url": "https://bordercheck.acme.com/policies.json" },
+  "update": { "binary": true, "policy_url": "https://bordercheck.domain.com/policies.json" },
   "notify": { "statuses": ["fail", "warn"], "severities": ["high"] },
   "checks": {
     "listeners":  { "on_problem": "fail", "allow": [{ "process": "rapportd" }] },

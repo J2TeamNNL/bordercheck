@@ -17,7 +17,7 @@ import (
 
 // A policy with every check off, so tests don't depend on the machine they run on.
 const policyFmt = `{"name": "Test", "report": {"url": %q, "headers": {"Authorization": "Bearer t0ken"},
- "interval": "24h", "email_domains": ["acme.com"]}, "update": {%s},
+ "interval": "24h", "email_domains": ["domain.com"]}, "update": {%s},
  "checks": {"firewall": {"enabled": false}, "disk-encryption": {"enabled": false},
   "listeners": {"enabled": false}, "tailscale": {"enabled": false}, "mesh-vpn": {"enabled": false}, "docker": {"enabled": false},
   "secrets": {"enabled": false}, "ssh-keys": {"enabled": false}, "ai-agents": {"enabled": false}}}`
@@ -25,7 +25,7 @@ const policyFmt = `{"name": "Test", "report": {"url": %q, "headers": {"Authoriza
 func setup(t *testing.T, srv *httptest.Server) (Env, *strings.Builder) {
 	t.Helper()
 	dir := t.TempDir()
-	cfg := Config{Email: "an@acme.com", InstallID: "id1", UpdateRepo: "ptrinh/bordercheck"}
+	cfg := Config{Email: "an@domain.com", InstallID: "id1", UpdateRepo: "ptrinh/bordercheck"}
 	if err := writeJSON(filepath.Join(dir, "config.json"), cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestSendPostsJSONAndRespectsInterval(t *testing.T) {
 	if err := Send(t.Context(), env, false); err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].Email != "an@acme.com" || got[0].InstallID != "id1" || got[0].Policy != "Test" {
+	if len(got) != 1 || got[0].Email != "an@domain.com" || got[0].InstallID != "id1" || got[0].Policy != "Test" {
 		t.Fatalf("got %+v", got)
 	}
 	if err := Send(t.Context(), env, false); err != nil || len(got) != 1 {
@@ -122,13 +122,13 @@ func TestPolicyURLFallsBackToSavedCopy(t *testing.T) {
 
 func TestCheckEmail(t *testing.T) {
 	for in, want := range map[string]string{
-		"  An@Acme.com ":          "an@acme.com",
-		"An <an@acme.com>":        "an@acme.com",
-		"an@gmail.com":            "error",
-		"not an email":            "error",
-		"an@sub.acme.com.evil.io": "error",
+		"  An@Domain.com ":          "an@domain.com",
+		"An <an@domain.com>":        "an@domain.com",
+		"an@gmail.com":              "error",
+		"not an email":              "error",
+		"an@sub.domain.com.evil.io": "error",
 	} {
-		got, err := checkEmail(in, []string{"acme.com"})
+		got, err := checkEmail(in, []string{"domain.com"})
 		if (err != nil) != (want == "error") || (err == nil && got != want) {
 			t.Errorf("checkEmail(%q) = %q, %v", in, got, err)
 		}
@@ -140,8 +140,8 @@ func TestCheckEmail(t *testing.T) {
 
 func TestAskEmailRetries(t *testing.T) {
 	out := &strings.Builder{}
-	email, err := askEmail(strings.NewReader("an@gmail.com\nan@acme.com\n"), out, []string{"acme.com"})
-	if err != nil || email != "an@acme.com" || strings.Count(out.String(), "Your work email") != 2 {
+	email, err := askEmail(strings.NewReader("an@gmail.com\nan@domain.com\n"), out, []string{"domain.com"})
+	if err != nil || email != "an@domain.com" || strings.Count(out.String(), "Your work email") != 2 {
 		t.Errorf("got %q %v; prompt %q", email, err, out)
 	}
 	if _, err := askEmail(strings.NewReader(""), io.Discard, nil); err == nil {
@@ -196,7 +196,7 @@ func TestSendRunsUpdateOnlyWhenOnAndDue(t *testing.T) {
 		t.Fatalf("update off: err %v, %d release fetches", err, gets)
 	}
 	setPolicy(t, env, srv, `"binary": true`)
-	cfg := Config{Email: "an@acme.com", InstallID: "id1", UpdateRepo: "o/r", UpdateKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}
+	cfg := Config{Email: "an@domain.com", InstallID: "id1", UpdateRepo: "o/r", UpdateKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}
 	if err := writeJSON(filepath.Join(env.Dir, "config.json"), cfg); err != nil {
 		t.Fatal(err)
 	}

@@ -37,10 +37,10 @@ describe("copy buttons", () => {
   it("on the issued page: one hashed script, one row of buttons per person, a message in the admin's language", async () => {
     const evil = `</script><script>alert(1)</script>" data-copy="x`;
     const roleId = await makeRole(evil);
-    const res = await issue({ emails: "an@acme.com\nbo@acme.com", role_id: String(roleId), note: evil });
+    const res = await issue({ emails: "an@domain.com\nbo@domain.com", role_id: String(roleId), note: evil });
     expect(res.status).toBe(200);
     const { body, targets } = await checkScriptPage(res);
-    const ids = [...body.matchAll(/<h2>(\S+@acme\.com) <span class="muted">#(\d+)<\/span><\/h2>/g)].map((m) => m[2]);
+    const ids = [...body.matchAll(/<h2>(\S+@domain\.com) <span class="muted">#(\d+)<\/span><\/h2>/g)].map((m) => m[2]);
     expect(ids.length).toBe(2);
     expect(targets).toEqual(ids.flatMap((id) => ["link", "sh", "ps1", "msg"].map((k) => `inv-${id}-${k}`)));
     for (const t of targets) expect(body).toContain(` id="${t}">`);
@@ -53,7 +53,7 @@ describe("copy buttons", () => {
     expect(body.match(/<code tabindex="0"/g)?.length).toBe(8);
 
     for (const [lang, word, msg] of [["zh", "复制消息", "你好，请在你的工作电脑上安装 bordercheck"], ["vi", "Sao chép tin nhắn", "Chào bạn, vui lòng cài bordercheck"]]) {
-      const r = await issue({ emails: `c-${lang}@acme.com`, role_id: String(roleId) }, lang);
+      const r = await issue({ emails: `c-${lang}@domain.com`, role_id: String(roleId) }, lang);
       const { body: b } = await checkScriptPage(r);
       expect(b).toContain(word);
       expect(b).toContain(msg);
@@ -63,7 +63,7 @@ describe("copy buttons", () => {
 
   it("on the re-issue page too", async () => {
     const roleId = await makeRole("Dev");
-    await issue({ emails: "an@acme.com", role_id: String(roleId) });
+    await issue({ emails: "an@domain.com", role_id: String(roleId) });
     const id = (await (await call(new Request(`${BASE}/admin/invites`, { headers: { authorization: `Bearer ${ADMIN_TOKEN}` } }))).text())
       .match(/\/admin\/invites\/(\d+)\/reissue/)![1];
     const res = await call(new Request(`${BASE}/admin/invites/${id}/reissue`, { method: "POST", headers: { authorization: `Bearer ${ADMIN_TOKEN}` } }));
@@ -73,7 +73,7 @@ describe("copy buttons", () => {
 
   it("on the invite page, for the commands shown", async () => {
     const roleId = await makeRole("Dev");
-    const page = await (await issue({ emails: "an@acme.com", role_id: String(roleId) })).text();
+    const page = await (await issue({ emails: "an@domain.com", role_id: String(roleId) })).text();
     const code = page.match(/\/i\/([A-Za-z0-9_-]{43})/)![1];
     for (const ua of ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "curl/8"]) {
       const res = await call(new Request(`${BASE}/i/${code}`, { headers: { "user-agent": ua, "cf-connecting-ip": "203.0.113.61" } }));

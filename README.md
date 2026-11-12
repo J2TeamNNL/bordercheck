@@ -77,7 +77,7 @@ Each machine runs bordercheck every hour as a per-user service and reports to yo
   each role (Dev, Support, Sales…) a policy, create an invite per person, and send them one command:
 
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.acme.com/i/<code>
+  curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.domain.com/i/<code>
   ```
 
   Each machine gets its own token, so you can revoke one alone. The portal shows the fleet, posts alerts to

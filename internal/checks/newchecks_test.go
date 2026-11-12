@@ -130,7 +130,7 @@ func TestParsePrivateKey(t *testing.T) {
 			"DEK-Info": "AES-128-CBC,00112233445566778899AABBCCDDEEFF"}), true, true, false, "PEM", "RSA"},
 		{"putty plain", "PuTTY-User-Key-File-3: ssh-ed25519\nEncryption: none\nComment: a\n", true, false, false, "PuTTY", "ed25519"},
 		{"putty encrypted", "PuTTY-User-Key-File-2: ssh-rsa\nEncryption: aes256-cbc\n", true, true, false, "PuTTY", "rsa"},
-		{"public key", "ssh-ed25519 AAAAC3Nza me@acme.com\n", false, false, false, "", ""},
+		{"public key", "ssh-ed25519 AAAAC3Nza me@domain.com\n", false, false, false, "", ""},
 		{"certificate", randomPEM("CERTIFICATE", nil), false, false, false, "", ""},
 		{"garbage", "-----BEGIN OPENSSH PRIVATE KEY-----\nnot base64!!\n-----END OPENSSH PRIVATE KEY-----\n", false, false, false, "", ""},
 	} {
@@ -145,7 +145,7 @@ func TestParsePrivateKey(t *testing.T) {
 func TestGatherAndEvalSSH(t *testing.T) {
 	home := t.TempDir()
 	writeFile(t, home, ".ssh/id_ed25519", openSSHKey(t, "ssh-ed25519", "none"), 0o600)
-	writeFile(t, home, ".ssh/id_ed25519.pub", "ssh-ed25519 AAAA me@acme.com\n", 0o644)
+	writeFile(t, home, ".ssh/id_ed25519.pub", "ssh-ed25519 AAAA me@domain.com\n", 0o644)
 	writeFile(t, home, ".ssh/id_locked", openSSHKey(t, "ssh-ed25519", "aes256-ctr"), 0o600)
 	writeFile(t, home, ".ssh/id_open", openSSHKey(t, "ssh-ed25519", "none"), 0o644)
 	writeFile(t, home, ".ssh/id_sk", openSSHKey(t, "sk-ssh-ed25519@openssh.com", "none"), 0o600)
@@ -154,11 +154,11 @@ func TestGatherAndEvalSSH(t *testing.T) {
 	writeFile(t, home, "keys/deploy", pkcs8Key(t), 0o600)
 	writeFile(t, home, ".ssh/config", "Host *\n  IdentityFile ~/keys/work_rsa\n  IdentityFile %d/missing\n  IdentityFile ~/.ssh/%h\nInclude conf.d/*\n", 0o600)
 	writeFile(t, home, ".ssh/conf.d/extra", "Host deploy\n  IdentityFile=\"~/keys/deploy\"\n", 0o600)
-	line1, blob1 := authorizedLine(t, `command="echo hi",no-pty`, "alice@acme.com")
+	line1, blob1 := authorizedLine(t, `command="echo hi",no-pty`, "alice@domain.com")
 	line2, blob2 := authorizedLine(t, "", "")
 	writeFile(t, home, ".ssh/authorized_keys", "# managed\n"+line1+"\n\n"+line2+"\n"+
 		`command="ssh-rsa not-a-key",restrict`+"\n", 0o600)
-	if a := parseAuthorizedKeys(strings.NewReader("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBadBase64x bob@acme.com\n"), "~/a"); len(a) != 1 || a[0].fingerprint != "" {
+	if a := parseAuthorizedKeys(strings.NewReader("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBadBase64x bob@domain.com\n"), "~/a"); len(a) != 1 || a[0].fingerprint != "" {
 		t.Errorf("undecodable key should still count: %+v", a)
 	}
 
@@ -172,7 +172,7 @@ func TestGatherAndEvalSSH(t *testing.T) {
 	if !slices.Equal(paths, want) {
 		t.Fatalf("keys: got %q, want %q", paths, want)
 	}
-	if len(auth) != 2 || auth[0].comment != "alice@acme.com" || auth[0].line != 2 || auth[1].comment != "" {
+	if len(auth) != 2 || auth[0].comment != "alice@domain.com" || auth[0].line != 2 || auth[1].comment != "" {
 		t.Fatalf("authorized keys: %+v", auth)
 	}
 
@@ -233,7 +233,7 @@ func TestClassifyProc(t *testing.T) {
 		{"cloudflared", "tunnel --url http://localhost:8080", "cloudflared", "8080", check.High},
 		{"cloudflared", "--no-autoupdate tunnel run --token " + fakeTunnel, "cloudflared", "", check.High},
 		{"cloudflared", "--config /etc/cf.yml tunnel run", "cloudflared", "", check.High},
-		{"cloudflared", "access tcp --hostname db.acme.com --url localhost:5432", "", "", ""},
+		{"cloudflared", "access tcp --hostname db.domain.com --url localhost:5432", "", "", ""},
 		{"cloudflared", "proxy-dns", "", "", ""},
 		{"/usr/local/bin/node", "/usr/local/bin/lt --port 3000 --subdomain acme", "localtunnel", "3000", check.High},
 		{"node", "/Users/me/.npm/_npx/1/node_modules/.bin/npx -y localtunnel -p 4000", "localtunnel", "4000", check.High},
@@ -250,7 +250,7 @@ func TestClassifyProc(t *testing.T) {
 		{"code", "--wait file.txt", "", "", ""},
 		{"devtunnel.exe", "host -p 3000", "devtunnel", "3000", check.Medium},
 		{"devtunnel", "host -p 3000 --allow-anonymous", "devtunnel", "3000", check.High},
-		{"/usr/bin/ssh", "-R 8080:localhost:3000 me@vps.acme.com", "ssh", "3000", check.Medium},
+		{"/usr/bin/ssh", "-R 8080:localhost:3000 me@vps.domain.com", "ssh", "3000", check.Medium},
 		{"ssh", "-fNR 80:localhost:5173 serveo.net", "ssh", "5173", check.High},
 		{"autossh", "-M 0 -R 9000 bastion", "ssh", "", check.Medium},
 		{"ssh", "-o RemoteForward=8080:127.0.0.1:3000 host", "ssh", "3000", check.Medium},
@@ -263,7 +263,7 @@ func TestClassifyProc(t *testing.T) {
 			t.Errorf("%s %s: got %+v ok=%v, want tool %q port %q sev %q", filepath.Base(tc.exe), tc.args, e, ok, tc.tool, tc.port, tc.sev)
 		}
 		assertNoLeak(t, "exposure", e.String())
-		for _, host := range []string{"acme.com", "serveo", "bore.pub", "ngrok.app", "frpc.toml"} {
+		for _, host := range []string{"domain.com", "serveo", "bore.pub", "ngrok.app", "frpc.toml"} {
 			if strings.Contains(e.String(), host) {
 				t.Errorf("exposure shows a command-line argument: %q", e)
 			}
@@ -356,16 +356,16 @@ func TestCredentialReaders(t *testing.T) {
 		data  string
 		names []string // the name of each hit, in order
 	}{
-		{"docker inline", readDockerConfig, `{"auths":{"ghcr.io":{"auth":"` + b64 + `"},"registry.acme.com":{"identitytoken":"` + fakeBearer + `"}}}`,
-			[]string{"ghcr.io", "registry.acme.com"}},
+		{"docker inline", readDockerConfig, `{"auths":{"ghcr.io":{"auth":"` + b64 + `"},"registry.domain.com":{"identitytoken":"` + fakeBearer + `"}}}`,
+			[]string{"ghcr.io", "registry.domain.com"}},
 		{"docker creds store", readDockerConfig, `{"auths":{"https://index.docker.io/v1/":{}},"credsStore":"osxkeychain","credHelpers":{"gcr.io":"gcloud"}}`, nil},
 		{"kube inline", readKubeConfig, "apiVersion: v1\nclusters:\n- name: prod\n  cluster:\n    certificate-authority-data: " + b64 +
 			"\nusers:\n- name: prod-admin\n  user:\n    client-certificate-data: " + b64 + "\n    client-key-data: " + b64 +
 			"\n- name: ci\n  user:\n    token: " + fakeBearer + "\n", []string{"prod-admin", "ci"}},
 		{"kube exec plugin", readKubeConfig, "users:\n- name: eks\n  user:\n    exec:\n      apiVersion: client.authentication.k8s.io/v1beta1\n" +
 			"      command: aws\n      args: [\"eks\", \"get-token\"]\n- name: file\n  user:\n    tokenFile: /var/run/token\n    client-key: /Users/me/.kube/key.pem\n", nil},
-		{"netrc multi-line", readNetrc, "machine api.acme.com\n  login me\n  password " + fakeSecret + "\nmachine x login y password $PASS\ndefault login a password b2\n",
-			[]string{"api.acme.com", "default"}},
+		{"netrc multi-line", readNetrc, "machine api.domain.com\n  login me\n  password " + fakeSecret + "\nmachine x login y password $PASS\ndefault login a password b2\n",
+			[]string{"api.domain.com", "default"}},
 		{"git credentials", readGitCredentials, "https://me:" + fakeGitHub + "@github.com\nhttps://github.com\n", []string{"github.com"}},
 		{"git helper store", readGitConfigHelper, "[user]\n  name = Me\n[credential]\n\thelper = store\n", []string{"credential.helper"}},
 		{"git helper keychain", readGitConfigHelper, "[credential]\n  helper = osxkeychain\n[alias]\n  helper = store\n", nil},
@@ -380,7 +380,7 @@ func TestCredentialReaders(t *testing.T) {
 		{"gh token", readGHHosts, "github.com:\n    users:\n        me:\n            oauth_token: gh" + "o_" + fakeSecret + "\n    git_protocol: https\n    oauth_token: gh" + "o_" + fakeSecret + "\n", []string{"github.com", "github.com"}},
 		{"gh keychain", readGHHosts, "github.com:\n    users:\n        me:\n    git_protocol: https\n    user: me\n", nil},
 		{"terraform", readTerraformCreds, `{"credentials":{"app.terraform.io":{"token":"` + fakeSecret + `.atlasv1.` + fakeSecret + `"}}}`, []string{"app.terraform.io"}},
-		{"pgpass", readPgPass, "# host:port:db:user:pw\ndb.acme.com:5432:*:app:" + fakeSecret + "\nlocal\\:sock:*:*:me:\nweird:1:d:u:pa\\:ss\n", []string{"db.acme.com", "weird"}},
+		{"pgpass", readPgPass, "# host:port:db:user:pw\ndb.domain.com:5432:*:app:" + fakeSecret + "\nlocal\\:sock:*:*:me:\nweird:1:d:u:pa\\:ss\n", []string{"db.domain.com", "weird"}},
 		{"my.cnf", iniPasswords("MySQL password", "password"), "[client]\nuser=me\npassword=\"" + fakeSecret + "\"\n[mysqldump]\npassword\n", []string{"client"}},
 	} {
 		hs := tc.read([]byte(tc.data))
@@ -398,10 +398,10 @@ func TestScanLocations(t *testing.T) {
 	home := t.TempDir()
 	writeFile(t, home, ".docker/config.json", `{"auths":{"ghcr.io":{"auth":"`+base64.StdEncoding.EncodeToString([]byte("me:"+fakeSecret))+`"}}}`, 0o600)
 	writeFile(t, home, ".kube/config", "users:\n- name: prod-admin\n  user:\n    token: "+fakeBearer+"\n", 0o600)
-	writeFile(t, home, ".netrc", "machine api.acme.com login me password "+fakeSecret+"\n", 0o600)
+	writeFile(t, home, ".netrc", "machine api.domain.com login me password "+fakeSecret+"\n", 0o600)
 	writeFile(t, home, ".git-credentials", "https://me:"+fakeGitHub+"@github.com\n", 0o600)
 	writeFile(t, home, ".config/gcloud/credentials.db", "SQLite format 3\x00", 0o600)
-	writeFile(t, home, ".config/gcloud/legacy_credentials/me@acme.com/adc.json", `{"type":"authorized_user","refresh_token":"1//`+fakeSecret+`"}`, 0o600)
+	writeFile(t, home, ".config/gcloud/legacy_credentials/me@domain.com/adc.json", `{"type":"authorized_user","refresh_token":"1//`+fakeSecret+`"}`, 0o600)
 	writeFile(t, home, "AppData/Roaming/gcloud/credentials.db", "SQLite format 3\x00", 0o600)
 	writeFile(t, home, ".pgpass", "db:5432:*:app:"+fakeSecret+"\n", 0o600)
 
@@ -416,9 +416,9 @@ func TestScanLocations(t *testing.T) {
 	want := []string{
 		"~/.docker/config.json|Docker registry login|ghcr.io|",
 		"~/.kube/config|Kubernetes token|prod-admin|",
-		"~/.netrc|netrc password|api.acme.com|",
+		"~/.netrc|netrc password|api.domain.com|",
 		"~/.git-credentials|Git credential (plain text)|github.com|WXYZ",
-		"~/.config/gcloud/legacy_credentials/me@acme.com/adc.json|gcloud application default credentials (refresh token)||",
+		"~/.config/gcloud/legacy_credentials/me@domain.com/adc.json|gcloud application default credentials (refresh token)||",
 		"~/.config/gcloud/credentials.db|gcloud credential store (tokens in a plain SQLite file)||",
 		"~/.pgpass|PostgreSQL password|db|",
 	}
@@ -488,7 +488,7 @@ func TestScanAIConfigs(t *testing.T) {
   "projects": {"/Users/me/app": {"mcpServers": {
      "db": {"command": "pg-mcp", "args": ["--password", "` + fakeSecret + `"]},
      "safe": {"command": "x", "env": {"API_KEY": "${API_KEY}", "TOKEN": "${env:TOKEN}"}},
-     "remote": {"type": "http", "url": "https://mcp.acme.com/mcp", "headers": {"Authorization": "Bearer ` + fakeBearer + `"}}}}}}`
+     "remote": {"type": "http", "url": "https://mcp.domain.com/mcp", "headers": {"Authorization": "Bearer ` + fakeBearer + `"}}}}}}`
 	settings := `{"permissions": {"defaultMode": "bypassPermissions", "allow": ["Bash(npm test)"]}, "skipDangerousModePermissionPrompt": true}`
 	vscode := `{
   // my settings

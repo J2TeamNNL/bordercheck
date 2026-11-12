@@ -84,13 +84,13 @@ func TestPrintPolicyShape(t *testing.T) {
 // A waiver written for the tailscale check covers mesh-vpn when Tailscale is
 // its only finding (the result then carries the alias), and only then.
 func TestTailscaleWaiverAppliesToMeshVPN(t *testing.T) {
-	p, err := load(t, `{"waivers": [{"check": "tailscale", "email": "an@acme.com", "until": "2026-12-01", "reason": "lab"}]}`)
+	p, err := load(t, `{"waivers": [{"check": "tailscale", "email": "an@domain.com", "until": "2026-12-01", "reason": "lab"}]}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ts := check.Result{ID: "mesh-vpn", Status: check.Fail, Severity: check.High, Aliases: []string{"tailscale"}}
 	other := check.Result{ID: "mesh-vpn", Status: check.Warn, Severity: check.Medium}
-	got := p.Waive([]check.Result{ts, other}, Identity{Email: "an@acme.com"}, today)
+	got := p.Waive([]check.Result{ts, other}, Identity{Email: "an@domain.com"}, today)
 	if got[0].Status != check.Waived || got[1].Status != check.Warn {
 		t.Errorf("got %+v / %+v", got[0], got[1])
 	}

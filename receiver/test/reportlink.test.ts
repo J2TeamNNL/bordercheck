@@ -23,7 +23,7 @@ describe("a public report link issued by an admin", () => {
     // It opens the machine's report without sign-in, and the machine's own link still works.
     const page = await open(link, "203.0.113.60");
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain("an@acme.com");
+    expect(await page.text()).toContain("an@domain.com");
     expect((await open(own, "203.0.113.61")).status).toBe(200);
 
     // Only its hash is stored, and the audit trail says who made it.
@@ -43,7 +43,7 @@ describe("a public report link issued by an admin", () => {
   });
 
   it("is refused for a machine that has not reported, a revoked one and an unknown one", async () => {
-    const m = await enrolled("bo@acme.com");
+    const m = await enrolled("bo@domain.com");
     const none = await adminPost(`/admin/machine/${m.install_id}/report-link`);
     expect(none.status).toBe(409);
     expect(await none.text()).toContain("has not sent a report yet");

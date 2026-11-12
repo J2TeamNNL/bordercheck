@@ -384,7 +384,7 @@ describe("passkeys and Cloudflare Access", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ keys: [{ ...jwk, kid: "k1", alg: "RS256" }] }));
     const part = (o: unknown) => b64url(enc.encode(JSON.stringify(o)));
     const head = part({ alg: "RS256", kid: "k1" });
-    const claims = part({ aud: ["aud"], iss: "https://acme.cloudflareaccess.com", exp: Math.floor(Date.now() / 1000) + 600, email: "it@acme.com" });
+    const claims = part({ aud: ["aud"], iss: "https://acme.cloudflareaccess.com", exp: Math.floor(Date.now() / 1000) + 600, email: "it@domain.com" });
     const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", keys.privateKey, enc.encode(`${head}.${claims}`));
     const jwt = `${head}.${claims}.${b64url(sig)}`;
     for (const e of [accessOnly, { ...accessOnly, ADMIN_TOKEN }]) {

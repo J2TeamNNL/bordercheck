@@ -3,15 +3,15 @@
 # organisation every hour (a per-user service; no root, no sudo).
 #
 #   curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh \
-#     | sh -s -- https://bordercheck.acme.com/policies.json
+#     | sh -s -- https://bordercheck.domain.com/policies.json
 #
 # or, with an invite link IT sent you (no email question; IT set it):
 #
 #   curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh \
-#     | sh -s -- https://bordercheck.acme.com/i/<code>
+#     | sh -s -- https://bordercheck.domain.com/i/<code>
 #
 # Options (after the URL or before it):
-#   --email you@acme.com   don't ask for the work email (scripted rollouts; not with an invite link)
+#   --email you@domain.com   don't ask for the work email (scripted rollouts; not with an invite link)
 #   --version vX.Y.Z       install that release instead of the latest
 #   --repo owner/name      install from a fork (with --key, the fork's release key); with an
 #                          invite link, the installed copy also takes its updates from there
@@ -49,9 +49,9 @@ die() {
 
 usage() {
 	cat >&2 <<'EOF'
-Usage: install.sh https://bordercheck.acme.com/policies.json [--email you@acme.com]
+Usage: install.sh https://bordercheck.domain.com/policies.json [--email you@domain.com]
                   [--version vX.Y.Z] [--repo owner/name --key BASE64] [--dry-run]
-       install.sh https://bordercheck.acme.com/i/<code>
+       install.sh https://bordercheck.domain.com/i/<code>
                   [--version vX.Y.Z] [--repo owner/name --key BASE64] [--dry-run]
 EOF
 	exit 2
@@ -134,7 +134,7 @@ main() {
 		esac
 	done
 	policy=${policy:-${BORDERCHECK_POLICY_URL:-}}
-	[ -n "$policy" ] || die "give your invite link or your organisation's policies URL, e.g.: sh -s -- https://bordercheck.acme.com/policies.json"
+	[ -n "$policy" ] || die "give your invite link or your organisation's policies URL, e.g.: sh -s -- https://bordercheck.domain.com/policies.json"
 	case $policy in https://*) ;; *) die "the URL must start with https://" ;; esac
 	# An invite link, https://<host>/i/<code>: keep in step with ParseInvite in internal/agent/enroll.go.
 	invite=no
@@ -248,7 +248,7 @@ main() {
 		# Piped into sh, stdin is this script: ask on the terminal instead.
 		"$tmp/$asset" "$@" </dev/tty
 	else
-		die "there is no terminal to ask for your work email; pass --email you@acme.com."
+		die "there is no terminal to ask for your work email; pass --email you@domain.com."
 	fi
 }
 

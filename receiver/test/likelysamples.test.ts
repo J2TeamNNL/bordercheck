@@ -52,7 +52,7 @@ describe("likely_samples in a report", () => {
 
 describe("pages and the API", () => {
   it("the machine page lists them under the secrets check, escaped, with the rule", async () => {
-    const an = await enrolled("smp-an@acme.com");
+    const an = await enrolled("smp-an@domain.com");
     await post(report({}, [result("secrets", "pass", { likely_samples: [...samples, hostile] })]), { token: an.token });
     const body = await (await adminGet(`/admin/machine/${an.install_id}`)).text();
     expect(body).toContain("Look like sample keys (4)");
@@ -68,7 +68,7 @@ describe("pages and the API", () => {
     expect(body).not.toContain("<details>"); // short: shown open
 
     // A long list is folded.
-    const bo = await enrolled("smp-bo@acme.com");
+    const bo = await enrolled("smp-bo@domain.com");
     const many = Array.from({ length: 12 }, (_, i) => ({ path: `~/examples/${i}/.env`, kind: "Secret-looking variable", rule: "sample-dir" }));
     await post(report({}, [result("secrets", "warn", { severity: "medium", likely_samples: many })]), { token: bo.token });
     const long = await (await adminGet(`/admin/machine/${bo.install_id}`)).text();
@@ -83,7 +83,7 @@ describe("pages and the API", () => {
   });
 
   it("the report page shows only the count", async () => {
-    const m = await enrolled("smp-cy@acme.com");
+    const m = await enrolled("smp-cy@domain.com");
     const res = await post(
       report({}, [result("firewall", "fail", { severity: "high" }), result("secrets", "warn", { severity: "medium", likely_samples: [samples[1], hostile] })]),
       { token: m.token },
@@ -94,14 +94,14 @@ describe("pages and the API", () => {
     expect(page).not.toContain("SESSION_SECRET");
     expect(page).not.toContain("demo-apps");
     expect(page).not.toContain("alert(1)");
-    const old = await enrolled("smp-dee@acme.com");
+    const old = await enrolled("smp-dee@domain.com");
     const r2 = await post(report(), { token: old.token });
     const p2 = await (await call(new Request((await r2.json<{ report_url: string }>()).report_url.replace("https://bordercheck.example.com", BASE)))).text();
     expect(p2).not.toContain("sample keys");
   });
 
   it("MCP/API machine detail: the count always, the items with evidence, under untrusted", async () => {
-    const m = await enrolled("smp-ed@acme.com");
+    const m = await enrolled("smp-ed@domain.com");
     await post(report({}, [result("secrets", "pass", { likely_samples: [samples[1], hostile] })]), { token: m.token });
     const plain = await machineDetail(env, m.install_id, {}, new Date());
     const d = plain.ok ? (plain.data as Record<string, unknown>) : {};
@@ -116,7 +116,7 @@ describe("pages and the API", () => {
     expect(items[1].rule).toBe("other");
     expect(items[1].untrusted.rule).toContain("img src");
 
-    const old = await enrolled("smp-fay@acme.com");
+    const old = await enrolled("smp-fay@domain.com");
     await post(report(), { token: old.token });
     const o = await machineDetail(env, old.install_id, { evidence: true }, new Date());
     expect((o.ok ? (o.data as Record<string, unknown>) : {}).likely_samples_count).toBe(0);

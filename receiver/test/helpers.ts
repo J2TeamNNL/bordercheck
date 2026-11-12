@@ -20,7 +20,7 @@ export function report(extra: Record<string, unknown> = {}, results?: unknown[])
     policy: "Acme",
     time: "2026-11-01T10:00:00Z",
     host: { os: "darwin", arch: "arm64", hostname: "an-mbp" },
-    email: "an@acme.com",
+    email: "an@domain.com",
     install_id: "4f1c0000aaaabbbbccccdddd",
     counts: { fail: 1, error: 0, warn: 0, pass: 1, skip: 0 },
     results: results ?? [result("firewall", "fail", { severity: "high", fix: "Turn it on." }), result("secrets", "pass")],
@@ -97,7 +97,7 @@ let enrollIp = 0;
 
 // enrolled invites `email` into `roleName` (created if missing) and enrolls a
 // machine with the code, as bordercheck does. Its token is what reports use.
-export async function enrolled(email = "an@acme.com", roleName = "Dev", host = HOST) {
+export async function enrolled(email = "an@domain.com", roleName = "Dev", host = HOST) {
   const roleId = (await env.DB.prepare("SELECT id FROM roles WHERE name = ?").bind(roleName).first<number>("id")) ?? (await makeRole(roleName));
   const [code] = await makeInvites([email], roleId);
   const ip = `198.18.${(enrollIp >> 8) & 255}.${enrollIp++ & 255}`;

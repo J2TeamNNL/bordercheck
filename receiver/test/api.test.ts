@@ -46,10 +46,10 @@ const until = (days: number) => new Date(Date.now() + days * 86400000).toISOStri
 const codeOf = (link: string) => /\/i\/([A-Za-z0-9_-]{43})$/.exec(link)![1];
 
 async function fleet() {
-  const m = await enrolled("an@acme.com", "Dev");
+  const m = await enrolled("an@domain.com", "Dev");
   const r = await post(report({}, [result("firewall", "fail", { severity: "high", fix: "Turn it on.", evidence: ["/etc/pf.conf"] }), result("secrets", "pass")]), { token: m.token });
   const link = (await r.json<{ report_url: string }>()).report_url;
-  const bo = await enrolled("bo@acme.com", "Support");
+  const bo = await enrolled("bo@domain.com", "Support");
   await post(report({ host: { os: "linux", arch: "amd64", hostname: "bo-box" } }, [result("firewall", "pass")]), { token: bo.token });
   return { ...m, bo, link };
 }
@@ -90,7 +90,7 @@ describe("API access", () => {
     const writes: [string, string, unknown?][] = [
       ["POST", `/machines/${m.install_id}/revoke`],
       ["POST", "/roles", { name: "Q", policy: {} }],
-      ["POST", "/invites", { email: "q@acme.com", role_id: m.roleId }],
+      ["POST", "/invites", { email: "q@domain.com", role_id: m.roleId }],
       ["DELETE", `/machines/${m.install_id}/waivers/1`],
       ["PUT", `/roles/${m.roleId}`, { name: "X" }],
     ];
@@ -115,7 +115,7 @@ describe("API access", () => {
       expect(r.body.error.code).toBe("origin_not_allowed");
     }
     expect((await api("GET", "/summary", { headers: { origin: BASE } })).status).toBe(200);
-    expect((await api("GET", "/summary", { headers: { origin: "https://bordercheck.acme.com" }, e: { DASHBOARD_URL: "https://bordercheck.acme.com" } })).status).toBe(200);
+    expect((await api("GET", "/summary", { headers: { origin: "https://bordercheck.domain.com" }, e: { DASHBOARD_URL: "https://bordercheck.domain.com" } })).status).toBe(200);
   });
 
   it("is rate-limited per client IP, counting wrong tokens too", async () => {
@@ -216,7 +216,7 @@ describe("API roles", () => {
         name: "Watched",
         policy: {
           report: { include_evidence: true, include_ips: true, include_location: true, check_interval: "1h" },
-          waivers: [{ check: "firewall", email: "an@acme.com", until: until(30), reason: "Vendor laptop" }],
+          waivers: [{ check: "firewall", email: "an@domain.com", until: until(30), reason: "Vendor laptop" }],
         },
       },
     });
@@ -260,17 +260,17 @@ describe("API roles", () => {
 describe("API invites", () => {
   it("creates one or many, returns codes once, never stores or audits them", async () => {
     const roleId = await makeRole("Dev");
-    const one = await api("POST", "/invites", { body: { email: "New.Hire@acme.com", role_id: roleId, days: 3, note: "HR-123" } });
+    const one = await api("POST", "/invites", { body: { email: "New.Hire@domain.com", role_id: roleId, days: 3, note: "HR-123" } });
     expect(one.status).toBe(201);
     expect(one.body).toMatchObject({ role: "Dev", expires_in_days: 3 });
     const inv = one.body.invites[0];
-    expect(inv).toMatchObject({ email: "new.hire@acme.com", invite_id: expect.any(Number), expires_at: expect.stringMatching(/^\d{4}-/) });
+    expect(inv).toMatchObject({ email: "new.hire@domain.com", invite_id: expect.any(Number), expires_at: expect.stringMatching(/^\d{4}-/) });
     const code = codeOf(inv.invite_link);
     expect(inv.install_macos_linux).toBe(`curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- ${BASE}/i/${code}`);
     expect(inv.install_windows).toContain(`${BASE}/i/${code}`);
 
-    const many = await api("POST", "/invites", { body: { emails: ["a@acme.com", "b@acme.com"], role_id: roleId } });
-    expect(many.body.invites.map((i: any) => i.email)).toEqual(["a@acme.com", "b@acme.com"]);
+    const many = await api("POST", "/invites", { body: { emails: ["a@domain.com", "b@domain.com"], role_id: roleId } });
+    expect(many.body.invites.map((i: any) => i.email)).toEqual(["a@domain.com", "b@domain.com"]);
     expect(many.body.expires_in_days).toBe(7);
 
     const audit = JSON.stringify(await auditRows());
@@ -278,40 +278,40 @@ describe("API invites", () => {
     const list = await api("GET", "/invites");
     expect(list.raw).not.toContain(code);
     expect(list.body).toMatchObject({ total: 3, counts: { pending: 3 } });
-    expect((await api("GET", "/invites?email=NEW.HIRE@acme.com")).body.data.map((i: any) => i.invite_id)).toEqual([inv.invite_id]);
+    expect((await api("GET", "/invites?email=NEW.HIRE@domain.com")).body.data.map((i: any) => i.invite_id)).toEqual([inv.invite_id]);
     expect((await enroll({ code, host: HOST })).status).toBe(200);
     const used = await api("GET", "/invites?status=used");
-    expect(used.body.data[0]).toMatchObject({ email: "new.hire@acme.com", status: "used", note: "HR-123" });
+    expect(used.body.data[0]).toMatchObject({ email: "new.hire@domain.com", status: "used", note: "HR-123" });
     expect(used.body.total).toBe(1);
   });
 
   it("validation: all or nothing, one problem list", async () => {
     const roleId = await makeRole("Dev");
     const before = await count("invites");
-    const bad = await api("POST", "/invites", { body: { emails: ["ok@acme.com", "not-an-email"], role_id: roleId } });
+    const bad = await api("POST", "/invites", { body: { emails: ["ok@domain.com", "not-an-email"], role_id: roleId } });
     expect(bad.status).toBe(400);
     expect(bad.body.error.details[0].message).toContain("not-an-email");
     expect((await api("POST", "/invites", { body: { role_id: roleId } })).status).toBe(400);
-    expect((await api("POST", "/invites", { body: { email: "a@acme.com", emails: ["b@acme.com"], role_id: roleId } })).status).toBe(400);
-    expect((await api("POST", "/invites", { body: { emails: ["a@acme.com, b@acme.com"], role_id: roleId } })).status).toBe(400);
-    const many = Array.from({ length: 501 }, (_, i) => `p${i}@acme.com`);
+    expect((await api("POST", "/invites", { body: { email: "a@domain.com", emails: ["b@domain.com"], role_id: roleId } })).status).toBe(400);
+    expect((await api("POST", "/invites", { body: { emails: ["a@domain.com, b@domain.com"], role_id: roleId } })).status).toBe(400);
+    const many = Array.from({ length: 501 }, (_, i) => `p${i}@domain.com`);
     expect((await api("POST", "/invites", { body: { emails: many, role_id: roleId } })).body.error.details[0].message).toBe("body.emails must have at most 500 items");
-    const outside = await api("POST", "/invites", { body: { email: "x@other.example", role_id: roleId }, e: { ALLOWED_EMAIL_DOMAINS: "acme.com" } });
+    const outside = await api("POST", "/invites", { body: { email: "x@other.example", role_id: roleId }, e: { ALLOWED_EMAIL_DOMAINS: "domain.com" } });
     expect(outside.body.error.details[0].message).toContain("Outside ALLOWED_EMAIL_DOMAINS");
-    expect((await api("POST", "/invites", { body: { email: "x@acme.com", role_id: 999 } })).body.error.details).toEqual([{ message: "Pick a role." }]);
-    expect((await api("POST", "/invites", { body: { email: "x@acme.com", role_id: roleId, days: 91 } })).status).toBe(400);
+    expect((await api("POST", "/invites", { body: { email: "x@domain.com", role_id: 999 } })).body.error.details).toEqual([{ message: "Pick a role." }]);
+    expect((await api("POST", "/invites", { body: { email: "x@domain.com", role_id: roleId, days: 91 } })).status).toBe(400);
     expect(await count("invites")).toBe(before);
     // 120 at once is fine (the dashboard's limit, not MCP's 50).
-    const bulk = await api("POST", "/invites", { body: { emails: Array.from({ length: 120 }, (_, i) => `q${i}@acme.com`), role_id: roleId } });
+    const bulk = await api("POST", "/invites", { body: { emails: Array.from({ length: 120 }, (_, i) => `q${i}@domain.com`), role_id: roleId } });
     expect(bulk.status).toBe(201);
     expect(bulk.body.invites).toHaveLength(120);
   });
 
   it("revoke and reissue", async () => {
     const roleId = await makeRole("Dev");
-    const [a, b] = (await api("POST", "/invites", { body: { emails: ["a@acme.com", "b@acme.com"], role_id: roleId } })).body.invites;
+    const [a, b] = (await api("POST", "/invites", { body: { emails: ["a@domain.com", "b@domain.com"], role_id: roleId } })).body.invites;
     const rev = await api("POST", `/invites/${a.invite_id}/revoke`);
-    expect(rev.body).toEqual({ invite_id: a.invite_id, email: "a@acme.com", status: "revoked" });
+    expect(rev.body).toEqual({ invite_id: a.invite_id, email: "a@domain.com", status: "revoked" });
     const again = await api("POST", `/invites/${a.invite_id}/revoke`);
     expect(again.status).toBe(409);
     expect(again.body.error.code).toBe("invite_not_pending");
@@ -329,24 +329,24 @@ describe("API invites", () => {
 
   it("Idempotency-Key: a retry gets 409 with the invite ids, never a second invite or the codes", async () => {
     const roleId = await makeRole("Dev");
-    const body = { emails: ["a@acme.com", "b@acme.com"], role_id: roleId };
+    const body = { emails: ["a@domain.com", "b@domain.com"], role_id: roleId };
     const key = "onboarding-HR-4711";
     const first = await api("POST", "/invites", { body, headers: { "idempotency-key": key } });
     expect(first.status).toBe(201);
     const codes = first.body.invites.map((i: any) => codeOf(i.invite_link));
     // Same body, keys in another order: the same request.
-    const retry = await api("POST", "/invites", { body: { role_id: roleId, emails: ["a@acme.com", "b@acme.com"] }, headers: { "idempotency-key": key } });
+    const retry = await api("POST", "/invites", { body: { role_id: roleId, emails: ["a@domain.com", "b@domain.com"] }, headers: { "idempotency-key": key } });
     expect(retry.status).toBe(409);
     expect(retry.body.error.code).toBe("already_created");
     expect(retry.body.error.details).toEqual(first.body.invites.map((i: any) => ({ invite_id: i.invite_id, email: i.email })));
     for (const c of codes) expect(retry.raw).not.toContain(c);
     expect(await count("invites")).toBe(2);
-    const other = await api("POST", "/invites", { body: { email: "c@acme.com", role_id: roleId }, headers: { "idempotency-key": key } });
+    const other = await api("POST", "/invites", { body: { email: "c@domain.com", role_id: roleId }, headers: { "idempotency-key": key } });
     expect(other.status).toBe(422);
     expect(other.body.error.code).toBe("idempotency_key_reused");
     // Only hashes are stored: not the key, not the codes, not the emails.
     const stored = JSON.stringify((await env.DB.prepare("SELECT * FROM api_idempotency").all()).results);
-    for (const s of [key, ...codes, "a@acme.com"]) expect(stored).not.toContain(s);
+    for (const s of [key, ...codes, "a@domain.com"]) expect(stored).not.toContain(s);
     // Without a key, a retry makes new invites (that is what the key is for).
     expect((await api("POST", "/invites", { body })).status).toBe(201);
     expect(await count("invites")).toBe(4);
@@ -361,11 +361,11 @@ describe("API invites", () => {
     const bad = await api("POST", "/invites", { body: { email: "nope", role_id: roleId }, headers: { "idempotency-key": key } });
     expect(bad.status).toBe(400);
     expect(await count("api_idempotency")).toBe(0);
-    const fixed = await api("POST", "/invites", { body: { email: "an@acme.com", role_id: roleId }, headers: { "idempotency-key": key } });
+    const fixed = await api("POST", "/invites", { body: { email: "an@domain.com", role_id: roleId }, headers: { "idempotency-key": key } });
     expect(fixed.status).toBe(201);
     // Simulate the first of two concurrent requests still running.
     const pendingKey = "still-running-01";
-    const body = { email: "bo@acme.com", role_id: roleId };
+    const body = { email: "bo@domain.com", role_id: roleId };
     await env.DB.prepare("INSERT INTO api_idempotency (key_hash, request_hash, state, created_at, expires_at) VALUES (?, ?, 'pending', ?, ?)")
       .bind(await sha256hex("bordercheck-idempotency:" + pendingKey), await sha256hex(JSON.stringify(body)), new Date().toISOString(), "2999-01-01T00:00:00Z")
       .run();
@@ -386,23 +386,23 @@ describe("API machines", () => {
     expect(all.body.next_cursor).toBeNull();
     const failing = await api("GET", "/machines?state=failing");
     expect(failing.body.data.map((x: any) => x.install_id)).toEqual([m.install_id]);
-    expect(failing.body.data[0]).toMatchObject({ enrolled: true, role: "Dev", email: "an@acme.com", state: "non-compliant", untrusted: { hostname: "an-mbp" } });
+    expect(failing.body.data[0]).toMatchObject({ enrolled: true, role: "Dev", email: "an@domain.com", state: "non-compliant", untrusted: { hostname: "an-mbp" } });
     expect(failing.raw).not.toContain("/etc/pf.conf");
     expect((await api("GET", "/machines?check=firewall")).body.data.map((x: any) => x.install_id)).toEqual([m.install_id]);
     const pass = await api("GET", "/machines?check=firewall&check_status=pass");
-    expect(pass.body).toMatchObject({ total: 1, data: [{ install_id: m.bo.install_id, email: "bo@acme.com" }] });
+    expect(pass.body).toMatchObject({ total: 1, data: [{ install_id: m.bo.install_id, email: "bo@domain.com" }] });
     expect((await api("GET", "/machines?search=bo-b")).body.total).toBe(1);
     expect((await api("GET", `/machines?role_id=${m.roleId}`)).body.total).toBe(1);
     expect((await api("GET", "/machines?check_status=pass")).status).toBe(400);
     expect((await api("GET", "/machines?state=legacy")).status).toBe(400);
 
-    const waiting = await enrolled("cy@acme.com", "Dev");
+    const waiting = await enrolled("cy@domain.com", "Dev");
     const nr = await api("GET", "/machines?state=no_report");
-    expect(nr.body).toMatchObject({ total: 1, data: [{ install_id: waiting.install_id, email: "cy@acme.com", role: "Dev" }] });
+    expect(nr.body).toMatchObject({ total: 1, data: [{ install_id: waiting.install_id, email: "cy@domain.com", role: "Dev" }] });
     expect((await api("GET", "/machines?state=no_report&check=firewall")).status).toBe(400);
 
     // Paging by install_id: every machine once, whatever order they report in.
-    for (const e of ["d@acme.com", "e@acme.com", "f@acme.com"]) {
+    for (const e of ["d@domain.com", "e@domain.com", "f@domain.com"]) {
       const x = await enrolled(e, "Dev");
       await post(report({}, [result("firewall", "pass")]), { token: x.token });
     }
@@ -430,7 +430,7 @@ describe("API machines", () => {
     await env.DB.prepare("UPDATE machines SET public_ip = '198.51.100.4', geo = ? WHERE install_id = ?")
       .bind(JSON.stringify({ country: "VN", city: "Hanoi", lat: 21.0, lon: 105.8 }), m.install_id).run();
     const g = await api("GET", `/machines/${m.install_id}`);
-    expect(g.body.enrollment).toMatchObject({ role: "Dev", email: "an@acme.com", revoked: false });
+    expect(g.body.enrollment).toMatchObject({ role: "Dev", email: "an@domain.com", revoked: false });
     expect(g.body.checks_needing_attention[0]).toMatchObject({ check_id: "firewall", status: "fail", severity: "high", untrusted: { fix: "Turn it on." } });
     expect(g.body.notice).toBeUndefined();
     expect(g.raw).not.toContain("/etc/pf.conf");
@@ -586,7 +586,7 @@ describe("API and untrusted text", () => {
 
   it("no token, code hash, token hash or report-link id ever appears in a response", async () => {
     const m = await fleet();
-    const created = (await api("POST", "/invites", { body: { email: "c@acme.com", role_id: m.roleId } })).body.invites[0];
+    const created = (await api("POST", "/invites", { body: { email: "c@domain.com", role_id: m.roleId } })).body.invites[0];
     const code = codeOf(created.invite_link);
     const linkId = /\/r\/([A-Za-z0-9_-]{32})$/.exec(m.link)![1];
     const hashes = [

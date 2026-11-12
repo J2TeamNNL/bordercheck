@@ -89,7 +89,7 @@ describe("migration 0004", () => {
 
 describe("ingest and alerts", () => {
   it("raises one alert per episode, delivers it to the webhook at once, and clears it", async () => {
-    const m = await enrolled("comp-an@acme.com");
+    const m = await enrolled("comp-an@domain.com");
     const e: Env = { ...env, ALERT_WEBHOOK_URL: DISCORD, DASHBOARD_URL: "https://bordercheck.example.com" };
     const r = recorder();
     const req = (body: unknown) => reportRequest(body, m.token);
@@ -103,7 +103,7 @@ describe("ingest and alerts", () => {
     expect(r.calls).toHaveLength(1);
     const content: string = r.calls[0].body.content;
     expect(content).toContain("SIGNS OF COMPROMISE in `startup-items`");
-    expect(content).toContain("`comp-an@acme.com`");
+    expect(content).toContain("`comp-an@domain.com`");
     expect(content).toContain(`https://bordercheck.example.com/admin/machine/${m.install_id}`);
     expect(content).not.toContain("com.x.plist"); // which item stays on the machine page
     const row = await env.DB.prepare("SELECT compromised_since FROM machines WHERE install_id = ?").bind(m.install_id).first<string>("compromised_since");
@@ -136,7 +136,7 @@ describe("ingest and alerts", () => {
   });
 
   it("goes after the response with waitUntil; a failed webhook leaves it for the cron", async () => {
-    const m = await enrolled("comp-bo@acme.com");
+    const m = await enrolled("comp-bo@domain.com");
     const e: Env = { ...env, ALERT_WEBHOOK_URL: HOOK, DIGEST_HOURS: "0" };
     const waits: Promise<unknown>[] = [];
     const down = recorder(true);
@@ -155,7 +155,7 @@ describe("ingest and alerts", () => {
   });
 
   it("without a webhook the alert is still listed on the Alerts page", async () => {
-    const m = await enrolled("comp-cy@acme.com");
+    const m = await enrolled("comp-cy@domain.com");
     const res = await post(compromised(), { token: m.token });
     expect(res.status).toBe(200);
     const a = (await alerts()).find((x) => x.kind === "compromised")!;
@@ -176,7 +176,7 @@ describe("ingest and alerts", () => {
   });
 
   it("an older client's report never marks a machine compromised", async () => {
-    const m = await enrolled("comp-dee@acme.com");
+    const m = await enrolled("comp-dee@domain.com");
     await post(report({}, [result("startup-items", "fail", { severity: "high" })]), { token: m.token });
     expect((await alerts()).map((a) => a.kind)).toEqual(["high_fail"]);
     expect(await env.DB.prepare("SELECT compromised_since FROM machines WHERE install_id = ?").bind(m.install_id).first("compromised_since")).toBeNull();
@@ -187,24 +187,24 @@ describe("pages", () => {
   const hostile = `<img src=x onerror=alert(1)> & "q"`;
 
   it("the overview has a Compromised tile and filter, sorts it first, and badges it", async () => {
-    const ok = await enrolled("comp-ok@acme.com");
+    const ok = await enrolled("comp-ok@domain.com");
     await post(report({}, [result("firewall", "fail", { severity: "high" })]), { token: ok.token });
-    const bad = await enrolled("comp-bad@acme.com");
+    const bad = await enrolled("comp-bad@domain.com");
     await post(compromised(), { token: bad.token });
 
     const all = await (await adminGet("/admin")).text();
     expect(all).toContain(`href="/admin?filter=compromised"`);
     expect(all).toContain("signs of compromise in the latest report");
     expect(all).toContain(`<span class="pill s-comp">compromised</span>`);
-    expect(all.indexOf("comp-bad@acme.com")).toBeLessThan(all.indexOf("comp-ok@acme.com"));
+    expect(all.indexOf("comp-bad@domain.com")).toBeLessThan(all.indexOf("comp-ok@domain.com"));
 
     const only = await (await adminGet("/admin?filter=compromised")).text();
-    expect(only).toContain("comp-bad@acme.com");
-    expect(only).not.toContain("comp-ok@acme.com");
+    expect(only).toContain("comp-bad@domain.com");
+    expect(only).not.toContain("comp-ok@domain.com");
   });
 
   it("the machine page has a banner with each sign, escaped, and since when", async () => {
-    const m = await enrolled("comp-ed@acme.com");
+    const m = await enrolled("comp-ed@domain.com");
     await post(
       report({ compromised: true, compromise_checks: ["startup-items", "cracked-software"] }, [
         startupFail(hostile),
@@ -235,7 +235,7 @@ describe("pages", () => {
   });
 
   it("the report page tells the person to stop and contact IT, with check titles only", async () => {
-    const m = await enrolled("comp-fay@acme.com");
+    const m = await enrolled("comp-fay@domain.com");
     const res = await post(compromised(hostile), { token: m.token });
     const { report_url } = await res.json<{ report_url: string }>();
     const page = await (await call(new Request(report_url.replace("https://bordercheck.example.com", BASE)))).text();
@@ -246,7 +246,7 @@ describe("pages", () => {
     expect(page).not.toContain("com.x");
     expect(page).not.toContain("bordercheck fix"); // no fix prompt: nothing is cleaned up before IT looks
 
-    const old = await enrolled("comp-gus@acme.com");
+    const old = await enrolled("comp-gus@domain.com");
     const r2 = await post(report(), { token: old.token });
     const p2 = await (await call(new Request((await r2.json<{ report_url: string }>()).report_url.replace("https://bordercheck.example.com", BASE)))).text();
     expect(p2).not.toContain("may be compromised");
@@ -255,12 +255,12 @@ describe("pages", () => {
 
 describe("MCP and REST", () => {
   it("machine summaries, detail and the fleet summary carry compromised and since", async () => {
-    const m = await enrolled("comp-hal@acme.com");
+    const m = await enrolled("comp-hal@domain.com");
     await post(
       report({ compromised: true, compromise_checks: ["startup-items"] }, [startupFail(), result("firewall", "pass")]),
       { token: m.token, e: {} },
     );
-    const other = await enrolled("comp-ida@acme.com");
+    const other = await enrolled("comp-ida@domain.com");
     await post(clean(), { token: other.token });
 
     const now = new Date();

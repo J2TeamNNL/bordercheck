@@ -36,7 +36,7 @@ var testItems = []checks.Item{
 	{Check: "ai-agents", Path: "~/.codex/config.toml", Kind: "Codex: commands run without a sandbox", Blocked: checks.BlockedGuardrail},
 	{Check: "ssh-keys", Path: "~/.ssh/aur", Names: []string{"ssh-ed25519"}, Kind: "no passphrase"},
 	{Check: "ssh-keys", Path: "~/.ssh/open", Kind: "no passphrase", Blocked: checks.BlockedPerms},
-	{Check: "ssh-keys", Path: "~/.ssh/authorized_keys", Names: []string{"bob@acme.com"}, Kind: "can log in here", Blocked: checks.BlockedAuthorized},
+	{Check: "ssh-keys", Path: "~/.ssh/authorized_keys", Names: []string{"bob@domain.com"}, Kind: "can log in here", Blocked: checks.BlockedAuthorized},
 	{Check: "ssh-keys", Path: "~/.ssh/config", Names: []string{"ForwardAgent yes"}, Kind: "ForwardAgent yes", Blocked: checks.BlockedSSHConfig},
 	// A file two checks find something in.
 	{Check: "secrets", Path: "~/.continue/config.json", Names: []string{"apiKey"}, Kind: sv},

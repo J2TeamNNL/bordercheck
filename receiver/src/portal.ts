@@ -350,7 +350,7 @@ ${scope && scope.roles.length === 0 ? note(L.t("scope.none"), "s-warn") : ""}
 ${note(message, tone(status))}
 <h2 id="new">${L.t("invites.new")}</h2>
 ${options.value ? html`<form method="post" action="/admin/invites"><div class="panel"><div class="cols">
-<div class="field"><label for="inv-emails">${L.t("invites.emails")}</label><textarea id="inv-emails" class="emails" name="emails" rows="6" spellcheck="false" required placeholder="an@acme.com&#10;bo@acme.com"></textarea></div>
+<div class="field"><label for="inv-emails">${L.t("invites.emails")}</label><textarea id="inv-emails" class="emails" name="emails" rows="6" spellcheck="false" required placeholder="an@domain.com&#10;bo@domain.com"></textarea></div>
 <div><div class="field"><label for="inv-role">${L.t("common.role")}</label><select id="inv-role" name="role_id" class="full">${options}</select></div>
 <div class="field"><label for="inv-days">${L.t("invites.expires")}</label><input id="inv-days" name="days" type="number" min="1" max="90" value="${cfg.inviteDays}"></div>
 <div class="field"><label for="inv-note">${L.t("invites.note")}</label><input id="inv-note" name="note" maxlength="200" class="full"></div></div></div>

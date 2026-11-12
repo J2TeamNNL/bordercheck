@@ -23,16 +23,16 @@ policy and sends nothing.
 IT creates an invite for the person in the portal and sends them the command it shows. macOS and Linux:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.acme.com/i/<code>
+curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.domain.com/i/<code>
 ```
 
 Windows (PowerShell):
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/i/<code>
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.domain.com/i/<code>
 ```
 
-Or, with the binary already there: `bordercheck install https://bordercheck.acme.com/i/<code>`.
+Or, with the binary already there: `bordercheck install https://bordercheck.domain.com/i/<code>`.
 
 bordercheck copies itself into the [install folder](#the-service) and checks that the hourly service can be
 registered, then spends the code (`POST /enroll`) and gets back this install's ID, the email and role IT set, a
@@ -95,21 +95,21 @@ Write a policy with a `report.url` (see [Policies](policies.md)), host it at an 
 one command. macOS and Linux:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.acme.com/policies.json
+curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.domain.com/policies.json
 ```
 
 Windows (PowerShell):
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/policies.json
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.domain.com/policies.json
 ```
 
 The script picks the latest release for the OS and CPU, [checks it](#what-the-install-script-proves), and runs
 `bordercheck install <url>`, which asks for the person's work email on the terminal.
 
-Already have the binary? `./bordercheck install https://bordercheck.acme.com/policies.json` does the same, or
+Already have the binary? `./bordercheck install https://bordercheck.domain.com/policies.json` does the same, or
 hand people a zip with `bordercheck` and `policies.json` side by side and they run `./bordercheck install`.
-`-email you@acme.com` skips the question.
+`-email you@domain.com` skips the question.
 
 Your endpoint receives a `POST` of the [report](#what-is-sent) with the headers in `report.headers`. Anything in
 those headers can be read by everyone who can fetch the policy, so give it a token that can only submit reports,
@@ -119,7 +119,7 @@ and treat reports as unauthenticated.
 
 | `install.sh` | `install.ps1` | |
 |---|---|---|
-| `--email an@acme.com` | `-Email an@acme.com` | Don't ask for the email (scripted rollouts; not with an invite link) |
+| `--email an@domain.com` | `-Email an@domain.com` | Don't ask for the email (scripted rollouts; not with an invite link) |
 | `--version v1.2.3` | `-Version v1.2.3` | Install that release instead of the latest |
 | `--dry-run` | `-DryRun` | Download and check, then stop before installing; never runs the downloaded binary |
 | `--repo owner/name` | `-Repo owner/name` | Install from a fork; with an invite link, the installed copy also takes its [updates](#updates) from there |
@@ -349,7 +349,7 @@ The report is the same JSON as `bordercheck -json`, plus `email` and `install_id
 {
   "tool": "bordercheck", "version": "v0.2.0", "policy": "Acme", "time": "2026-10-30T14:46:07Z",
   "host": { "os": "darwin", "arch": "arm64", "hostname": "an-mbp", "ips": ["192.168.1.23", "2001:db8::23"] },
-  "email": "an@acme.com", "install_id": "4f1c…",
+  "email": "an@domain.com", "install_id": "4f1c…",
   "counts": { "fail": 1, "error": 0, "warn": 1, "pass": 3, "skip": 1, "waived": 0 },
   "results": [ { "id": "firewall", "title": "Firewall is on", "status": "fail", "severity": "high",
                  "summary": "The macOS firewall is off.", "fix": "…",

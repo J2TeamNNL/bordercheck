@@ -15,8 +15,8 @@ describe("mesh-vpn", () => {
     expect(validateRolePolicy({ checks: { "mesh-vpn": { allow: ["zerotier"], on_problem: "fail" }, tailscale: {} } }, now)).toEqual([]);
     expect(
       validateRolePolicy(
-        { waivers: [{ check: "tailscale", email: "an@acme.com", until: "2026-12-01", reason: "lab" },
-          { check: "mesh-vpn", email: "an@acme.com", until: "2026-12-01", reason: "lab" }] },
+        { waivers: [{ check: "tailscale", email: "an@domain.com", until: "2026-12-01", reason: "lab" },
+          { check: "mesh-vpn", email: "an@domain.com", until: "2026-12-01", reason: "lab" }] },
         now,
       ),
     ).toEqual([]);

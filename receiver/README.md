@@ -41,7 +41,7 @@ npx wrangler deploy
 Keep a copy of `ADMIN_TOKEN` in your password manager: it is the dashboard login. It must be at least 16
 characters; with neither Access nor `ADMIN_TOKEN` the dashboard is off.
 
-Then add a custom domain (e.g. `bordercheck.acme.com`) in `routes`, set `DASHBOARD_URL` so alerts and invite
+Then add a custom domain (e.g. `bordercheck.domain.com`) in `routes`, set `DASHBOARD_URL` so alerts and invite
 links use it, and deploy again. Upgrading: `npx wrangler d1 migrations apply bordercheck --remote` adds new
 tables and columns.
 
@@ -56,10 +56,10 @@ no shared report token and no shared `policies.json` endpoint.
    and a note. The page then shows, **once**, each person's invite link and install commands:
 
    ```sh
-   curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.acme.com/i/<code>
+   curl -fsSL https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.sh | sh -s -- https://bordercheck.domain.com/i/<code>
    ```
    ```powershell
-   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/i/<code>
+   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.domain.com/i/<code>
    ```
 
    Send each person their own (this version sends no email). Only a hash of the code is stored, so a lost
@@ -102,7 +102,7 @@ characters). `GET` returns an HTML page with the install commands; it never cons
 `200`:
 
 ```json
-{"install_id": "<32 hex>", "email": "an@acme.com", "role": "Dev", "token": "bcm_<43 base64url>",
+{"install_id": "<32 hex>", "email": "an@domain.com", "role": "Dev", "token": "bcm_<43 base64url>",
  "policy_url": "https://<host>/policy", "report_url": "https://<host>/report"}
 ```
 
@@ -185,7 +185,7 @@ with `REPORT_LINKS` `"off"`.
 
 The dashboard shows each machine's weak spots, so it is never public. Two ways in; either is enough:
 
-**Cloudflare Access (recommended).** Create a self-hosted Access application for `bordercheck.acme.com/admin`
+**Cloudflare Access (recommended).** Create a self-hosted Access application for `bordercheck.domain.com/admin`
 (only `/admin`: `/report`, `/policy`, `/enroll`, `/i/…` and `/r/…` must stay reachable by
 laptops and people), allow your IT group, and set
 `ACCESS_TEAM_DOMAIN` (e.g. `acme.cloudflareaccess.com`) and `ACCESS_AUD` (the application's AUD tag) in
@@ -380,7 +380,7 @@ token), or put it in one with a service token that your client sends as well.
 Claude Code (keep the token out of your shell history, e.g. read it from your password manager):
 
 ```sh
-claude mcp add --transport http bordercheck https://bordercheck.acme.com/mcp \
+claude mcp add --transport http bordercheck https://bordercheck.domain.com/mcp \
   --header "Authorization: Bearer $BORDERCHECK_MCP_TOKEN"
 ```
 
@@ -393,7 +393,7 @@ server; otherwise bridge it with `mcp-remote`, in `claude_desktop_config.json`:
   "mcpServers": {
     "bordercheck": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://bordercheck.acme.com/mcp", "--header", "Authorization:${BORDERCHECK_AUTH}"],
+      "args": ["-y", "mcp-remote", "https://bordercheck.domain.com/mcp", "--header", "Authorization:${BORDERCHECK_AUTH}"],
       "env": { "BORDERCHECK_AUTH": "Bearer <MCP_TOKEN>" }
     }
   }

@@ -45,7 +45,7 @@ describe("login-free report links", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(res.headers.get("content-security-policy")).toContain("default-src 'none'");
     const body = await res.text();
-    expect(body).toContain("an@acme.com");
+    expect(body).toContain("an@domain.com");
     expect(body).toContain("an-mbp");
     expect(body).toContain("Turn it on.");
     expect(body).toContain(`<span class="sev sev-high">high</span>`);
@@ -59,10 +59,10 @@ describe("login-free report links", () => {
 
   it("cannot reach another machine, and unknown ids get one uniform 404", async () => {
     const urlA = await reportUrl(await post(report()));
-    const bo = await enrolled("bo@acme.com");
+    const bo = await enrolled("bo@domain.com");
     await post(report({ host: { os: "linux", arch: "amd64", hostname: "bo-box" } }), { token: bo.token });
     const a = await (await open(urlA)).text();
-    expect(a).not.toContain("bo@acme.com");
+    expect(a).not.toContain("bo@domain.com");
     const r1 = await open(`${BASE}/r/${"A".repeat(32)}`);
     const r2 = await open(`${BASE}/r/short`);
     expect(r1.status).toBe(404);
@@ -119,7 +119,7 @@ describe("login-free report links", () => {
   it("escapes everything from the report", async () => {
     const evil = "<script>alert(1)</script>";
     const url = await reportUrl(
-      await post(report({ email: `x"><img src=x>@acme.com`, host: { os: "darwin", arch: "arm64", hostname: evil } }, [
+      await post(report({ email: `x"><img src=x>@domain.com`, host: { os: "darwin", arch: "arm64", hostname: evil } }, [
         result("firewall", "fail", { severity: evil, title: evil, summary: evil, fix: evil }),
         result("docker", "waived", { waived: { until: evil, reason: evil } }),
       ])),
@@ -246,7 +246,7 @@ describe("fix prompt on the report page", () => {
 
   it("is absent when the role's policy turns it off", async () => {
     await makeRole("NoFix", { ...DEV_POLICY, report: { interval: "24h", fix_prompt: false } });
-    const m = await enrolled("bo@acme.com", "NoFix");
+    const m = await enrolled("bo@domain.com", "NoFix");
     const body = await (await open(await reportUrl(await post(report({ version: "v0.5.0" }, failing), { token: m.token })))).text();
     expect(body).toContain("Turn it on.");
     expect(body).not.toContain("fix-prompt");

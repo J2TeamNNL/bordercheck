@@ -383,18 +383,18 @@ describe("sub-admin scopes", () => {
   let fleet: Awaited<ReturnType<typeof setup>>;
 
   async function setup() {
-    const a1 = await enrolled("a1@acme.com", "A", { os: "darwin", arch: "arm64", hostname: "a1-mbp" });
-    const b1 = await enrolled("b1@acme.com", "B", { os: "linux", arch: "amd64", hostname: "b1-box" });
+    const a1 = await enrolled("a1@domain.com", "A", { os: "darwin", arch: "arm64", hostname: "a1-mbp" });
+    const b1 = await enrolled("b1@domain.com", "B", { os: "linux", arch: "amd64", hostname: "b1-box" });
     for (const m of [a1, b1]) {
       expect((await post(report({}, [result("firewall", "fail", { severity: "high", fix: "Turn it on." }), result("secrets", "pass")]), { token: m.token })).status).toBe(200);
     }
     // A machine that reported but never enrolled cannot exist through /report, so plant one.
     await env.DB.prepare(
       `INSERT INTO machines (install_id, email, hostname, os, arch, version, policy, first_seen, last_seen, fail, high_fail, error, warn, waived, pass, skip, other, report)
-       VALUES ('ffffffffffffffffffffffffffffffff', 'loose@acme.com', 'loose', 'linux', 'amd64', 'v1', 'p', ?1, ?1, 0, 0, 0, 0, 0, 0, 0, 0, '{}')`,
+       VALUES ('ffffffffffffffffffffffffffffffff', 'loose@domain.com', 'loose', 'linux', 'amd64', 'v1', 'p', ?1, ?1, 0, 0, 0, 0, 0, 0, 0, 0, '{}')`,
     ).bind(new Date().toISOString()).run();
-    await makeInvites(["a2@acme.com"], a1.roleId);
-    await makeInvites(["b2@acme.com"], b1.roleId);
+    await makeInvites(["a2@domain.com"], a1.roleId);
+    await makeInvites(["b2@domain.com"], b1.roleId);
     const sub = await addAdmin("Sub", [a1.roleId]);
     const s = await signIn(sub.token);
     return { a1, b1, roleA: a1.roleId, roleB: b1.roleId, sub, s };
@@ -404,13 +404,13 @@ describe("sub-admin scopes", () => {
     fleet = await setup();
     const { s, a1, b1 } = fleet;
     const home = await (await get("/admin", s)).text();
-    expect(home).toContain("a1@acme.com");
-    expect(home).not.toContain("b1@acme.com");
-    expect(home).not.toContain("loose@acme.com");
+    expect(home).toContain("a1@domain.com");
+    expect(home).not.toContain("b1@domain.com");
+    expect(home).not.toContain("loose@domain.com");
     expect(home).toContain("1 reporting · 1 non-compliant");
     const inv = await (await get("/admin/invites?status=all", s)).text();
-    expect(inv).toContain("a2@acme.com");
-    expect(inv).not.toContain("b2@acme.com");
+    expect(inv).toContain("a2@domain.com");
+    expect(inv).not.toContain("b2@domain.com");
     expect(inv).toContain(`<option value="${fleet.roleA}"`);
     expect(inv).not.toContain(`<option value="${fleet.roleB}"`);
     const roles = await (await get("/admin/roles", s)).text();
@@ -420,15 +420,15 @@ describe("sub-admin scopes", () => {
     expect(alerts).toContain(a1.install_id);
     expect(alerts).not.toContain(b1.install_id);
     const check = await (await get("/admin/checks/firewall", s)).text();
-    expect(check).toContain("a1@acme.com");
-    expect(check).not.toContain("b1@acme.com");
+    expect(check).toContain("a1@domain.com");
+    expect(check).not.toContain("b1@domain.com");
     expect((await checkStats(env, 10, { admin: fleet.sub.id, roles: [fleet.roleA] })).find((c) => c.check_id === "firewall")?.total).toBe(1);
     expect((await checkStats(env, 10)).find((c) => c.check_id === "firewall")?.total).toBe(2);
 
     // The owner still sees everything.
     const all = await (await get("/admin", OWNER)).text();
-    for (const e of ["a1@acme.com", "b1@acme.com", "loose@acme.com"]) expect(all).toContain(e);
-    expect(await (await get("/admin/invites?status=all", OWNER)).text()).toContain("b2@acme.com");
+    for (const e of ["a1@domain.com", "b1@domain.com", "loose@domain.com"]) expect(all).toContain(e);
+    expect(await (await get("/admin/invites?status=all", OWNER)).text()).toContain("b2@domain.com");
   });
 
   it("gets 404 on role B's machines and every action on them, and on machines never enrolled", async () => {
@@ -472,20 +472,20 @@ describe("sub-admin scopes", () => {
     expect(move.status).toBe(400);
     expect(await env.DB.prepare("SELECT role_id FROM enrollments WHERE install_id = ?").bind(a1.install_id).first<number>("role_id")).toBe(roleA);
 
-    const inv = await send("/admin/invites", s, [["emails", "x@acme.com"], ["role_id", String(roleB)]]);
+    const inv = await send("/admin/invites", s, [["emails", "x@domain.com"], ["role_id", String(roleB)]]);
     expect(inv.status).toBe(400);
-    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM invites WHERE email = 'x@acme.com'").first<number>("n")).toBe(0);
-    expect((await send("/admin/invites", s, [["emails", "x@acme.com"], ["role_id", String(roleA)]])).status).toBe(200);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM invites WHERE email = 'x@domain.com'").first<number>("n")).toBe(0);
+    expect((await send("/admin/invites", s, [["emails", "x@domain.com"], ["role_id", String(roleA)]])).status).toBe(200);
 
     for (const [method, path] of [["GET", `/admin/roles/${roleB}`], ["POST", `/admin/roles/${roleB}`], ["POST", `/admin/roles/${roleB}/delete`]]) {
       const r = method === "GET" ? await get(path, s) : await send(path, s, [["name", "B2"], ["policy", "{}"]]);
       expect(r.status, `${method} ${path}`).toBe(404);
     }
     expect(await env.DB.prepare("SELECT name FROM roles WHERE id = ?").bind(roleB).first<string>("name")).toBe("B");
-    const bInvite = await env.DB.prepare("SELECT id FROM invites WHERE email = 'b2@acme.com'").first<number>("id");
+    const bInvite = await env.DB.prepare("SELECT id FROM invites WHERE email = 'b2@domain.com'").first<number>("id");
     for (const act of ["revoke", "reissue"]) expect((await send(`/admin/invites/${bInvite}/${act}`, s)).status, act).toBe(404);
     expect(await env.DB.prepare("SELECT revoked_at FROM invites WHERE id = ?").bind(bInvite).first("revoked_at")).toBeNull();
-    const aInvite = await env.DB.prepare("SELECT id FROM invites WHERE email = 'a2@acme.com'").first<number>("id");
+    const aInvite = await env.DB.prepare("SELECT id FROM invites WHERE email = 'a2@domain.com'").first<number>("id");
     expect((await send(`/admin/invites/${aInvite}/revoke`, s)).status).toBe(200);
   });
 
@@ -499,7 +499,7 @@ describe("sub-admin scopes", () => {
     expect(await res.text()).toContain(`/admin/roles/${roleC}`);
     expect((await get(`/admin/roles/${roleC}`, s)).status).toBe(200);
     expect((await send(`/admin/machine/${a1.install_id}/role`, s, [["role_id", String(roleC)]])).status).toBe(303);
-    expect((await send("/admin/invites", s, [["emails", "c@acme.com"], ["role_id", String(roleC)]])).status).toBe(200);
+    expect((await send("/admin/invites", s, [["emails", "c@domain.com"], ["role_id", String(roleC)]])).status).toBe(200);
     // Back to A, then delete C (no invites left in C after revoking).
     expect((await send(`/admin/machine/${a1.install_id}/role`, s, [["role_id", String(fleet.roleA)]])).status).toBe(303);
     await env.DB.prepare("DELETE FROM invites WHERE role_id = ?").bind(roleC).run();
@@ -548,7 +548,7 @@ describe("sub-admin scopes", () => {
     await send(`/admin/admins/${sub.id}/roles`, OWNER, []);
     const empty = await (await get("/admin", s)).text();
     expect(empty).toContain("You do not manage any role yet");
-    expect(empty).not.toContain("b1@acme.com");
+    expect(empty).not.toContain("b1@domain.com");
     expect(await (await get("/admin/roles", s)).text()).toContain("Create one below");
     expect(await (await get("/admin/invites", s)).text()).toContain("You do not manage any role yet");
   });

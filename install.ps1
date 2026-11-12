@@ -10,13 +10,13 @@ install has the downloaded binary check the signature, after its checksum matche
 Dry runs never execute the binary and say so when only the checksum was checked.
 
 .EXAMPLE
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/policies.json
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.domain.com/policies.json
 
 .EXAMPLE
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/policies.json -Email an@acme.com
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.domain.com/policies.json -Email an@domain.com
 
 .EXAMPLE
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.acme.com/i/<code>
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ptrinh/bordercheck/main/install.ps1))) https://bordercheck.domain.com/i/<code>
 #>
 param(
     # The policies URL, or an invite link https://<host>/i/<code> from IT.
@@ -45,7 +45,7 @@ function Fail([string]$msg) { throw "bordercheck-install: $msg Nothing was insta
 if (-not $Key) { $Key = if ($env:BORDERCHECK_PUBLIC_KEY) { $env:BORDERCHECK_PUBLIC_KEY } else { $OfficialKey } }
 $GitHub = if ($env:BORDERCHECK_GITHUB) { $env:BORDERCHECK_GITHUB } else { 'https://github.com' }
 
-if (-not $PolicyUrl) { Fail "Give your invite link or your organisation's policies URL, e.g. https://bordercheck.acme.com/policies.json." }
+if (-not $PolicyUrl) { Fail "Give your invite link or your organisation's policies URL, e.g. https://bordercheck.domain.com/policies.json." }
 if (-not $PolicyUrl.StartsWith('https://')) { Fail 'The URL must start with https://.' }
 # An invite link: keep in step with ParseInvite in internal/agent/enroll.go.
 $Invite = $PolicyUrl -cmatch '^https://[^/?#@]+/i/[A-Za-z0-9._~-]+/?$'

@@ -63,9 +63,9 @@ describe("validation", () => {
   });
 
   it("enforces ALLOWED_EMAIL_DOMAINS on the enrolled email, not the body's", async () => {
-    const an = await enrolled("an@ACME.com");
+    const an = await enrolled("an@DOMAIN.com");
     const x = await enrolled("x@acme.co.uk");
-    const e = { ALLOWED_EMAIL_DOMAINS: "acme.com, @acme.co.uk" };
+    const e = { ALLOWED_EMAIL_DOMAINS: "domain.com, @acme.co.uk" };
     expect((await post(report({ email: "x@evil.example" }), { token: an.token, e })).status).toBe(200);
     expect((await post(report(), { token: x.token, e })).status).toBe(200);
     // A machine enrolled before the domain list was narrowed.
@@ -74,8 +74,8 @@ describe("validation", () => {
 
   it("caps the number of machines", async () => {
     const e = { MAX_MACHINES: "1" };
-    const a = await enrolled("an@acme.com");
-    const b = await enrolled("bo@acme.com");
+    const a = await enrolled("an@domain.com");
+    const b = await enrolled("bo@domain.com");
     expect((await post(report(), { token: a.token, e })).status).toBe(200);
     expect((await post(report(), { token: a.token, e })).status).toBe(200); // same machine again is fine
     expect((await post(report(), { token: b.token, e })).status).toBe(403);

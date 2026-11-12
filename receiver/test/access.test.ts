@@ -24,7 +24,7 @@ async function jwt(claims: Record<string, unknown>, key = keys.privateKey, kid =
 }
 
 const now = Date.now();
-const good = () => ({ aud: [AUD], iss: `https://${TEAM}`, exp: Math.floor(now / 1000) + 600, email: "it@acme.com" });
+const good = () => ({ aud: [AUD], iss: `https://${TEAM}`, exp: Math.floor(now / 1000) + 600, email: "it@domain.com" });
 
 beforeAll(async () => {
   keys = (await crypto.subtle.generateKey(
@@ -56,10 +56,10 @@ describe("Cloudflare Access", () => {
   it("accepts a valid JWT and shows the identity", async () => {
     stubCerts();
     const token = await jwt(good());
-    expect(await accessIdentity(withJwt(token), e, now)).toBe("it@acme.com");
+    expect(await accessIdentity(withJwt(token), e, now)).toBe("it@domain.com");
     const res = await call(withJwt(token), e);
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain("it@acme.com");
+    expect(await res.text()).toContain("it@domain.com");
   });
 
   it("rejects wrong audience, issuer, expiry, signature and alg", async () => {

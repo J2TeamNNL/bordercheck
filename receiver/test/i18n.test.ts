@@ -182,7 +182,7 @@ function assertTranslated(body: string, lang: Lang, where: string) {
 
 async function seed() {
   const roleId = await makeRole("Dev");
-  const m = await enrolled("an@acme.com", "Dev");
+  const m = await enrolled("an@domain.com", "Dev");
   const res = await post(
     report({}, [
       result("firewall", "fail", { severity: "high", fix: "Turn it on." }),
@@ -193,7 +193,7 @@ async function seed() {
     { token: m.token },
   );
   const reportUrl = (await res.json<{ report_url: string }>()).report_url.replace("https://bordercheck.example.com", "");
-  const [code] = await makeInvites(["bo@acme.com"], roleId);
+  const [code] = await makeInvites(["bo@domain.com"], roleId);
   await env.DB.prepare("INSERT INTO alerts (kind, install_id, check_id, detail, created_at) VALUES ('high_fail', ?, 'firewall', '{}', ?)")
     .bind(m.install_id, new Date().toISOString()).run();
   return { roleId, m, reportUrl, code };
@@ -298,7 +298,7 @@ describe("language switcher", () => {
 
   it("works on an invite page without consuming the invite or copying the code", async () => {
     const roleId = await makeRole("Dev");
-    const [code] = await makeInvites(["bo@acme.com"], roleId);
+    const [code] = await makeInvites(["bo@domain.com"], roleId);
     const res = await switchTo(`/i/${code}`, { lang: "zh" });
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe(`/i/${code}`);
@@ -309,7 +309,7 @@ describe("language switcher", () => {
     const page = await (await publicGet(`/i/${code}`, { cookie: "bc_lang=zh" })).text();
     expect(page).toContain("安装 bordercheck");
     expect(page.split(code).length - 1).toBe(2); // only in the two install commands
-    const inv = await env.DB.prepare("SELECT used_at, revoked_at FROM invites WHERE email = 'bo@acme.com'").first();
+    const inv = await env.DB.prepare("SELECT used_at, revoked_at FROM invites WHERE email = 'bo@domain.com'").first();
     expect(inv).toEqual({ used_at: null, revoked_at: null });
     const enrolledRes = await call(new Request(`${BASE}/enroll`, {
       method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "198.51.100.77" },
@@ -338,7 +338,7 @@ describe("language switcher", () => {
     const roleId = await makeRole("Dev");
     const res = await call(new Request(`${BASE}/admin/invites`, {
       method: "POST", headers: { authorization: `Bearer ${ADMIN_TOKEN}`, cookie: "bc_lang=vi" },
-      body: new URLSearchParams({ emails: "c@acme.com", role_id: String(roleId) }),
+      body: new URLSearchParams({ emails: "c@domain.com", role_id: String(roleId) }),
     }));
     const body = await res.text();
     expect(body).toContain("Hãy sao chép ngay.");
