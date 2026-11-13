@@ -28,6 +28,9 @@ func TestMain(m *testing.M) {
 	// Nor an entry in the app search of the machine running them.
 	launcher.ensure = func(Env, Config) error { return nil }
 	launcher.remove = func() error { return nil }
+	// Nor a link in its ~/.local/bin, a line in its shell profile or its PATH.
+	command.ensure = func(Env, *State) error { return nil }
+	command.remove = func(Env) error { return nil }
 	// Nor the notification app: never launched, fetched or checked for real.
 	ntfRun = func(context.Context, string, notifier.Mode, string, string) error { return errors.New("not in tests") }
 	ntfVerify = func(context.Context, string, string) (string, error) { return "", errors.New("not in tests") }

@@ -112,6 +112,9 @@ type State struct {
 	LastTry         time.Time `json:"last_try,omitzero"`
 	LastError       string    `json:"last_error,omitempty"`
 	LastUpdateCheck time.Time `json:"last_update_check,omitzero"`
+	// CommandSetUp: the person's shell profile (macOS) or PATH (Windows) was
+	// given what plain `bordercheck` needs, once (see command).
+	CommandSetUp bool `json:"command_set_up,omitempty"`
 	// NotifierTried is when the hourly run last tried to install the macOS
 	// app on a Mac that has none (see adoptNotifier).
 	NotifierTried time.Time `json:"notifier_tried,omitzero"`
@@ -312,7 +315,7 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 			err, filepath.Join(env.Dir, binName()))
 		return err
 	}
-	fmt.Fprintf(env.Out, "Done: BorderCheck is installed and the first report is sent. Nothing else to do; it checks again on its own.\nTo see the details and how to fix anything it found, run: \"%s\"\n", filepath.Join(env.Dir, binName()))
+	fmt.Fprintf(env.Out, "Done: BorderCheck is installed and the first report is sent. Nothing else to do; it checks again on its own.\nTo see the details and how to fix anything it found, run: \"%s\"\n(in a terminal opened from now on, just: bordercheck)\n", filepath.Join(env.Dir, binName()))
 	fmt.Fprintf(env.Out, "\nBorderCheck %s · %s\n", env.Version, report.Credit)
 	return nil
 }
@@ -356,7 +359,7 @@ func sends(r policy.Report) string {
 // Uninstall removes the service and the install folder, the token with it.
 // The portal is not told: a revoked or forgotten install is IT's to clean up.
 func Uninstall(env Env) error {
-	err := errors.Join(services.unregister(), notifier.Remove(env.Dir), launcher.remove())
+	err := errors.Join(services.unregister(), notifier.Remove(env.Dir), launcher.remove(), command.remove(env))
 	for _, name := range []string{"config.json", "state.json", "bordercheck.log", policy.FileName, TokenFile, ignore.FileName, binName()} {
 		if e := os.Remove(filepath.Join(env.Dir, name)); e != nil && !errors.Is(e, os.ErrNotExist) {
 			err = errors.Join(err, e) // Windows cannot remove a running binary; it goes on the next uninstall
@@ -384,6 +387,9 @@ func Send(ctx context.Context, env Env, force bool) error {
 	adoptNotifier(ctx, env, &cfg, &st, now)
 	if err := launcher.ensure(env, cfg); err != nil {
 		fmt.Fprintf(env.Out, "%s no %s entry in this computer's app search: %v\n", now.Format(time.RFC3339), LauncherName, err)
+	}
+	if err := command.ensure(env, &st); err != nil {
+		fmt.Fprintf(env.Out, "%s plain \"bordercheck\" not set up in the terminal: %v\n", now.Format(time.RFC3339), err)
 	}
 	// A revoked install asks the portal again once a day, not every hour.
 	if tok != nil && !st.Revoked.IsZero() && !force && now.Sub(st.RevokedChecked) < revokedRetry {

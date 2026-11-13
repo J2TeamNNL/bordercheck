@@ -252,6 +252,20 @@ A receiver may answer a report with `{"report_url": "https://<host>/r/<id>"}`, a
 machine's own report that needs no login. BorderCheck keeps it (in `state.json`, never in the log) only if it is
 https on exactly the host reports go to, and shows it in `bordercheck status`.
 
+**Typing `bordercheck`.** The install folder is not on `PATH`, so an installed copy makes the plain command work,
+without admin rights:
+
+| OS | What it does |
+|---|---|
+| macOS | a link `~/.local/bin/bordercheck` to the installed program and, unless `~/.zprofile`, `~/.zshrc` or `~/.zshenv` already mentions `.local/bin`, one line at the end of `~/.zprofile` that appends `~/.local/bin` to `PATH` (marked "added by BorderCheck") |
+| Linux | the same link; no file is edited (most systems have `~/.local/bin` on `PATH`) |
+| Windows | the install folder is added to the user's own `PATH` (`HKCU\Environment`), other entries left as they are |
+
+It applies to terminals opened afterwards. The hourly run sets it up (so an older install gets it after updating); the
+profile line and the Windows `PATH` entry are added once, so removing them by hand sticks. A file or link that is
+already at `~/.local/bin/bordercheck` and is not this install's is left alone. `bordercheck uninstall` removes the
+link, the line and the `PATH` entry.
+
 **Opening it without a terminal.** `bordercheck open` opens the page in the default browser, and an installed copy
 puts a **BorderCheck** entry in the computer's app search that does the same:
 
