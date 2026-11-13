@@ -68,6 +68,8 @@ const help = `BorderCheck %s: checks this computer for open doors and says how t
 Everyday
   bordercheck                    check this computer now and show what to fix (sends nothing)
   bordercheck status             is it installed, when it last reported, the link to your report page
+  bordercheck open               open your report page in the browser (also: "BorderCheck" in Spotlight,
+                                 the Start menu or your desktop's application menu)
   bordercheck fix                what to fix and how, written for an AI coding assistant to follow with you
   bordercheck send -force        check now and send a fresh report to your organisation
   bordercheck update             get the newest policy and the newest version now
@@ -114,7 +116,7 @@ func run(args []string) int {
 		switch args[0] {
 		case "help", "--help":
 			return runHelp()
-		case "install", "uninstall", "status", "send", "update", "notifications":
+		case "install", "uninstall", "status", "open", "send", "update", "notifications":
 			return runAgent(args[0], args[1:])
 		case "fix":
 			return runFix(args[1:])
@@ -358,6 +360,8 @@ func runAgent(cmd string, args []string) int {
 		if s, err = agent.Status(env); err == nil {
 			fmt.Print(s)
 		}
+	case "open":
+		err = agent.Open(ctx, env)
 	case "send":
 		// The service has no terminal: keep a log beside the install, trimmed when it grows.
 		logPath := filepath.Join(dir, "bordercheck.log")

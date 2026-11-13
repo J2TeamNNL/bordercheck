@@ -25,6 +25,9 @@ func TestMain(m *testing.M) {
 	services.register = func(string, string) error { return nil }
 	services.unregister = func() error { return nil }
 	services.status = func() string { return "fake service" }
+	// Nor an entry in the app search of the machine running them.
+	launcher.ensure = func(Env, Config) error { return nil }
+	launcher.remove = func() error { return nil }
 	// Nor the notification app: never launched, fetched or checked for real.
 	ntfRun = func(context.Context, string, notifier.Mode, string, string) error { return errors.New("not in tests") }
 	ntfVerify = func(context.Context, string, string) (string, error) { return "", errors.New("not in tests") }

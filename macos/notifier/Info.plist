@@ -14,6 +14,8 @@
 	<key>CFBundleShortVersionString</key><string>@SHORT_VERSION@</string>
 	<key>CFBundleVersion</key><string>@SHORT_VERSION@</string>
 	<key>LSMinimumSystemVersion</key><string>11.0</string>
+	<!-- Opened by a person, it opens this machine's report page; bordercheck copies only an app that says so to ~/Applications. -->
+	<key>BCOpensReport</key><true/>
 	<!-- No Dock icon or menu bar: it runs for a moment and quits. -->
 	<key>LSUIElement</key><true/>
 	<!-- Where it was built from, written by scripts/build-notifier.sh and checked by the release workflow. -->

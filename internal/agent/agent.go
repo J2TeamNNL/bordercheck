@@ -353,7 +353,7 @@ func sends(r policy.Report) string {
 // Uninstall removes the service and the install folder, the token with it.
 // The portal is not told: a revoked or forgotten install is IT's to clean up.
 func Uninstall(env Env) error {
-	err := errors.Join(services.unregister(), notifier.Remove(env.Dir))
+	err := errors.Join(services.unregister(), notifier.Remove(env.Dir), launcher.remove())
 	for _, name := range []string{"config.json", "state.json", "bordercheck.log", policy.FileName, TokenFile, ignore.FileName, binName()} {
 		if e := os.Remove(filepath.Join(env.Dir, name)); e != nil && !errors.Is(e, os.ErrNotExist) {
 			err = errors.Join(err, e) // Windows cannot remove a running binary; it goes on the next uninstall
@@ -372,6 +372,9 @@ func Send(ctx context.Context, env Env, force bool) error {
 	}
 	var st State
 	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
+	if err := launcher.ensure(env, cfg); err != nil {
+		fmt.Fprintf(env.Out, "%s no %s entry in this computer's app search: %v\n", time.Now().Format(time.RFC3339), LauncherName, err)
+	}
 	tok, err := credentials(env, cfg)
 	if err != nil {
 		return err

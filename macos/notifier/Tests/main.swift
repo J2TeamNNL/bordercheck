@@ -31,6 +31,13 @@ check(parseMode(["x", "post", "https://evil.example"]) == nil && !launchedWithou
 check(parseMode(["x", "POST"]) == nil && !launchedWithoutMode(["x", "POST"]), "case")
 check(parseMode(["x", "open"]) == nil, "unknown mode")
 
+// Opened by a person: the one program it runs, and what it says on failure.
+check(installedBinary(home: URL(fileURLWithPath: "/Users/an")).path == "/Users/an/Library/Application Support/bordercheck/bordercheck", "installed binary")
+check(openFailure(Data("bordercheck: no report has been sent yet\n".utf8)) == "No report has been sent yet", "prefix and newline dropped")
+check(openFailure(Data()) == "BorderCheck could not open this computer's report page.", "nothing written")
+check(openFailure(Data("a\u{1b}[31mb\u{202e}c".utf8)) == "A[31mbc", "control and format characters dropped")
+check(openFailure(Data(String(repeating: "x", count: 5000).utf8)).count == maxExplanation + 1, "bounded")
+
 // Only authorize may ask macOS.
 check(mayRequestAuthorization(.authorize), "authorize asks")
 for m in [Mode.status, .post, .validate] {

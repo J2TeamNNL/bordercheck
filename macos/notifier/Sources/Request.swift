@@ -20,8 +20,11 @@
 //	{"v":1,"status":"invalid","error":"..."}
 //
 // Launched with no argument, it is macOS delivering a click on one of its
-// notifications (or someone opening it from Finder): it opens the
-// notification's report link if it passes allowedURL, and quits.
+// notifications: it opens the notification's report link if it passes
+// allowedURL, and quits. Or it is a person opening the app (Spotlight,
+// Launchpad, Finder): no click arrives, so it runs the installed bordercheck
+// with the one fixed argument "open", which opens this machine's report page,
+// and shows what bordercheck said if there is none.
 import Foundation
 import UserNotifications
 
@@ -40,6 +43,27 @@ func parseMode(_ args: [String]) -> Mode? {
 /// person opening it. Old systems add a process serial number argument.
 func launchedWithoutMode(_ args: [String]) -> Bool {
     args.count == 1 || (args.count == 2 && args[1].hasPrefix("-psn_"))
+}
+
+/// The installed bordercheck, where `bordercheck install` puts it on macOS
+/// (agent.Dir): the only program the app ever runs, and only with "open".
+func installedBinary(home: URL) -> URL {
+    home.appendingPathComponent("Library/Application Support/bordercheck/bordercheck")
+}
+
+let maxExplanation = 600
+
+/// What to tell the person when `bordercheck open` failed: what it wrote on
+/// stderr, as plain text of a bounded length, or a general line when it wrote
+/// nothing readable.
+func openFailure(_ stderr: Data) -> String {
+    var s = String(decoding: stderr.prefix(4096), as: UTF8.self)
+    s = String(s.unicodeScalars.filter { $0 == "\n" || !($0.properties.generalCategory == .control || $0.properties.generalCategory == .format) })
+    s = s.trimmingCharacters(in: .whitespacesAndNewlines)
+    if s.hasPrefix("bordercheck: ") { s = String(s.dropFirst("bordercheck: ".count)) }
+    if s.isEmpty { return "BorderCheck could not open this computer's report page." }
+    if s.count > maxExplanation { s = String(s.prefix(maxExplanation)) + "…" }
+    return s.prefix(1).uppercased() + s.dropFirst()
 }
 
 /// Only authorize may ask macOS; every other mode just reads the answer.

@@ -4,6 +4,10 @@
 // in System Settings → Notifications, and open the machine's report page when
 // clicked. The app's source is in macos/notifier.
 //
+// A copy of the app in ~/Applications (internal/agent, launcher) is what a
+// person finds in Spotlight: opened that way, with no mode, the app runs the
+// installed `bordercheck open`. This package never launches that copy.
+//
 // macOS lets an app post notifications only once the person has allowed it,
 // and records that against the app's bundle ID. bordercheck launches the app
 // through LaunchServices (/usr/bin/open), so the app, not bordercheck,

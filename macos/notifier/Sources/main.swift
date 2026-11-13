@@ -7,8 +7,11 @@
 // macOS for permission only in "authorize" mode (see Request.swift); the
 // hourly run uses "post", which posts only if the person already allowed it.
 //
-// It runs nothing and opens nothing but an https link on the one host
-// bordercheck allowed, checked here again when the notification is clicked.
+// It opens nothing but an https link on the one host bordercheck allowed,
+// checked here again when the notification is clicked. The one program it
+// runs is the installed bordercheck, with the fixed argument "open", when a
+// person opens the app themselves (it is copied to ~/Applications so that
+// Spotlight and Launchpad find it): that opens this machine's report page.
 import AppKit
 import UserNotifications
 
@@ -18,6 +21,11 @@ let answerSeconds = 120.0
 let quickSeconds = 15.0
 /// How long a relaunch for a click waits for macOS to hand over the click.
 let clickSeconds = 10.0
+/// How long a launch without a mode waits for a click before it is taken as a
+/// person opening the app.
+let launchSeconds = 1.5
+/// How long `bordercheck open` may take.
+let openSeconds = 30.0
 
 func finish(_ a: Answer) -> Never {
     FileHandle.standardOutput.write(Data((a.json() + "\n").utf8))
@@ -41,6 +49,9 @@ func readRequest() -> Request {
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     let mode: Mode?
     var asked = false
+    /// A click was delivered, or the app took the launch as a person's: only one of the two acts.
+    var clicked = false
+    var opening = false
 
     init(mode: Mode?) {
         self.mode = mode
@@ -61,9 +72,50 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             authorize()
         case .post?:
             post(readRequest())
-        case .validate?, nil:
-            break // nil: a click arrives through the delegate, or nothing does and the timer quits
+        case .validate?:
+            break
+        case nil:
+            // A click arrives through the delegate at once; if none does, a person opened the app.
+            DispatchQueue.main.asyncAfter(deadline: .now() + launchSeconds) {
+                if !self.clicked { self.openReport() }
+            }
         }
+    }
+
+    /// Runs `bordercheck open`; quits when it worked, says why when it did not.
+    func openReport() {
+        opening = true
+        let p = Process()
+        p.executableURL = installedBinary(home: FileManager.default.homeDirectoryForCurrentUser)
+        p.arguments = ["open"]
+        let err = Pipe()
+        p.standardInput = FileHandle.nullDevice
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = err
+        do {
+            try p.run()
+        } catch {
+            explain("BorderCheck is not installed for this user on this computer.")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + openSeconds) { if p.isRunning { p.terminate() } }
+        DispatchQueue.global().async {
+            let said = err.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            DispatchQueue.main.async {
+                if p.terminationReason == .exit && p.terminationStatus == 0 { exit(0) }
+                self.explain(openFailure(said))
+            }
+        }
+    }
+
+    func explain(_ text: String) -> Never {
+        NSApp.activate(ignoringOtherApps: true)
+        let a = NSAlert()
+        a.messageText = "BorderCheck"
+        a.informativeText = text
+        a.addButton(withTitle: "OK")
+        a.runModal()
+        exit(0)
     }
 
     /// Asks macOS once, and only when it has never been answered.
@@ -120,7 +172,10 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func timedOut() {
-        if mode == nil { exit(0) }
+        if mode == nil {
+            if !opening { exit(0) }
+            return // a person opened the app: it quits when bordercheck is done or the message is closed
+        }
         if mode == .authorize { reportStatus(); return } // unanswered: not_determined
         finish(Answer(status: "error", error: "timed out"))
     }
@@ -135,13 +190,14 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive r: UNNotificationResponse,
                                 withCompletionHandler done: @escaping () -> Void) {
         let info = r.notification.request.content.userInfo
-        if r.actionIdentifier == UNNotificationDefaultActionIdentifier,
+        clicked = true
+        if !opening, r.actionIdentifier == UNNotificationDefaultActionIdentifier,
            let link = info["link"] as? String, let host = info["allowed_host"] as? String,
            let url = allowedURL(link, host: host) {
             NSWorkspace.shared.open(url)
         }
         done()
-        if mode == nil {
+        if mode == nil && !opening {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { exit(0) }
         }
     }

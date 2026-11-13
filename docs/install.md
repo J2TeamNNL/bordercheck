@@ -155,6 +155,7 @@ when a report is due), so that is how soon a sign is noticed.
 
 ```sh
 bordercheck status               # signs of compromise if any, email, enrollment, policy, what is sent, service, last report, report page, updates
+bordercheck open                 # open this computer's report page in the browser
 bordercheck send -force          # send a report now
 bordercheck fix                  # what to fix and how, as instructions an AI coding assistant can follow with you
 bordercheck ignore <path> -reason "why"   # a secret, AI config token or SSH key that is not sensitive: stops counting, IT still sees it
@@ -250,6 +251,19 @@ is otherwise in `state.json` for the same user.
 A receiver may answer a report with `{"report_url": "https://<host>/r/<id>"}`, a link to that
 machine's own report that needs no login. BorderCheck keeps it (in `state.json`, never in the log) only if it is
 https on exactly the host reports go to, and shows it in `bordercheck status`.
+
+**Opening it without a terminal.** `bordercheck open` opens the page in the default browser, and an installed copy
+puts a **BorderCheck** entry in the computer's app search that does the same:
+
+| OS | Where | What it is |
+|---|---|---|
+| macOS | Spotlight and Launchpad | a copy of [BorderCheck's app](#borderchecks-notifications-on-macos) in `~/Applications/BorderCheck.app`; opened by a person, it runs the installed `bordercheck open`. Only on a Mac that has the app (it comes with notifications) |
+| Windows | the Start menu | a shortcut, `BorderCheck.lnk`, in the user's Start menu folder |
+| Linux | the desktop's application menu | `bordercheck.desktop` in `$XDG_DATA_HOME/applications` (by default `~/.local/share/applications`) |
+
+The hourly run creates the entry when it is missing (so an older install gets one after it updates) and
+`bordercheck uninstall` removes it. When there is no report page (nothing sent yet, or a receiver that gives none),
+the entry says so instead of opening anything.
 
 - **With BorderCheck's own notifications on a Mac**, every notification carries the link and opens the page
   when clicked. The page **does not open by itself**, whatever `notify.open_report` says: the person chooses
