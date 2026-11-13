@@ -42,6 +42,7 @@ var listenerHints = map[string]string{
 	"services":            "Windows service manager (RPC)",
 	"spoolsv":             "Windows print spooler (RPC)",
 	"tailscaled":          "Tailscale; reachable from your tailnet only",
+	"IPNExtension":        "Tailscale (the Mac app's network extension); reachable from your tailnet only",
 	"sshd":                "SSH server; turn it off if unused (Linux: sudo systemctl disable --now ssh; Mac: Remote Login)",
 	"kdeconnectd":         "KDE Connect",
 }

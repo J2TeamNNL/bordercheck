@@ -65,7 +65,8 @@
         "DropboxFileProvider",
         "Dropbox",
         "Spotify",
-        "tailscaled"
+        "tailscaled",
+        "IPNExtension"
       ]
     },
     "mesh-vpn": {

@@ -413,7 +413,7 @@ func Default() Policy {
 			Firewall: Firewall{RequireStealth: ptr(true), SuggestOutbound: true},
 			Listeners: Listeners{Allow: []ListenerRule{
 				{Process: "rapportd"}, // Apple Handoff/Continuity
-			}, InfoOnly: []string{"ControlCenter", "DropboxFileProvider", "Dropbox", "Spotify", "tailscaled"}},
+			}, InfoOnly: []string{"ControlCenter", "DropboxFileProvider", "Dropbox", "Spotify", "tailscaled", "IPNExtension"}},
 			Docker: Docker{AllowContainers: []string{}, AllowMounts: []string{}},
 			Secrets: Secrets{
 				ExtraFiles:         []string{},
