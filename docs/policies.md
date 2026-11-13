@@ -184,7 +184,7 @@ Every check takes two common fields:
 
 | Field | |
 |---|---|
-| `enabled` | `false` skips the check entirely. Default `true`. |
+| `enabled` | `false` skips the check entirely. Default `true`. An installed copy still names the check in its report, as skipped with "Disabled by the organisation's policy", and the person's report page lists it as not checked. A plain `bordercheck` run leaves it out. |
 | `on_problem` | `"fail"` or `"warn"`: report every problem the check finds with that status, to make it stricter or more lenient. Default: the check's own judgement. |
 
 On their own, checks report serious problems as `fail` with high severity and lesser ones as `warn` (medium or
@@ -223,9 +223,6 @@ loads the rules, a plain run says it cannot tell and skips; `sudo bordercheck -o
 
 No options. FileVault (macOS); LUKS/dm-crypt under `/` and `/home`, or ZFS encryption (Linux); BitLocker on the
 system drive (Windows).
-
-Installed reports mark checks disabled by IT (`enabled: false`) as skipped with a policy reason.
-The standalone CLI continues to list and run only enabled checks.
 
 ### listeners
 

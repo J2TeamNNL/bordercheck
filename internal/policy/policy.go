@@ -60,9 +60,8 @@ type Report struct {
 	// about a new problem within a day, IT gets one report a week. "" = check
 	// only when a report is due.
 	CheckInterval   string   `json:"check_interval"`
-	OmitHostname    bool     `json:"omit_hostname,omitempty"` // omit the hostname from scheduled reports
-	IncludeEvidence bool     `json:"include_evidence"`        // send file paths, ports, etc., not just pass/fail
-	EmailDomains    []string `json:"email_domains"`           // if set, the user's email must be in one of these
+	IncludeEvidence bool     `json:"include_evidence"` // send file paths, ports, etc., not just pass/fail
+	EmailDomains    []string `json:"email_domains"`    // if set, the user's email must be in one of these
 	// IncludeIPs adds the machine's own interface addresses (host.ips) to the
 	// installed service's report; IncludeLocation adds a device position
 	// (location) where the OS can give one without a prompt. Both off by default.

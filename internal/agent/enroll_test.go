@@ -825,26 +825,14 @@ func TestReportCarriesIPsOnlyWhenAsked(t *testing.T) {
 	}
 }
 
-func TestReportPolicyShowsDisabledChecksAndCanOmitHostname(t *testing.T) {
+func TestReportShowsChecksDisabledByPolicy(t *testing.T) {
 	p := newPortal(t)
 	env, _ := enrolledEnv(t, p)
 	if err := Send(t.Context(), env, true); err != nil {
 		t.Fatal(err)
 	}
-	if hostname, _ := os.Hostname(); hostname != "" && !strings.Contains(p.reports[0], `"hostname"`) {
-		t.Error("default report omitted the hostname")
-	}
-	p.policy = func(p *portal) string {
-		return enrolledPolicy(p.url()+"/report", p.url()+"/policy", "", `, "omit_hostname": true`)
-	}
-	if err := Send(t.Context(), env, true); err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(p.reports[1], `"hostname"`) {
-		t.Error("report contains hostname despite policy")
-	}
 	var rep report.Report
-	if err := json.Unmarshal([]byte(p.reports[1]), &rep); err != nil {
+	if err := json.Unmarshal([]byte(p.reports[0]), &rep); err != nil {
 		t.Fatal(err)
 	}
 	for _, result := range rep.Results {

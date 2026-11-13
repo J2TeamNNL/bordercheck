@@ -196,6 +196,26 @@ describe("report page: titles, links, production secrets", () => {
   });
 });
 
+describe("report page: checks switched off by policy", () => {
+  it("names them apart from the passes; any other skip still counts as fine", async () => {
+    const off = { summary: "Disabled by the organisation’s policy.", summary_parts: [{ key: "check.disabledByPolicy" }] };
+    const url = await reportUrl(
+      await post(
+        report({}, [result("firewall", "pass"), result("backup", "skip", { summary: "Not supported on linux yet." }), result("secrets", "skip", off)]),
+      ),
+    );
+    const page = await (await open(url)).text();
+    expect(page).toContain("Not checked: switched off by your organisation (1)");
+    expect(page).toContain("<b>2</b> passed or did not apply");
+    expect(page).not.toContain("Not supported on linux yet.");
+  });
+
+  it("shows no such heading when nothing is switched off", async () => {
+    const page = await (await open(await reportUrl(await post(report({}, [result("backup", "skip")]))))).text();
+    expect(page).not.toContain("switched off by your organisation");
+  });
+});
+
 describe("report page: client version", () => {
   it("shows which bordercheck version sent the report", async () => {
     const m = await enrolled();

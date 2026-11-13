@@ -125,8 +125,10 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   results.sort((a, b) => statusRank(a.status) - statusRank(b.status));
   const problems = results.filter((r) => r.status === "fail" || r.status === "warn" || r.status === "error");
   const waived = results.filter((r) => r.status === "waived");
-  const okCount = results.filter((r) => r.status === "pass").length;
-  const skipped = results.filter((r) => r.status === "skip");
+  // A check IT switched off is named, so nobody reads its absence as a pass.
+  // Any other skip (not applicable on this OS, say) counts with the passes.
+  const disabled = results.filter((r) => r.status === "skip" && r.summary_parts?.[0]?.key === "check.disabledByPolicy");
+  const okCount = results.filter((r) => r.status === "pass" || r.status === "skip").length - disabled.length;
   // Only how many the person marked as not sensitive: like the rest of the
   // evidence, which files and why stay off a page reached by link alone.
   const userIgnored = results.reduce((n, r) => n + (r.user_ignored?.length ?? 0), 0);
@@ -163,11 +165,8 @@ ${waived.length
 ${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}</div>`,
       )}`
     : ""}
-${skipped.length
-    ? html`<h2>${L.t("rep.skippedTitle", { n: skipped.length })}</h2>${skipped.map(
-        (r) => html`<div class="result s-skip"><div class="head">${badge(L, r.status)}</div><h3>${checkTitle(L, r.id, r.title)}</h3>
-${r.summary ? html`<div class="body">${summaryHtml(L, r)}</div>` : ""}</div>`,
-      )}`
+${disabled.length
+    ? html`<h2>${L.t("rep.disabledTitle", { n: disabled.length })}</h2><ul>${disabled.map((r) => html`<li>${checkTitle(L, r.id, r.title)}</li>`)}</ul>`
     : ""}
 <p class="foot">${L.t("rep.foot")}</p>`;
   // With the prompt comes its Copy button, so that response alone carries the hashed Copy script.

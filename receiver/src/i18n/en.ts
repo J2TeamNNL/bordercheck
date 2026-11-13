@@ -516,7 +516,7 @@ export const en = {
   "rep.for": "For [b]{email}[/b] on [b]{host}[/b], checked {when}.",
   "rep.okText": "This computer meets your organisation's checks. Nothing for you to do.",
   "rep.fixText": "Each item below says what's wrong and how to fix it. BorderCheck checks again on its own, so a fix shows up here after its next run.",
-  "rep.skippedTitle": "Checks skipped ({n})",
+  "rep.disabledTitle": "Not checked: switched off by your organisation ({n})",
   "rep.passed": "[b]{n}[/b] passed or did not apply",
   "rep.exempted": "[b]{n}[/b] exempted for now",
   "rep.userIgnored": "[b]{n}[/b] ignored by you",

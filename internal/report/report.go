@@ -18,7 +18,7 @@ import (
 type Host struct {
 	OS       string `json:"os"`
 	Arch     string `json:"arch"`
-	Hostname string `json:"hostname,omitempty"`
+	Hostname string `json:"hostname"`
 	// The machine's own interface addresses, sent by the installed service only
 	// when the policy sets report.include_ips.
 	IPs []string `json:"ips,omitempty"`

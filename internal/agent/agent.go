@@ -470,9 +470,6 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 	found := rep.CompromiseLines() // before evidence is left out: the details tell one sign from another
 	st.CompromiseFound = found
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID
-	if pol.Report.OmitHostname {
-		rep.Host.Hostname = ""
-	}
 	if pol.Report.IncludeIPs {
 		rep.Host.IPs = hostinfo.IPs()
 	}
