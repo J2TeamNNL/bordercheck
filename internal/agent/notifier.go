@@ -219,6 +219,11 @@ func setUpNotifications(ctx context.Context, env Env, cfg *Config, pol policy.Po
 	}
 	if err := ensureNotifier(ctx, env, cfg, zipPath); err != nil {
 		fmt.Fprintf(env.Out, "\nNotifications come through Script Editor: BorderCheck's own notification app is not available (%v).\n", err)
+		// The first run, a moment from now, need not try again (adoptNotifier).
+		var st State
+		_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
+		st.NotifierTried = time.Now()
+		_ = writeJSON(filepath.Join(env.Dir, "state.json"), st)
 		return
 	}
 	if !pol.Notify.Enabled {
@@ -282,6 +287,23 @@ func refreshNotifier(ctx context.Context, env Env, version string, now time.Time
 		return
 	}
 	fmt.Fprintf(env.Out, "%s notification app updated to %s\n", now.Format(time.RFC3339), version)
+}
+
+// adoptNotifier gives a Mac installed without BorderCheck's app (before the
+// app existed, or when it could not be downloaded) the app of this version,
+// so the person finds BorderCheck in Spotlight (see launcher). It tries once a
+// day, never asks macOS or the person anything, and changes nothing about how
+// notifications are shown until they run `bordercheck notifications`.
+func adoptNotifier(ctx context.Context, env Env, cfg *Config, st *State, now time.Time) {
+	if !macNotifier || !isRelease(env.Version) || notifier.Installed(env.Dir) || now.Sub(st.NotifierTried) < 24*time.Hour {
+		return
+	}
+	st.NotifierTried = now
+	if err := ensureNotifier(ctx, env, cfg, ""); err != nil {
+		fmt.Fprintf(env.Out, "%s BorderCheck's app not installed (trying again tomorrow): %v\n", now.Format(time.RFC3339), err)
+		return
+	}
+	fmt.Fprintf(env.Out, "%s installed BorderCheck's app %s\n", now.Format(time.RFC3339), env.Version)
 }
 
 // notificationsNote says, for status, how notifications reach the person on a

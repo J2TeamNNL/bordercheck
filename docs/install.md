@@ -257,7 +257,7 @@ puts a **BorderCheck** entry in the computer's app search that does the same:
 
 | OS | Where | What it is |
 |---|---|---|
-| macOS | Spotlight and Launchpad | a copy of [BorderCheck's app](#borderchecks-notifications-on-macos) in `~/Applications/BorderCheck.app`; opened by a person, it runs the installed `bordercheck open`. Only on a Mac that has the app (it comes with notifications) |
+| macOS | Spotlight and Launchpad | a copy of [BorderCheck's app](#borderchecks-notifications-on-macos) in `~/Applications/BorderCheck.app`; opened by a person, it runs the installed `bordercheck open`. A Mac installed without the app gets it on an hourly run (tried once a day); that asks nothing and leaves notifications as they were |
 | Windows | the Start menu | a shortcut, `BorderCheck.lnk`, in the user's Start menu folder |
 | Linux | the desktop's application menu | `bordercheck.desktop` in `$XDG_DATA_HOME/applications` (by default `~/.local/share/applications`) |
 

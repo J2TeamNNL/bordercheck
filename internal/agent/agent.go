@@ -112,7 +112,10 @@ type State struct {
 	LastTry         time.Time `json:"last_try,omitzero"`
 	LastError       string    `json:"last_error,omitempty"`
 	LastUpdateCheck time.Time `json:"last_update_check,omitzero"`
-	UpdateError     string    `json:"update_error,omitempty"`
+	// NotifierTried is when the hourly run last tried to install the macOS
+	// app on a Mac that has none (see adoptNotifier).
+	NotifierTried time.Time `json:"notifier_tried,omitzero"`
+	UpdateError   string    `json:"update_error,omitempty"`
 	// Notified maps each problem announced on the desktop (notify.Key) and
 	// still present at the last check to when it was last announced.
 	Notified map[string]time.Time `json:"notified,omitempty"`
@@ -372,15 +375,16 @@ func Send(ctx context.Context, env Env, force bool) error {
 	}
 	var st State
 	_ = readJSON(filepath.Join(env.Dir, "state.json"), &st)
-	if err := launcher.ensure(env, cfg); err != nil {
-		fmt.Fprintf(env.Out, "%s no %s entry in this computer's app search: %v\n", time.Now().Format(time.RFC3339), LauncherName, err)
-	}
 	tok, err := credentials(env, cfg)
 	if err != nil {
 		return err
 	}
 	statePath := filepath.Join(env.Dir, "state.json")
 	now := time.Now()
+	adoptNotifier(ctx, env, &cfg, &st, now)
+	if err := launcher.ensure(env, cfg); err != nil {
+		fmt.Fprintf(env.Out, "%s no %s entry in this computer's app search: %v\n", now.Format(time.RFC3339), LauncherName, err)
+	}
 	// A revoked install asks the portal again once a day, not every hour.
 	if tok != nil && !st.Revoked.IsZero() && !force && now.Sub(st.RevokedChecked) < revokedRetry {
 		fmt.Fprintf(env.Out, "%s revoked by IT since %s; asking %s again after %s\n", now.Format(time.RFC3339),

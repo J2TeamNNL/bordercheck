@@ -509,3 +509,38 @@ func TestRefreshAfterUpdate(t *testing.T) {
 		t.Errorf("another team's app replaced it\n%s", out)
 	}
 }
+
+func TestHourlyRunInstallsTheAppOnAMacWithoutIt(t *testing.T) {
+	out := &strings.Builder{}
+	env := Env{Dir: t.TempDir(), Version: "v9.9.9", GitHub: "https://releases.invalid", Out: out}
+	useFakes(t, &fakeApp{})
+	fetches := 0
+	oldFetch := ntfFetch
+	t.Cleanup(func() { ntfFetch = oldFetch })
+	ntfFetch = func(context.Context, *http.Client, update.Source, string, string, int64) ([]byte, error) {
+		fetches++
+		if fetches == 1 {
+			return nil, errors.New("offline")
+		}
+		return appZip(t, "#!/bin/sh\n"), nil
+	}
+	var cfg Config
+	var st State
+	now := time.Now()
+	adoptNotifier(t.Context(), env, &cfg, &st, now)
+	adoptNotifier(t.Context(), env, &cfg, &st, now.Add(time.Hour)) // not again the same day
+	if fetches != 1 || notifier.Installed(env.Dir) || !strings.Contains(out.String(), "trying again tomorrow") {
+		t.Fatalf("fetches %d\n%s", fetches, out)
+	}
+	adoptNotifier(t.Context(), env, &cfg, &st, now.Add(25*time.Hour))
+	if fetches != 2 || !notifier.Installed(env.Dir) || cfg.NotifierDigest == "" || readCfg(t, env).NotifierDigest != cfg.NotifierDigest {
+		t.Fatalf("fetches %d, digest %q\n%s", fetches, cfg.NotifierDigest, out)
+	}
+	// It is there: nothing more to fetch. A development build never fetches.
+	adoptNotifier(t.Context(), env, &cfg, &st, now.Add(72*time.Hour))
+	env2 := Env{Dir: t.TempDir(), Version: "dev", Out: out}
+	adoptNotifier(t.Context(), env2, &Config{}, &State{}, now)
+	if fetches != 2 {
+		t.Errorf("fetches %d", fetches)
+	}
+}
