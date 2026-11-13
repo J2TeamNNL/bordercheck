@@ -125,7 +125,8 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   results.sort((a, b) => statusRank(a.status) - statusRank(b.status));
   const problems = results.filter((r) => r.status === "fail" || r.status === "warn" || r.status === "error");
   const waived = results.filter((r) => r.status === "waived");
-  const okCount = results.filter((r) => r.status === "pass" || r.status === "skip").length;
+  const okCount = results.filter((r) => r.status === "pass").length;
+  const skipped = results.filter((r) => r.status === "skip");
   // Only how many the person marked as not sensitive: like the rest of the
   // evidence, which files and why stay off a page reached by link alone.
   const userIgnored = results.reduce((n, r) => n + (r.user_ignored?.length ?? 0), 0);
@@ -160,6 +161,12 @@ ${waived.length
         (r) => html`<div class="result s-waived"><div class="head">${badge(L, r.status)}</div><h3>${checkTitle(L, r.id, r.title)}</h3>
 <div class="waiver">${L.t("rep.until", { date: r.waived?.until ? L.day(r.waived.until) : "?" })}${r.waived?.reason ? html`: <span class="body">${r.waived.reason}</span>` : ""}</div>
 ${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}</div>`,
+      )}`
+    : ""}
+${skipped.length
+    ? html`<h2>${L.t("rep.skippedTitle", { n: skipped.length })}</h2>${skipped.map(
+        (r) => html`<div class="result s-skip"><div class="head">${badge(L, r.status)}</div><h3>${checkTitle(L, r.id, r.title)}</h3>
+${r.summary ? html`<div class="body">${summaryHtml(L, r)}</div>` : ""}</div>`,
       )}`
     : ""}
 <p class="foot">${L.t("rep.foot")}</p>`;

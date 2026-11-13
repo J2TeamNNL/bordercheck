@@ -224,6 +224,9 @@ loads the rules, a plain run says it cannot tell and skips; `sudo bordercheck -o
 No options. FileVault (macOS); LUKS/dm-crypt under `/` and `/home`, or ZFS encryption (Linux); BitLocker on the
 system drive (Windows).
 
+Installed reports mark checks disabled by IT (`enabled: false`) as skipped with a policy reason.
+The standalone CLI continues to list and run only enabled checks.
+
 ### listeners
 
 Ports reachable beyond localhost (`lsof` on macOS, `ss` or else `/proc/net/tcp` on Linux). `sudo bordercheck`
