@@ -111,7 +111,9 @@ guard CommandLine.arguments.count == 2, CommandLine.arguments[1].hasSuffix(".ico
 }
 let out = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
 try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
-for pt in [16, 32, 128, 256, 512] {
+// Up to 512 pixels (256 points at 2x). The 1024-pixel image alone was most of
+// the app's size, and nothing shows this app's icon that large.
+for pt in [16, 32, 128, 256] {
     writePNG(draw(size: pt), to: out.appendingPathComponent("icon_\(pt)x\(pt).png"))
     writePNG(draw(size: pt * 2), to: out.appendingPathComponent("icon_\(pt)x\(pt)@2x.png"))
 }
