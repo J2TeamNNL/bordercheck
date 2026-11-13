@@ -52,6 +52,7 @@ import {
   SIGNED_OUT,
 } from "./passkeys";
 import { hit } from "./ratelimit";
+import { mcpPage } from "./mcppage";
 import { inviteVisible, machineVisible, roleAllowed } from "./scope";
 
 const MAX_FORM_BYTES = 512 * 1024;
@@ -219,6 +220,7 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
     if (!(await inviteVisible(env, Number(m[1]), scope))) return invitesPage(env, url, v.who, L, L.m(msg("err.noSuchInvite")), 404, scope);
     return m[2] === "revoke" ? revokeInvite(env, url, v.who, Number(m[1]), L, scope) : reissueInvite(env, req, url, v.who, Number(m[1]), L, scope);
   }
+  if (path === "/admin/mcp" && req.method === "GET") return mcpPage(env, req, v.who, L);
   if (path === "/admin/audit" && req.method === "GET") return auditPage(env, url, v.who, L, scope);
 
   // Passkeys: for the token/session sign-in only. Under Cloudflare Access (or

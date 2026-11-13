@@ -440,7 +440,7 @@ export const MARK = new Html(
   `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.8 4.5 5.6v5.7c0 4.6 3.1 8.6 7.5 9.9 4.4-1.3 7.5-5.3 7.5-9.9V5.6L12 2.8Z" fill="rgba(255,255,255,.18)" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.6 12.1 2.4 2.4 4.5-4.7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 );
 
-export type NavItem = "Machines" | "Checks" | "Alerts" | "Roles" | "Invites" | "Audit" | "Passkeys" | "Admins";
+export type NavItem = "Machines" | "Checks" | "Alerts" | "Roles" | "Invites" | "Audit" | "Passkeys" | "Admins" | "MCP";
 
 const NAV: [NavItem, string, Key][] = [
   ["Machines", "/admin", "nav.machines"],
@@ -451,6 +451,7 @@ const NAV: [NavItem, string, Key][] = [
   ["Audit", "/admin/audit", "nav.audit"],
   ["Passkeys", "/admin/passkeys", "nav.passkeys"],
   ["Admins", "/admin/admins", "nav.admins"],
+  ["MCP", "/admin/mcp", "nav.mcp"],
 ];
 
 // Signed in with the portal's own sign-in (the admin token, a named admin's

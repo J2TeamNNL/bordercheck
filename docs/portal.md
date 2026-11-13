@@ -203,7 +203,7 @@ To serve the install commands from your own copy of the scripts rather than this
 ## 8. Ask Claude about the fleet (optional)
 
 `/mcp` is an MCP server that lets an admin's Claude read the fleet and make the same changes as the dashboard,
-through the same validation and audit trail. It is off until you set a token:
+through the same validation and audit trail. It is off until you set a token: The dashboard's **MCP** page says whether it is on, which tokens are set, the command to add it to Claude Code with this portal's address, and what each token lets Claude do.
 
 ```sh
 openssl rand -hex 32 | npx wrangler secret put MCP_TOKEN        # read and write tools

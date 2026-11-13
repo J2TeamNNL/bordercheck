@@ -588,3 +588,34 @@ describe("sub-admin scopes", () => {
     expect(out.result.structuredContent.count).toBe(3);
   });
 });
+
+describe("MCP page", () => {
+  const page = async (e: Record<string, string | undefined>) => {
+    const res = await call(new Request(`${BASE}/admin/mcp`, { headers: headersOf(OWNER) }), e);
+    expect(res.status).toBe(200);
+    return res.text();
+  };
+
+  it("says it is off without a token, and how to set one", async () => {
+    const html = await page({ MCP_TOKEN: undefined, MCP_READ_TOKEN: undefined });
+    expect(html).toContain("MCP is off");
+    expect(html).toContain("npx wrangler secret put MCP_TOKEN");
+    expect(html).toContain(`claude mcp add --transport http bordercheck ${BASE}/mcp`);
+    expect(html).toContain('href="/admin/mcp"');
+  });
+
+  it("says which tokens are set, lists the tools, and never shows a token", async () => {
+    const secret = "mcp-token-that-must-not-be-shown-0123456789";
+    const html = await page({ MCP_TOKEN: undefined, MCP_READ_TOKEN: secret });
+    expect(html).toContain("with a read-only token only");
+    expect(html).toContain("<code>fleet_summary</code>");
+    expect(html).toContain("<code>create_role</code>");
+    expect(html).not.toContain(secret);
+    expect(await page({ MCP_TOKEN: secret, MCP_READ_TOKEN: secret })).toContain("a read-and-write token and a read-only token are set");
+  });
+
+  it("needs a signed-in admin", async () => {
+    const res = await call(new Request(`${BASE}/admin/mcp`));
+    expect(res.status).not.toBe(200);
+  });
+});
