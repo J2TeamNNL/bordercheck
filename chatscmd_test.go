@@ -149,3 +149,22 @@ func TestGuardOutput(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteGit(t *testing.T) {
+	var b strings.Builder
+	found := []checks.GitFinding{{Repo: "~/code/api", Commit: "bf08e167", Date: "2026-03-02", File: ".env", Kind: "GitHub token", Tail: "Q7x9", Commits: 2, Pushed: true}}
+	if code := writeGit(&b, found, 3, []string{"~/big"}); code != 1 {
+		t.Errorf("exit %d", code)
+	}
+	for _, want := range []string{"== Git history (3 repositories)", "Read only in part (too large or too slow): ~/big",
+		"  1. GitHub token …Q7x9\n     Where: ~/code/api, commit bf08e167 (2026-03-02), .env (added in 2 commits)\n     State: no longer in the current files, still in the history; pushed to a remote.",
+		"git filter-repo"} {
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("no %q in:\n%s", want, b.String())
+		}
+	}
+	b.Reset()
+	if code := writeGit(&b, nil, 2, nil); code != 0 || !strings.Contains(b.String(), "No secrets found in git history.") {
+		t.Errorf("none: %d %s", code, b.String())
+	}
+}

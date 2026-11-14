@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ptrinh/bordercheck/internal/check"
 	"github.com/ptrinh/bordercheck/internal/ignore"
@@ -22,6 +23,11 @@ import (
 type Local struct {
 	Ignored   []ignore.Entry // secrets marked as not sensitive (bordercheck ignore)
 	IgnoreErr error          // the list of ignored secrets could not be read
+	// FullScanKnown: BorderCheck is installed here, so whether
+	// `bordercheck full-scan` was ever run is known; FullScanAt is when it last
+	// was (zero: never).
+	FullScanKnown bool
+	FullScanAt    time.Time
 }
 
 // CompromiseCheckIDs are the checks whose findings can be a sign of compromise

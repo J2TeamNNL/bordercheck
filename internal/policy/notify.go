@@ -23,16 +23,39 @@ type Notify struct {
 	// own notifications are allowed it does nothing: every notification there
 	// opens the page when clicked (internal/agent/notify.go).
 	OpenReport bool `json:"open_report"`
+	// Until `bordercheck full-scan` has run once on the machine, a
+	// notification nudges the person to run it (once is enough; it is never
+	// required again). FirstFullScanNudge: how long after the install first
+	// finds it has not run ("0" = never nudge). FullScanNudgeEvery: how often
+	// after that, until it has ("0" = only the first nudge).
+	FirstFullScanNudge string `json:"first_full_scan_nudge,omitempty"`
+	FullScanNudgeEvery string `json:"full_scan_nudge_every,omitempty"`
 }
 
 func defaultNotify() Notify {
 	return Notify{
-		Enabled:     true,
-		Statuses:    []check.Status{check.Fail},
-		Severities:  []check.Severity{check.High, check.Medium},
-		RemindEvery: "24h",
-		OpenReport:  true,
+		Enabled:            true,
+		Statuses:           []check.Status{check.Fail},
+		Severities:         []check.Severity{check.High, check.Medium},
+		RemindEvery:        "24h",
+		OpenReport:         true,
+		FirstFullScanNudge: "24h",
+		FullScanNudgeEvery: "336h", // 14 days
 	}
+}
+
+// FullScanNudges returns when to nudge the person to run a full scan: first,
+// after the install first finds it has not run (0 = never), and every, after
+// that (0 = not again).
+func (n Notify) FullScanNudges() (first, every time.Duration) {
+	first, every = 24*time.Hour, 14*24*time.Hour
+	if n.FirstFullScanNudge != "" {
+		first, _ = time.ParseDuration(n.FirstFullScanNudge)
+	}
+	if n.FullScanNudgeEvery != "" {
+		every, _ = time.ParseDuration(n.FullScanNudgeEvery)
+	}
+	return first, every
 }
 
 // Remind returns how long until a problem still there is announced again; 0 = never.
@@ -67,6 +90,16 @@ func (n Notify) validate() error {
 	}
 	if d, err := time.ParseDuration(n.RemindEvery); err != nil || (d != 0 && d < time.Hour) {
 		return fmt.Errorf("notify.remind_every must be \"0\" (never) or a duration of at least 1h, like \"24h\", not %q", n.RemindEvery)
+	}
+	if n.FirstFullScanNudge != "" {
+		if d, err := time.ParseDuration(n.FirstFullScanNudge); err != nil || (d != 0 && d < time.Hour) {
+			return fmt.Errorf("notify.first_full_scan_nudge must be \"0\" (never nudge) or a duration of at least 1h, like \"24h\", not %q", n.FirstFullScanNudge)
+		}
+	}
+	if n.FullScanNudgeEvery != "" {
+		if d, err := time.ParseDuration(n.FullScanNudgeEvery); err != nil || (d != 0 && d < 24*time.Hour) {
+			return fmt.Errorf("notify.full_scan_nudge_every must be \"0\" (only the first nudge) or a duration of at least 24h, like \"336h\" (14 days), not %q", n.FullScanNudgeEvery)
+		}
 	}
 	return nil
 }

@@ -327,3 +327,47 @@ func notificationsNote(ctx context.Context, env Env, cfg Config) string {
 	}
 	return "through Script Editor (osascript) until you allow BorderCheck's own; run: bordercheck notifications"
 }
+
+// Until `bordercheck full-scan` has run once on this computer, the person is
+// nudged to run it: notify.first_full_scan_nudge after this install first saw
+// it had not (a day by default), then every notify.full_scan_nudge_every (14
+// days by default). Once it has run, never again. Only with the policy's
+// desktop notifications on, and not if the person turned BorderCheck's off.
+
+// FullScanReminder is the reminder's text.
+var FullScanReminder = notify.Message{
+	Title: "BorderCheck: one scan left to run",
+	Body: "BorderCheck has not yet looked through all of your AI chat history, git history and logs for secrets left there.\n" +
+		"Run once, in a terminal: bordercheck full-scan",
+}
+
+func remindFullScan(ctx context.Context, env Env, pol policy.Policy, st *State, now time.Time) {
+	first, every := pol.Notify.FullScanNudges()
+	if !Local(env.Dir).FullScanAt.IsZero() || !pol.Notify.Enabled || first == 0 {
+		return
+	}
+	if st.FullScanSince.IsZero() {
+		st.FullScanSince = now
+	}
+	due := st.FullScanSince.Add(first)
+	if !st.FullScanReminded.IsZero() {
+		if every == 0 {
+			return // nudged once, as the policy asks
+		}
+		due = st.FullScanReminded.Add(every)
+	}
+	if now.Before(due) {
+		return
+	}
+	err := showMessage(ctx, env, st, FullScanReminder, now)
+	switch {
+	case err == nil:
+		st.FullScanReminded = now
+		fmt.Fprintf(env.Out, "%s reminded to run bordercheck full-scan\n", now.Format(time.RFC3339))
+	case errors.Is(err, errNotificationsOff):
+		st.FullScanReminded = now // they turned notifications off: not every hour either
+	default:
+		st.FullScanReminded = now // a reminder, not a problem: tried again next month, not every hour
+		fmt.Fprintf(env.Out, "%s full-scan reminder not shown: %v\n", now.Format(time.RFC3339), err)
+	}
+}

@@ -266,7 +266,7 @@ func Reason(items []string) string {
 	return "BorderCheck stopped this prompt before it was sent: it holds " + plural(len(items)) + " (" +
 		strings.Join(items, "; ") + "). Take it out, or put it in a file the assistant reads or an environment " +
 		"variable, and send the prompt again. The prompt is still in Claude Code's history on this computer " +
-		"(~/.claude); bordercheck chats lists such leftovers. If it is not a real secret, or is meant to be sent, " +
+		"(~/.claude); bordercheck full-scan lists such leftovers. If it is not a real secret, or is meant to be sent, " +
 		"add " + Allow + " anywhere in the prompt."
 }
 

@@ -36,7 +36,7 @@ import (
 // every prompt typed (history.jsonl, a few megabytes) but of the conversations
 // only what was written within policy ai_chat_hours (48 by default), at most
 // ai_chat_max_mb in all, and reports what it finds for information only;
-// `bordercheck chats` (ScanAIChats) reads the whole history. Only provider
+// `bordercheck full-scan` (ScanAIChats) reads the whole history. Only provider
 // token formats, private keys, passwords in URLs and passwords assigned to a
 // name are looked for: the generic NAME=value rule would flag every snippet
 // of code discussed in a chat. Each distinct secret is reported once per
@@ -299,6 +299,7 @@ var chatRules = func() []chatRule {
 
 // chatFile is a conversation file to read.
 type chatFile struct {
+	raw     bool // a database or a log, read as bytes: no lines, no message context
 	app     string
 	path    string
 	mod     time.Time
@@ -350,6 +351,18 @@ func findChats(ctx context.Context, home string, since time.Time, aider []string
 			}
 		}
 	}
+	// Databases of tools that keep chats or a clipboard in SQLite, read as
+	// bytes (their -wal file holds the latest writes).
+	for _, rs := range rawStores {
+		for _, p := range rs.paths(home, runtime.GOOS) {
+			for _, q := range []string{p, p + "-wal"} {
+				if info, err := os.Lstat(q); err == nil && !seen[q] && info.Mode().IsRegular() && !info.ModTime().Before(since) {
+					seen[q] = true
+					out = append(out, chatFile{app: rs.app, path: q, mod: info.ModTime(), size: info.Size(), raw: true})
+				}
+			}
+		}
+	}
 	// Aider keeps its histories in each project, found by the secrets walk.
 	for _, env := range []string{"AIDER_CHAT_HISTORY_FILE", "AIDER_INPUT_HISTORY_FILE"} {
 		if p := os.Getenv(env); filepath.IsAbs(p) {
@@ -380,7 +393,7 @@ func (s *secretScanner) scanChats(ctx context.Context, home string, since time.T
 		return nil, false
 	}
 	extra := s.extraRules()
-	if budget == math.MaxInt64 { // no limit (bordercheck chats): several files at once
+	if budget == math.MaxInt64 { // no limit (bordercheck full-scan): several files at once
 		return s.scanAllChats(ctx, home, since, ignored, extra), false
 	}
 	perFile := max(1, budget/4)
@@ -418,7 +431,12 @@ func (s *secretScanner) scanChatFile(f chatFile, shown string, from, n int64, si
 	}
 	segs, text := textSegments(data)
 	var found []secretFinding
-	for _, c := range s.scanChatIn(data, segs, shown, from == 0, extra) {
+	for _, c := range s.scanChatIn(data, segs, shown, from == 0 && !f.raw, extra) {
+		if f.raw {
+			c.ctx = chatContext{app: f.app, host: c.ctx.host, tail: c.ctx.tail, rep: c.ctx.rep}
+			found = append(found, c)
+			continue
+		}
 		// Every prompt ever typed counts: the prompt history is small and
 		// what was typed is what most needs taking out. In a conversation,
 		// changed recently but holding older messages too, a message that
@@ -434,7 +452,7 @@ func (s *secretScanner) scanChatFile(f chatFile, shown string, from, n int64, si
 // scanAllChats reads every conversation file whole, a few at a time, and
 // returns what they hold in the order findChats lists them.
 func (s *secretScanner) scanAllChats(ctx context.Context, home string, since time.Time, ignored func(string) bool, extra []secretRule) []secretFinding {
-	files := findChats(ctx, home, since, s.aider)
+	files := append(findChats(ctx, home, since, s.aider), s.logs...)
 	results := make([][]secretFinding, len(files))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 4) // each file already searches with every core; this keeps the disk busy
@@ -638,7 +656,7 @@ func (s *secretScanner) findingsOf(data []byte, hits []chatHit, shown string, wi
 		if s.showTail && h.rule.showTail && len(h.match) >= 20 {
 			f.tail = h.match[len(h.match)-4:]
 		}
-		// For `bordercheck chats` only, never in a report: where in the
+		// For `bordercheck full-scan` only, never in a report: where in the
 		// conversation it was, and the end of a password long enough that
 		// four characters give little away.
 		f.ctx = chatContextAt(data, h.at, shown)
@@ -674,7 +692,7 @@ func randomToken(m string) bool {
 }
 
 // ChatFinding is a secret found in AI chat history, without its value. Its
-// JSON form is what `bordercheck chats -json` prints.
+// JSON form is what `bordercheck full-scan -json` prints.
 type ChatFinding struct {
 	Path string `json:"path"`           // ~ for the home folder
 	Line int    `json:"line,omitempty"` // the message's line in the .jsonl file; 0 = not known
@@ -775,11 +793,16 @@ func (f ChatFinding) Explain(home string) string {
 // ChatFix is how to remove secrets from AI chat history, in English.
 func ChatFix() string { return msg.Of("secrets.fix.aiChat").English() }
 
-// ScanAIChats is `bordercheck chats`: every conversation changed since
+// ScanAIChats is `bordercheck full-scan`: every conversation changed since
 // `since` (the zero time: all of them), with no size limit and none of the
 // secrets check's time limit; the policy's ignore_paths and extra_patterns
 // apply. It only reads.
 func ScanAIChats(ctx context.Context, p policy.Secrets, since time.Time) ([]ChatFinding, error) {
+	return ScanChatsAndLogs(ctx, p, since, false)
+}
+
+// ScanChatsAndLogs is ScanAIChats, and with logs the log files (findLogs) too.
+func ScanChatsAndLogs(ctx context.Context, p policy.Secrets, since time.Time, logs bool) ([]ChatFinding, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -789,6 +812,13 @@ func ScanAIChats(ctx context.Context, p policy.Secrets, since time.Time) ([]Chat
 		return nil, err
 	}
 	s.find(ctx, home) // for Aider's histories, kept in each project
+	if logs {
+		s.logs = findLogs(ctx, home, runtime.GOOS)
+	}
+	return s.chatFindings(ctx, home, since)
+}
+
+func (s *secretScanner) chatFindings(ctx context.Context, home string, since time.Time) ([]ChatFinding, error) {
 	found, _ := s.scanChats(ctx, home, since, math.MaxInt64, s.ignored)
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -807,7 +837,7 @@ func ScanAIChats(ctx context.Context, p policy.Secrets, since time.Time) ([]Chat
 	return out, nil
 }
 
-// chatContext is what `bordercheck chats` says about where a secret was. It
+// chatContext is what `bordercheck full-scan` says about where a secret was. It
 // never goes into a report.
 type chatContext struct {
 	app     string // the assistant whose history it is
@@ -929,6 +959,9 @@ var (
 // codeValue: what is assigned to a password name in code rather than a
 // password: another variable, a field, a query string.
 func codeValue(v string) bool {
+	if strings.HasPrefix(v, "eyJ") { // a JWT: three base64 parts with dots, not a field name
+		return false
+	}
 	return dottedName.MatchString(v) || envName.MatchString(v) || strings.ContainsAny(v, "=&")
 }
 
@@ -969,7 +1002,7 @@ func urlHost(u string) string {
 	return host
 }
 
-// chatMeaning says what a kind of secret lets someone do, for `bordercheck chats`.
+// chatMeaning says what a kind of secret lets someone do, for `bordercheck full-scan`.
 var chatMeaning = map[string]string{
 	"Private key":       "A private key: whoever has it can sign in, or sign, wherever its public key is trusted.",
 	"AWS access key":    "Access to an AWS account, with whatever permissions this key has.",

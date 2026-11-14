@@ -142,7 +142,7 @@ func TestChatFindingsAreInformation(t *testing.T) {
 
 	// Only in chats, even a high-severity kind: the check passes and says so.
 	r := evalSecrets([]secretFinding{chat}, nil, false, fix)
-	if r.Status != "pass" || !strings.Contains(r.Summary, "bordercheck chats") || !strings.Contains(r.Summary, "For information: 1 secret") ||
+	if r.Status != "pass" || !strings.Contains(r.Summary, "bordercheck full-scan") || !strings.Contains(r.Summary, "For information: 1 secret") ||
 		strings.Contains(r.Summary, "No plain-text secrets in shell files, shell history, credential files, .env files or recent") {
 		t.Errorf("chat only: %s %q", r.Status, r.Summary)
 	}
@@ -454,5 +454,15 @@ func TestCloudSignInsAreInformation(t *testing.T) {
 	azure.signIn = false
 	if r := evalSecrets([]secretFinding{azure}, nil, false, secretFix()); r.Status != "warn" {
 		t.Errorf("policy off: %s", r.Status)
+	}
+}
+
+func TestFullScanSuggestedUntilRun(t *testing.T) {
+	if r := evalSecretsSamples(nil, nil, false, chatState{fullScanNever: true}, secretFix(), nil, nil); r.Status != "pass" ||
+		!strings.Contains(r.Summary, "run bordercheck full-scan once") {
+		t.Errorf("never run: %q", r.Summary)
+	}
+	if r := evalSecretsSamples(nil, nil, false, chatState{}, secretFix(), nil, nil); strings.Contains(r.Summary, "full-scan") {
+		t.Errorf("run before: %q", r.Summary)
 	}
 }

@@ -91,7 +91,8 @@ type secretFinding struct {
 	severe bool        // the rule itself is high severity, e.g. a private key
 	chat   bool        // in an AI assistant's conversation history (secrets_aichats.go)
 	signIn bool        // a cloud CLI's sign-in cache, reported for information (signInKinds)
-	ctx    chatContext // where in that conversation; for bordercheck chats only
+	synced string      // the cloud service the file is synced with (syncedBy), if any
+	ctx    chatContext // where in that conversation; for bordercheck full-scan only
 }
 
 func (f secretFinding) high() bool { return f.prod || f.severe }
@@ -110,6 +111,9 @@ func (f secretFinding) String() string {
 	if f.prod {
 		s += "  [production]"
 	}
+	if f.synced != "" {
+		s += "  [synced to " + f.synced + "]"
+	}
 	return s
 }
 
@@ -121,12 +125,16 @@ type secretScanner struct {
 	depth    int
 	ignore   []*regexp.Regexp
 	extra    []string
-	gitCfgs  []string // .git/config of repositories the walk passed; see secrets_gitremotes.go
-	aider    []string // Aider's chat and input histories the walk passed; see secrets_aichats.go
+	gitCfgs  []string   // .git/config of repositories the walk passed; see secrets_gitremotes.go
+	aider    []string   // Aider's chat and input histories the walk passed; see secrets_aichats.go
+	logs     []chatFile // log files to read too (bordercheck full-scan; secrets_raw.go)
+	loc      policy.SecretLocations
+	jsonKeys []string // small JSON files the walks passed: maybe a key (secrets_more.go)
+	postman  []string // exported Postman environments the walks passed
 }
 
 func newSecretScanner(p policy.Secrets, home string) (*secretScanner, error) {
-	s := &secretScanner{showTail: p.ShowTail == nil || *p.ShowTail, depth: p.WalkDepth}
+	s := &secretScanner{showTail: p.ShowTail == nil || *p.ShowTail, depth: p.WalkDepth, loc: p.Locations}
 	for _, sp := range p.ExtraPatterns { // the org's own formats are the most specific, so they go first
 		re, err := regexp.Compile(sp.Regex)
 		if err != nil {
@@ -159,6 +167,7 @@ func newSecretScanner(p policy.Secrets, home string) (*secretScanner, error) {
 func secrets(p policy.Secrets, local Local) func(context.Context) check.Result {
 	return func(ctx context.Context) check.Result {
 		home, found, bundles, incomplete, chats, err := scanSecrets(ctx, p)
+		chats.fullScanNever = local.FullScanKnown && local.FullScanAt.IsZero()
 		if err != nil {
 			return check.Errored(err)
 		}
@@ -192,6 +201,12 @@ func scanSecrets(ctx context.Context, p policy.Secrets) (home string, found []se
 		found = append(found, f)
 	}
 	found = append(found, s.scanGitRemotes(home, p.Locations)...)
+	found = append(found, s.scanLooseKeys(home)...)
+	for i := range found {
+		if p := found[i].path; strings.HasPrefix(p, "~") {
+			found[i].synced = syncedBy(home, filepath.Join(home, p[1:]))
+		}
+	}
 	if p.Locations.AIChats && p.AIChatHours > 0 {
 		since := time.Now().Add(-time.Duration(p.AIChatHours) * time.Hour)
 		inChats, partial := s.scanChats(ctx, home, since, int64(p.AIChatMaxMB)<<20, s.ignored)
@@ -289,18 +304,13 @@ func (s *secretScanner) find(ctx context.Context, home string) (scan, bundles []
 			s.aider = append(s.aider, p)
 			return nil
 		}
-		switch strings.ToLower(filepath.Ext(name)) {
-		case ".pem", ".key", ".p8":
-			add(p)
-		case ".p12", ".pfx":
-			bundles = append(bundles, p)
-		default:
-			if isEnvFile(name) {
-				add(p)
-			}
-		}
+		info, _ := d.Info()
+		s.lookAt(p, name, info, false, add, &bundles)
 		return nil
 	})
+	if s.walkTrash(ctx, home, add, &bundles) {
+		incomplete = true
+	}
 	return scan, bundles, incomplete
 }
 
@@ -457,6 +467,9 @@ func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool
 	if cs.unguarded {
 		note = append(note, msg.P("secrets.chatGuard"))
 	}
+	if cs.fullScanNever {
+		note = append(note, msg.P("secrets.fullScan"))
+	}
 	if cs.partial {
 		note = append(note, msg.P("secrets.chatsPartial"))
 	}
@@ -541,6 +554,16 @@ var credFix = map[string]string{
 	"Kubernetes password":                                         "secrets.fix.kube",
 	"Kubernetes auth-provider token":                              "secrets.fix.kube",
 	"Kubernetes auth-provider secret":                             "secrets.fix.kube",
+	"Postman environment secret":                                  "secrets.fix.postman",
+	"Insomnia environment secret":                                 "secrets.fix.insomnia",
+	"Insomnia request credential":                                 "secrets.fix.insomnia",
+	dbeaverKind:                                                   "secrets.fix.dbeaver",
+}
+
+// inTrash: a shown path in the Trash.
+func inTrash(shown string) bool {
+	p := filepath.ToSlash(shown)
+	return strings.HasPrefix(p, "~/.Trash/") || strings.Contains(p, "/Trash/files/")
 }
 
 // fixFor is the fix for what is left to report: the advice for each kind of
@@ -550,7 +573,11 @@ func fixFor(general msg.Text, found []secretFinding, bundles []string) msg.Text 
 	var specific msg.Text
 	seen := map[string]bool{}
 	other := len(bundles) > 0
+	trash := slices.ContainsFunc(bundles, inTrash)
+	synced := false
 	for _, f := range found {
+		trash = trash || inTrash(f.path)
+		synced = synced || f.synced != ""
 		key, ok := credFix[f.kind]
 		if !ok {
 			other = true
@@ -560,6 +587,13 @@ func fixFor(general msg.Text, found []secretFinding, bundles []string) msg.Text 
 			seen[key] = true
 			specific = append(specific, msg.P(key))
 		}
+	}
+	if trash {
+		specific = append(specific, msg.P("secrets.fix.trash"))
+	}
+	if synced {
+		specific = append(specific, msg.P("secrets.fix.synced"))
+		other = true // and the general advice: move the key out of the file
 	}
 	if len(specific) == 0 {
 		return general
@@ -578,8 +612,9 @@ func fixFor(general msg.Text, found []secretFinding, bundles []string) msg.Text 
 
 // chatState is how the scan of AI chat history went.
 type chatState struct {
-	partial   bool // larger than the policy's limit: only the newest part was read
-	unguarded bool // Claude Code is used here without bordercheck guard
+	partial       bool // larger than the policy's limit: only the newest part was read
+	unguarded     bool // Claude Code is used here without bordercheck guard
+	fullScanNever bool // installed here, and bordercheck full-scan has never run
 }
 
 func capEvidence(ev []string) []string {

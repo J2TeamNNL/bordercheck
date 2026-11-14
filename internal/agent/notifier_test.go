@@ -544,3 +544,119 @@ func TestHourlyRunInstallsTheAppOnAMacWithoutIt(t *testing.T) {
 		t.Errorf("fetches %d", fetches)
 	}
 }
+
+func TestFullScanRecord(t *testing.T) {
+	dir := t.TempDir()
+	if l := Local(dir); l.FullScanKnown {
+		t.Error("not installed: unknown")
+	}
+	if err := RecordFullScan(dir, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, FullScanFile)); err == nil {
+		t.Error("recorded without an install")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if l := Local(dir); !l.FullScanKnown || !l.FullScanAt.IsZero() {
+		t.Errorf("installed, never run: %+v", l)
+	}
+	at := time.Date(2026, 11, 15, 9, 0, 0, 0, time.UTC)
+	if err := RecordFullScan(dir, at); err != nil {
+		t.Fatal(err)
+	}
+	if l := Local(dir); !l.FullScanAt.Equal(at) {
+		t.Errorf("recorded: %v", l.FullScanAt)
+	}
+}
+
+func TestFullScanReminder(t *testing.T) {
+	s := record(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env := Env{Dir: dir, Out: &strings.Builder{}}
+	pol := policy.Default()
+	var st State
+	t0 := time.Date(2026, 11, 15, 9, 0, 0, 0, time.UTC)
+	shown := func() int { return len(s.osascript) }
+
+	remindFullScan(t.Context(), env, pol, &st, t0) // first seen: nothing yet
+	remindFullScan(t.Context(), env, pol, &st, t0.Add(23*time.Hour))
+	if shown() != 0 {
+		t.Fatalf("reminded before a day: %v", s.osascript)
+	}
+	remindFullScan(t.Context(), env, pol, &st, t0.Add(25*time.Hour))
+	if shown() != 1 || s.osascript[0] != FullScanReminder {
+		t.Fatalf("after a day: %v", s.osascript)
+	}
+	remindFullScan(t.Context(), env, pol, &st, t0.Add(10*24*time.Hour))
+	remindFullScan(t.Context(), env, pol, &st, t0.Add(16*24*time.Hour))
+	if shown() != 2 {
+		t.Fatalf("every 14 days by default: %d", shown())
+	}
+	// The policy sets how often; "0" never.
+	weekly := pol
+	weekly.Notify.FullScanNudgeEvery = "168h"
+	remindFullScan(t.Context(), env, weekly, &st, t0.Add(22*24*time.Hour))
+	if shown() != 2 {
+		t.Fatalf("weekly, after 6 days: %d", shown())
+	}
+	remindFullScan(t.Context(), env, weekly, &st, t0.Add(24*24*time.Hour))
+	if shown() != 3 {
+		t.Fatalf("weekly, after 8 days: %d", shown())
+	}
+	once := pol
+	once.Notify.FullScanNudgeEvery = "0" // only the first nudge, already given
+	remindFullScan(t.Context(), env, once, &st, t0.Add(60*24*time.Hour))
+	if shown() != 3 {
+		t.Fatalf("only the first: %d", shown())
+	}
+	// Notifications off in the policy: none.
+	off := pol
+	off.Notify.Enabled = false
+	remindFullScan(t.Context(), env, off, &st, t0.Add(90*24*time.Hour))
+	if shown() != 3 {
+		t.Fatalf("notifications off: %d", shown())
+	}
+	// Once a full scan has run: never again.
+	if err := RecordFullScan(dir, t0.Add(40*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	remindFullScan(t.Context(), env, pol, &st, t0.Add(120*24*time.Hour))
+	if shown() != 3 {
+		t.Fatalf("after a full scan: %d", shown())
+	}
+}
+
+func TestFirstFullScanNudge(t *testing.T) {
+	s := record(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env := Env{Dir: dir, Out: &strings.Builder{}}
+	t0 := time.Date(2026, 11, 15, 9, 0, 0, 0, time.UTC)
+	week := policy.Default()
+	week.Notify.FirstFullScanNudge = "168h"
+	var st State
+	remindFullScan(t.Context(), env, week, &st, t0)
+	remindFullScan(t.Context(), env, week, &st, t0.Add(6*24*time.Hour))
+	if len(s.osascript) != 0 {
+		t.Fatalf("before a week: %v", s.osascript)
+	}
+	remindFullScan(t.Context(), env, week, &st, t0.Add(8*24*time.Hour))
+	if len(s.osascript) != 1 {
+		t.Fatalf("after a week: %d", len(s.osascript))
+	}
+	never := policy.Default()
+	never.Notify.FirstFullScanNudge = "0"
+	var st2 State
+	remindFullScan(t.Context(), env, never, &st2, t0)
+	remindFullScan(t.Context(), env, never, &st2, t0.Add(400*24*time.Hour))
+	if len(s.osascript) != 1 {
+		t.Fatalf("never: %d", len(s.osascript))
+	}
+}

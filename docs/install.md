@@ -266,13 +266,35 @@ profile line and the Windows `PATH` entry are added once, so removing them by ha
 already at `~/.local/bin/bordercheck` and is not this install's is left alone. `bordercheck uninstall` removes the
 link, the line and the `PATH` entry.
 
-**AI chat history.** `bordercheck chats` lists the secrets in AI assistants' conversation history (Claude Code, Codex,
-Gemini CLI, Copilot, Cursor's agent, Cline, Aider; [which files](policies.md#secrets)), all of it (`-hours N` for less; `-json` for scripts): for each, the item (kind, variable name, last 4 characters of a
-provider token or of a password of 12 characters or more), where (file and line) and what it is (assistant,
-project, date, whether it was typed into the prompt, sent, written by the assistant or printed by a command it ran,
-and what the secret allows). Values are never printed, and none of it goes into a report. It exits `1` when it finds
-something. The `secrets` check reads every prompt typed but of the conversations only the last `ai_chat_hours`
-(48), and reports what it finds there for information ([details](policies.md#secrets)).
+**Full scan.** `bordercheck full-scan` (formerly `bordercheck chats`, which still works) reads what the hourly
+check reads only in part or not at all, and lists every secret it finds, never the values; none of it goes into a
+report. It exits `1` when it finds something. It only reads, apart from noting the date it ran in the install folder
+(`fullscan.json`, nothing about what it found); until a complete run has been noted (not with `-hours` or `-no-git`),
+the `secrets` summary suggests running it once, and, with the policy's desktop notifications on, a notification
+nudges the person: a day after the install first finds it has not run (`notify.first_full_scan_nudge`), then every
+14 days (`notify.full_scan_nudge_every`) until it has, never again once it has.
+It takes a minute or so on a busy computer.
+
+- **AI chat history**, all of it (`-hours N` for less): Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor's
+  agent, VS Code chat, Cline / Roo / Kilo, Aider ([which files](policies.md#secrets)); for each, the item (kind,
+  variable name, last 4 characters of a provider token or of a password of 12 characters or more), where (file and
+  every line it is on) and what it is (assistant, project, date, whether it was typed into the prompt, sent, written
+  by the assistant or printed by a command it ran, and what the secret allows).
+- **Databases of tools that keep chats or a clipboard:** Cursor's editor (`state.vscdb`), opencode, Goose, and
+  Alfred's clipboard history, searched as bytes for the same token formats (no lines). Raycast's clipboard is
+  encrypted; Maccy, Paste and Warp keep theirs inside app containers, which BorderCheck does not open because macOS
+  would ask you for permission.
+- **Log files** (`.log` in the temporary folders and `~/Library/Logs`): tokens a program printed (`curl -v`, a failed
+  request).
+- **Git history** (`-no-git` to leave it out): every line your own commits added, on every branch and tag, and the
+  stash, in each repository the secrets walk reaches. Commits by other authors (a cloned project), dependencies and
+  build output committed by mistake (`node_modules`, `vendor`, `dist`…), tools' cached repositories, and made-up
+  passwords in test and example files are left out; tokens and keys in them are not. For each: the commit that added
+  it, the file, whether the current files still hold it and whether it was pushed. The value is given to `git grep`
+  on its standard input, never on its command line.
+
+`-json` prints it all for scripts. The `secrets` check reads every prompt typed but of the conversations only the last
+`ai_chat_hours` (48), and reports what it finds there for information ([details](policies.md#secrets)).
 
 **Keeping secrets out of Claude Code.** `bordercheck guard install` adds three hooks to Claude Code's
 `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`), each running the program in a few milliseconds:

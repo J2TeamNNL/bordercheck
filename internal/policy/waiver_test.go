@@ -140,7 +140,7 @@ func TestDefaultRoundTrips(t *testing.T) {
 	if err := enc.Encode(Default()); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"notify":{"enabled":true,"statuses":["fail"],"severities":["high","medium"],"remind_every":"24h","open_report":true}`, `"waivers":[]`,
+	for _, want := range []string{`"notify":{"enabled":true,"statuses":["fail"],"severities":["high","medium"],"remind_every":"24h","open_report":true,"first_full_scan_nudge":"24h","full_scan_nudge_every":"336h"}`, `"waivers":[]`,
 		`"include_ips":false,"include_location":false,"fix_prompt":true`} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("default policy lacks %s:\n%s", want, buf.String())

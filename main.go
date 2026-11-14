@@ -74,8 +74,9 @@ Everyday
   bordercheck open               open your report page in the browser (also: "BorderCheck" in Spotlight,
                                  the Start menu or your desktop's application menu)
   bordercheck fix                what to fix and how, written for an AI coding assistant to follow with you
-  bordercheck chats              secrets in your AI assistants' chat history (Claude Code, Codex, Gemini CLI,
-                                 Copilot, Cursor's agent, Cline, Aider), all of it
+  bordercheck full-scan          secrets left where the hourly check looks only in part: all AI chat history
+                                 (Claude Code, Codex, Gemini CLI, Copilot, Cursor, Cline, Aider, opencode, Goose),
+                                 Alfred's clipboard, logs, and the history of your git repositories
   bordercheck guard install      keep secrets out of Claude Code: stop prompts that hold one, refuse commands
                                  that print them, hide them in commands' output (bordercheck guard: status)
   bordercheck send -force        check now and send a fresh report to your organisation
@@ -127,6 +128,8 @@ func run(args []string) int {
 			return runAgent(args[0], args[1:])
 		case "fix":
 			return runFix(args[1:])
+		case "full-scan":
+			return runFullScan(args[1:])
 		case "chats":
 			return runChats(args[1:])
 		case "guard":
@@ -285,47 +288,136 @@ func runFix(args []string) int {
 // -hours says otherwise, by file and line, never the values. The secrets
 // check reads only the last ai_chat_hours of it and points here. It only reads.
 // Exit status 1 when something is found.
-func runChats(args []string) int {
-	fs := flag.NewFlagSet("bordercheck chats", flag.ContinueOnError)
+func runChats(args []string) int { return runFullScan(args) } // the name before v0.5.15
+
+// runFullScan is `bordercheck full-scan`: every place a secret may have been
+// left that the hourly check reads only in part or not at all: all of the AI
+// assistants' chat history and the databases of tools that keep chats or a
+// clipboard, log files, and the history of every git repository the secrets
+// walk reaches. By file and line or commit, never the values. It only reads.
+// Exit status 1 when something is found.
+func runFullScan(args []string) int {
+	fs := flag.NewFlagSet("bordercheck full-scan", flag.ContinueOnError)
 	policyPath := fs.String("policy", "", "policy JSON file")
-	hours := fs.Int("hours", 0, "only conversations changed in this many hours (0: all)")
+	hours := fs.Int("hours", 0, "only chats and logs changed in this many hours (0: all); git history is read in full")
 	jsonOut := fs.Bool("json", false, "print the findings as JSON (never the values)")
+	noGit := fs.Bool("no-git", false, "leave git history out")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if fs.NArg() > 0 {
-		return fail(fmt.Errorf("chats: unexpected argument %q", fs.Arg(0)))
+		return fail(fmt.Errorf("full-scan: unexpected argument %q", fs.Arg(0)))
 	}
 	if *hours < 0 {
-		return fail(errors.New("chats: -hours must not be negative"))
+		return fail(errors.New("full-scan: -hours must not be negative"))
 	}
 	pol, err := loadPolicy(*policyPath)
 	if err != nil {
 		return fail(err)
 	}
 	var since time.Time
-	what := "all of the AI chat history"
+	what := "all of the AI chat history, chat and clipboard databases, and logs"
 	if *hours > 0 {
 		since = time.Now().Add(-time.Duration(*hours) * time.Hour)
-		what = fmt.Sprintf("AI chat history from the last %d hours", *hours)
+		what = fmt.Sprintf("AI chats, chat and clipboard databases, and logs changed in the last %d hours", *hours)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	if isTerminal(os.Stderr) && !*jsonOut {
-		fmt.Fprintf(os.Stderr, "Reading %s (Claude Code, Codex, Gemini CLI, Copilot, Cursor's agent, Cline, Aider)…\n", what)
+	say := func(s string) {
+		if isTerminal(os.Stderr) && !*jsonOut {
+			fmt.Fprintln(os.Stderr, s)
+		}
 	}
-	found, err := checks.ScanAIChats(ctx, pol.Checks.Secrets, since)
+	say("Reading " + what + "…")
+	found, err := checks.ScanChatsAndLogs(ctx, pol.Checks.Secrets, since, true)
 	if err != nil {
 		return fail(err)
 	}
+	var git []checks.GitFinding
+	repos, partial := 0, []string(nil)
+	if !*noGit {
+		say("Reading the history of the git repositories in your home folder…")
+		if git, repos, partial, err = checks.ScanGitHistory(ctx, pol.Checks.Secrets); err != nil {
+			return fail(err)
+		}
+	}
+	if dir, err := agent.Dir(); err == nil && *hours == 0 && !*noGit && ctx.Err() == nil {
+		_ = agent.RecordFullScan(dir, time.Now()) // only the date, so the hourly check stops suggesting it
+	}
 	home, _ := os.UserHomeDir()
-	code := writeChats(os.Stdout, found, *hours, what, home, *jsonOut)
+	if *jsonOut {
+		return writeFullScanJSON(os.Stdout, found, git, repos, partial, *hours, home, !*noGit)
+	}
+	code := writeChats(os.Stdout, found, *hours, what, home, false)
+	if !*noGit {
+		code = max(code, writeGit(os.Stdout, git, repos, partial))
+	}
 	settings := guard.SettingsPath(home)
-	if _, err := os.Stat(filepath.Dir(settings)); code == 1 && !*jsonOut && err == nil && len(guard.Installed(settings)) < len(guard.Hooks) {
+	if _, err := os.Stat(filepath.Dir(settings)); code == 1 && err == nil && len(guard.Installed(settings)) < len(guard.Hooks) {
 		fmt.Println("\nTo keep secrets out of Claude Code from now on (stop prompts that hold one, refuse commands that print them,\n" +
 			"hide them in commands' output), run: bordercheck guard install")
 	}
 	return code
+}
+
+// writeGit prints the secrets found in git history; 1 when there are any.
+func writeGit(w io.Writer, found []checks.GitFinding, repos int, partial []string) int {
+	fmt.Fprintf(w, "\n== Git history (%d repositories)\n", repos)
+	if len(partial) > 0 {
+		fmt.Fprintf(w, "Read only in part (too large or too slow): %s\n", strings.Join(partial, ", "))
+	}
+	if len(found) == 0 {
+		fmt.Fprintln(w, "No secrets found in git history.")
+		return 0
+	}
+	fmt.Fprintf(w, "%d secret(s) in git history. Values are not shown.\n", len(found))
+	for i, f := range found {
+		fmt.Fprintf(w, "\n%3d. %s\n     Where: %s\n     State: %s\n", i+1, f.Item(), f.Where(), f.State())
+	}
+	fmt.Fprintf(w, "\n%s\n", checks.GitFix())
+	return 1
+}
+
+// writeFullScanJSON prints both parts as JSON; the exit status is 1 when either found something.
+func writeFullScanJSON(w io.Writer, chats []checks.ChatFinding, git []checks.GitFinding, repos int, partial []string, hours int, home string, withGit bool) int {
+	type item struct {
+		checks.ChatFinding
+		App     string `json:"app"`
+		Explain string `json:"explain"`
+	}
+	type gitPart struct {
+		Repos    int                 `json:"repos"`
+		Partial  []string            `json:"partial,omitempty"`
+		Findings []checks.GitFinding `json:"findings"`
+		Fix      string              `json:"fix,omitempty"`
+	}
+	out := struct {
+		Hours    int      `json:"hours"` // 0: all; git history is always read in full
+		Findings []item   `json:"findings"`
+		Fix      string   `json:"fix,omitempty"`
+		Git      *gitPart `json:"git,omitempty"`
+	}{Hours: hours, Findings: []item{}}
+	for _, f := range chats {
+		out.Findings = append(out.Findings, item{f, f.App(), f.Explain(home)})
+	}
+	if len(chats) > 0 {
+		out.Fix = checks.ChatFix()
+	}
+	if withGit {
+		out.Git = &gitPart{Repos: repos, Partial: partial, Findings: append([]checks.GitFinding{}, git...)}
+		if len(git) > 0 {
+			out.Git.Fix = checks.GitFix()
+		}
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(out); err != nil {
+		return fail(err)
+	}
+	if len(chats)+len(git) > 0 {
+		return 1
+	}
+	return 0
 }
 
 // runGuard is `bordercheck guard`: install, uninstall or show the Claude Code

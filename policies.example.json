@@ -33,7 +33,9 @@
       "medium"
     ],
     "remind_every": "24h",
-    "open_report": true
+    "open_report": true,
+    "first_full_scan_nudge": "24h",
+    "full_scan_nudge_every": "336h"
   },
   "waivers": [
     {

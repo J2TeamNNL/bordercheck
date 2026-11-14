@@ -156,12 +156,18 @@ export function validateRolePolicy(p: unknown, now: Date): Msg[] {
     if (!isObj(p.notify)) must("v.mustObject", "notify");
     else {
       const n = p.notify;
-      keysIn(n, ["enabled", "statuses", "severities", "remind_every", "open_report"], "notify", errs);
+      keysIn(n, ["enabled", "statuses", "severities", "remind_every", "open_report", "first_full_scan_nudge", "full_scan_nudge_every"], "notify", errs);
       if (n.open_report !== undefined && typeof n.open_report !== "boolean") must("v.mustBool", "notify.open_report");
       if (n.enabled !== undefined && typeof n.enabled !== "boolean") must("v.mustBool", "notify.enabled");
       if (n.statuses !== undefined) strList(n.statuses, "notify.statuses", errs, ["fail", "warn"]);
       if (n.severities !== undefined) strList(n.severities, "notify.severities", errs);
       if (n.remind_every !== undefined && goDuration(n.remind_every) === null) errs.push(msg("v.duration", { where: "notify.remind_every" }));
+      for (const [k, min, minMs] of [["first_full_scan_nudge", "1h", 3600e3], ["full_scan_nudge_every", "24h", 24 * 3600e3]] as const) {
+        if (n[k] === undefined) continue;
+        const d = typeof n[k] === "string" ? goDuration(n[k]) : null;
+        if (d === null) errs.push(msg("v.duration", { where: `notify.${k}` }));
+        else if (d !== 0 && d < minMs) errs.push(msg("v.minDuration", { where: `notify.${k}`, min }));
+      }
     }
   }
 

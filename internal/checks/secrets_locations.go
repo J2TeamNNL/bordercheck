@@ -99,6 +99,12 @@ var credLocations = []credLocation{
 		}},
 	{on: func(l policy.SecretLocations) bool { return l.MySQL }, paths: homeFiles(".my.cnf"),
 		read: iniPasswords("MySQL password", "password")},
+	{on: func(l policy.SecretLocations) bool { return l.APIClients }, read: readInsomnia,
+		paths: func(home, goos string) []string {
+			d := insomniaDir(home, goos)
+			return []string{filepath.Join(d, "insomnia.Environment.db"), filepath.Join(d, "insomnia.Request.db")}
+		}},
+	{on: func(l policy.SecretLocations) bool { return l.APIClients }, kind: dbeaverKind, paths: dbeaverCredentials},
 }
 
 func gcloudDir(home, goos string) string {

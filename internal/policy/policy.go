@@ -199,7 +199,7 @@ type Secrets struct {
 	SampleRules []string `json:"sample_rules"`
 	// AIChatHours: with locations.ai_chats, read the conversations changed in
 	// this many hours, newest first, at most AIChatMaxMB megabytes in all.
-	// What is found there is for information only; `bordercheck chats` reads
+	// What is found there is for information only; `bordercheck full-scan` reads
 	// the whole history.
 	AIChatHours int `json:"ai_chat_hours"`
 	AIChatMaxMB int `json:"ai_chat_max_mb"`
@@ -225,6 +225,9 @@ type SecretLocations struct {
 	PgPass         bool `json:"pgpass"`          // ~/.pgpass
 	MySQL          bool `json:"mysql"`           // ~/.my.cnf
 	GitRemotes     bool `json:"git_remotes"`     // tokens in git remote URLs (.git/config of repositories the walk finds, ~/.gitconfig)
+	Trash          bool `json:"trash"`           // the Trash (macOS ~/.Trash, Linux's XDG Trash): keys, .env files and SSH keys left there
+	KeyFiles       bool `json:"key_files"`       // Google service account keys (JSON) saved anywhere the walk reaches
+	APIClients     bool `json:"api_clients"`     // Insomnia's data, exported Postman environments, DBeaver's saved passwords
 	AIChats        bool `json:"ai_chats"`        // AI assistants' conversation history (Claude Code, Codex CLI); see ai_chat_hours
 }
 
@@ -436,7 +439,7 @@ func Default() Policy {
 				ShowTail:           ptr(true),
 				WalkDepth:          5,
 				Locations: SecretLocations{Docker: true, Kube: true, Netrc: true, GitCredentials: true, GCloud: true,
-					Azure: true, PyPI: true, GitHubCLI: true, Terraform: true, PgPass: true, MySQL: true, GitRemotes: true, AIChats: true},
+					Azure: true, PyPI: true, GitHubCLI: true, Terraform: true, PgPass: true, MySQL: true, GitRemotes: true, AIChats: true, Trash: true, KeyFiles: true, APIClients: true},
 				UserIgnore:     true,
 				SampleRules:    slices.Clone(SampleRuleNames),
 				AIChatHours:    48,

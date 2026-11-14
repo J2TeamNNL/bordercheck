@@ -121,7 +121,12 @@ type State struct {
 	// NotifierTried is when the hourly run last tried to install the macOS
 	// app on a Mac that has none (see adoptNotifier).
 	NotifierTried time.Time `json:"notifier_tried,omitzero"`
-	UpdateError   string    `json:"update_error,omitempty"`
+	// FullScanSince is when this install was first seen without a full scan
+	// run, and FullScanReminded when the person was last reminded to run one
+	// (remindFullScan).
+	FullScanSince    time.Time `json:"full_scan_since,omitzero"`
+	FullScanReminded time.Time `json:"full_scan_reminded,omitzero"`
+	UpdateError      string    `json:"update_error,omitempty"`
 	// Notified maps each problem announced on the desktop (notify.Key) and
 	// still present at the last check to when it was last announced.
 	Notified map[string]time.Time `json:"notified,omitempty"`
@@ -188,7 +193,30 @@ var allChecks = checks.ForReport
 // counts as empty, and the secrets check says so.
 func Local(dir string) checks.Local {
 	entries, err := ignore.Load(dir)
-	return checks.Local{Ignored: entries, IgnoreErr: err}
+	l := checks.Local{Ignored: entries, IgnoreErr: err}
+	if _, err := os.Stat(filepath.Join(dir, "config.json")); err == nil {
+		l.FullScanKnown = true
+		var fs struct {
+			At time.Time `json:"at"`
+		}
+		if readJSON(filepath.Join(dir, FullScanFile), &fs) == nil {
+			l.FullScanAt = fs.At
+		}
+	}
+	return l
+}
+
+// FullScanFile records when `bordercheck full-scan` last ran, and nothing
+// about what it found: the secrets check suggests running it once until it has.
+const FullScanFile = "fullscan.json"
+
+// RecordFullScan notes that a full scan ran at, in an installed copy's folder;
+// it does nothing when BorderCheck is not installed.
+func RecordFullScan(dir string, at time.Time) error {
+	if _, err := os.Stat(filepath.Join(dir, "config.json")); err != nil {
+		return nil
+	}
+	return writeJSON(filepath.Join(dir, FullScanFile), map[string]time.Time{"at": at.UTC()})
 }
 
 func readJSON(path string, v any) error {
@@ -363,7 +391,7 @@ func sends(r policy.Report) string {
 // The portal is not told: a revoked or forgotten install is IT's to clean up.
 func Uninstall(env Env) error {
 	err := errors.Join(services.unregister(), notifier.Remove(env.Dir), launcher.remove(), command.remove(env), removeGuard(env))
-	for _, name := range []string{"config.json", "state.json", "bordercheck.log", policy.FileName, TokenFile, ignore.FileName, binName()} {
+	for _, name := range []string{"config.json", "state.json", "bordercheck.log", FullScanFile, policy.FileName, TokenFile, ignore.FileName, binName()} {
 		if e := os.Remove(filepath.Join(env.Dir, name)); e != nil && !errors.Is(e, os.ErrNotExist) {
 			err = errors.Join(err, e) // Windows cannot remove a running binary; it goes on the next uninstall
 		}
@@ -471,6 +499,8 @@ func Send(ctx context.Context, env Env, force bool) error {
 	}
 	if errors.Is(err, ErrRevoked) {
 		revoked(ctx, env, &st, now, force)
+	} else if !force {
+		remindFullScan(ctx, env, pol, &st, now)
 	}
 	// After the report, so a broken update never costs a report. Its error is
 	// in state.json and the log; the report's error is what Send returns.

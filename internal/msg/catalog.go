@@ -178,13 +178,14 @@ var Catalog = map[string]Entry{
 	"secrets.passExceptInfo":   s("No plain-text secrets that count against this computer; what is listed is for information."),
 	"secrets.signInInfo":       pl("For information: 1 cloud CLI sign-in is kept in plain text, as the CLI does by design; signing out removes it.", "For information: {n} cloud CLI sign-ins are kept in plain text, as the CLIs do by design; signing out removes them."),
 	"secrets.chatInfo": pl("For information: 1 secret in AI prompts or recent AI chat history ({files} file(s)). "+
-		"Run [code]bordercheck chats[/code] to check all of the history and see how to remove them.",
+		"Run [code]bordercheck full-scan[/code] to check all of the history (and git history and logs) and see how to remove them.",
 		"For information: {n} secrets in AI prompts or recent AI chat history ({files} file(s)). "+
-			"Run [code]bordercheck chats[/code] to check all of the history and see how to remove them."),
+			"Run [code]bordercheck full-scan[/code] to check all of the history (and git history and logs) and see how to remove them."),
 	"secrets.found": pl("1 secret in plain text across {files} file(s).", "{n} secrets in plain text across {files} file(s)."),
 	"secrets.foundProd": pl("1 secret in plain text across {files} file(s), {prod} marked production.",
 		"{n} secrets in plain text across {files} file(s), {prod} marked production."),
 	"secrets.incomplete": s("The scan hit its time limit, so some folders were not checked."),
+	"secrets.fullScan":   s("BorderCheck's full scan has not been run on this computer yet: run [code]bordercheck full-scan[/code] once to find secrets left in all of the AI chat history, the history of your git repositories and log files."),
 	"secrets.chatGuard": s("To keep secrets out of Claude Code from now on (stop prompts that hold one, refuse " +
 		"commands that print them, hide them in commands' output), run [code]bordercheck guard install[/code]."),
 	"secrets.chatsPartial": s("AI chat history is larger than the policy's limit (checks.secrets.ai_chat_max_mb), " +
@@ -212,6 +213,12 @@ var Catalog = map[string]Entry{
 	"secrets.fix.pgpass":      s("Keep the password in touchenv and give it to the client only when it runs: [code]touchenv run PGPASSWORD -- psql …[/code]; then delete the line from [code].pgpass[/code]."),
 	"secrets.fix.pypi":        s("Upload with a PyPI API token kept out of the file: [code]touchenv run TWINE_PASSWORD -- twine upload …[/code] (with [code]TWINE_USERNAME=__token__[/code]), or the system keyring through the [code]keyring[/code] package; then remove the password from [code].pypirc[/code]."),
 	"secrets.fix.kube":        s("Let kubectl fetch short-lived tokens instead of keeping them in [code]~/.kube/config[/code]: use the cloud's exec plugin (EKS: [code]aws eks update-kubeconfig[/code], GKE: [code]gke-gcloud-auth-plugin[/code], AKS: [code]kubelogin[/code]) and remove the inline token or key."),
+	"secrets.fix.git":         s("A secret committed to git stays in the history: in every clone, and on the remote it was pushed to, after the file is fixed. If it was pushed, take it as seen by everyone with access to that repository. To take it out of the history, rewrite it (git filter-repo --replace-text) and force-push, and have others clone again; take it out of the current files and keep it in touchenv or a .env file git ignores."),
+	"secrets.fix.synced":      s("A file marked as synced is also on that cloud service, in its version history and on every device synced with it: move the secret out of it, then delete the old versions there (most services keep them 30 days or more)."),
+	"secrets.fix.trash":       s("Files in the Trash are still on disk, and every program you run can read them: empty the Trash, or delete just those items for good (in Finder's Trash: Delete Immediately)."),
+	"secrets.fix.postman":     s("An exported Postman environment keeps its values in the file: delete the export, or export again without the secrets (keep them in Postman as secret-type variables, current values only)."),
+	"secrets.fix.insomnia":    s("Insomnia keeps environment variables and request credentials in plain text in its data folder ([code]insomnia.*.db[/code]): take long-lived keys out of it and use short-lived tokens, or paste a key in only for the session."),
+	"secrets.fix.dbeaver":     s("DBeaver encrypts saved passwords with a key that is the same in every install, so anyone who can read the file can decrypt them: untick Save password for each connection, or turn on secure password storage in its Security preferences where your DBeaver has it."),
 	"secrets.fix.aiChat": s("For a key in an AI assistant's chat history, delete that conversation: the file listed " +
 		"holds it (Claude Code keeps each one as a .jsonl file under [code]~/.claude/projects[/code], Codex under " +
 		"[code]~/.codex/sessions[/code]; Gemini CLI, Copilot, Cursor's agent, Cline and Aider likewise keep one file " +
