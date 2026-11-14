@@ -123,8 +123,11 @@ func TestKeystoreAloneIsInformation(t *testing.T) {
 	if r.Status != check.Pass || !strings.Contains(strings.Join(r.Evidence, "\n"), "[keystore, information]") {
 		t.Errorf("status %v, evidence %q", r.Status, r.Evidence)
 	}
-	// In the Trash it counts.
-	writeTestFile(t, filepath.Join(home, ".Trash", "old.jks"), "\xfe\xed\xfe\xedbinary")
+	// In the Trash it counts. (The Windows Recycle Bin names files differently; TestRecycledName covers it.)
+	if runtime.GOOS == "windows" {
+		return
+	}
+	writeTestFile(t, filepath.Join(trashDir(home, runtime.GOOS), "old.jks"), "\xfe\xed\xfe\xedbinary")
 	if r := secrets(policy.Default().Checks.Secrets, Local{})(t.Context()); r.Status != check.Warn || !strings.Contains(r.Fix, "A keystore is") {
 		t.Errorf("a keystore in the Trash: status %v, fix %q", r.Status, r.Fix)
 	}
