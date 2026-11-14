@@ -328,6 +328,7 @@
   "secrets.fix.git": "A secret committed to git stays in the history: in every clone, and on the remote it was pushed to, after the file is fixed. If it was pushed, take it as seen by everyone with access to that repository. To take it out of the history, rewrite it (git filter-repo --replace-text) and force-push, and have others clone again; take it out of the current files and keep it in touchenv or a .env file git ignores.",
   "secrets.fix.gitCreds": "Let git keep passwords in the system's store: [code]git config --global credential.helper osxkeychain[/code] (macOS), [code]manager[/code] (Windows, Git Credential Manager) or [code]libsecret[/code] (Linux); then delete [code]~/.git-credentials[/code] and sign in again on the next push.",
   "secrets.fix.insomnia": "Insomnia keeps environment variables and request credentials in plain text in its data folder ([code]insomnia.*.db[/code]): take long-lived keys out of it and use short-lived tokens, or paste a key in only for the session.",
+  "secrets.fix.keystore": "A keystore is a signing key behind a password: keep its passwords out of files (in touchenv, given to the build as environment variables: touchenv run --intent \"release\" STORE_PASSWORD KEY_PASSWORD -- ./gradlew bundleRelease), and keep the keystore itself out of repositories and synced folders. If a password sits next to it in a .properties file, anyone who copies both can sign as you.",
   "secrets.fix.kube": "Let kubectl fetch short-lived tokens instead of keeping them in [code]~/.kube/config[/code]: use the cloud's exec plugin (EKS: [code]aws eks update-kubeconfig[/code], GKE: [code]gke-gcloud-auth-plugin[/code], AKS: [code]kubelogin[/code]) and remove the inline token or key.",
   "secrets.fix.linux": "Move each key into the desktop keyring ([code]secret-tool store[/code] / [code]secret-tool lookup[/code], from libsecret) or a password manager CLI such as pass or 1Password [code]op run[/code], then delete the line or file.",
   "secrets.fix.mac": "Move each key into the Keychain behind Touch ID with touchenv (https://github.com/ptrinh/touch-env): [code]touchenv set NAME[/code], then delete the line or file.",
@@ -350,6 +351,10 @@
   },
   "secrets.fullScan": "BorderCheck's full scan has not been run on this computer yet: run [code]bordercheck full-scan[/code] once to find secrets left in all of the AI chat history, the history of your git repositories and log files.",
   "secrets.incomplete": "The scan hit its time limit, so some folders were not checked.",
+  "secrets.keystoreInfo": {
+    "one": "For information: 1 Java/Android keystore (a signing key). It is safe while its passwords are not in a file (keep them in touchenv) and it stays out of repositories and synced folders.",
+    "other": "For information: {n} Java/Android keystores (signing keys). They are safe while their passwords are not in a file (keep them in touchenv) and they stay out of repositories and synced folders."
+  },
   "secrets.pass": "No plain-text secrets in shell files, shell history, credential files, .env files, AI prompts or recent AI chat history.",
   "secrets.passExceptInfo": "No plain-text secrets that count against this computer; what is listed is for information.",
   "secrets.passOutsideChats": "No plain-text secrets in shell files, shell history, credential files or .env files.",

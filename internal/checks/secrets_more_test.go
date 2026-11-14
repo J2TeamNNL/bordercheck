@@ -83,3 +83,49 @@ func TestTrashKeyFilesAndAPIClients(t *testing.T) {
 		}
 	}
 }
+
+func TestKeystoresAndSigningProperties(t *testing.T) {
+	home := isolatedHome(t)
+	writeTestFile(t, filepath.Join(home, ".android-keys", "app-release.jks"), "\xfe\xed\xfe\xedbinary")
+	writeTestFile(t, filepath.Join(home, ".android", "debug.keystore"), "\xfe\xed\xfe\xedbinary")
+	writeTestFile(t, filepath.Join(home, "code", "app", "android", "keystore.properties"), "storeFile=../app.jks\nstorePassword=Xk29dLq7wPq\nkeyAlias=upload\n")
+	writeTestFile(t, filepath.Join(home, ".gradle", "gradle.properties"), "org.gradle.jvmargs=-Xmx4g\nMYAPP_UPLOAD_STORE_PASSWORD=Tr0ub4dor-x9q\n")
+	writeTestFile(t, filepath.Join(home, "code", "app", "android", "app", "version.properties"), "VERSION_PASSWORD_HINT=notscanned123\n")
+	r := secrets(policy.Default().Checks.Secrets, Local{})(t.Context())
+	ev := filepath.ToSlash(strings.Join(r.Evidence, "\n"))
+	for _, want := range []string{
+		"~/.android-keys/app-release.jks  Java/Android keystore (a signing key behind a password)",
+		"~/code/app/android/keystore.properties:2  Secret-looking variable (storePassword)",
+		"~/.gradle/gradle.properties:2  Secret-looking variable (MYAPP_UPLOAD_STORE_PASSWORD)",
+	} {
+		if !strings.Contains(ev, want) {
+			t.Errorf("no %q in:\n%s", want, ev)
+		}
+	}
+	if strings.Contains(ev, "debug.keystore") {
+		t.Errorf("the SDK's debug keystore was reported:\n%s", ev)
+	}
+	if strings.Contains(ev, "version.properties") {
+		t.Errorf("an unrelated .properties file was read:\n%s", ev)
+	}
+	if !strings.Contains(r.Fix, "A keystore is a signing key behind a password") {
+		t.Errorf("fix: %s", r.Fix)
+	}
+	if !strings.Contains(ev, "app-release.jks  Java/Android keystore (a signing key behind a password)  [keystore, information]") {
+		t.Errorf("a keystore where it belongs is not information:\n%s", ev)
+	}
+}
+
+func TestKeystoreAloneIsInformation(t *testing.T) {
+	home := isolatedHome(t)
+	writeTestFile(t, filepath.Join(home, "keystores", "app.jks"), "\xfe\xed\xfe\xedbinary")
+	r := secrets(policy.Default().Checks.Secrets, Local{})(t.Context())
+	if r.Status != check.Pass || !strings.Contains(strings.Join(r.Evidence, "\n"), "[keystore, information]") {
+		t.Errorf("status %v, evidence %q", r.Status, r.Evidence)
+	}
+	// In the Trash it counts.
+	writeTestFile(t, filepath.Join(home, ".Trash", "old.jks"), "\xfe\xed\xfe\xedbinary")
+	if r := secrets(policy.Default().Checks.Secrets, Local{})(t.Context()); r.Status != check.Warn || !strings.Contains(r.Fix, "A keystore is") {
+		t.Errorf("a keystore in the Trash: status %v, fix %q", r.Status, r.Fix)
+	}
+}

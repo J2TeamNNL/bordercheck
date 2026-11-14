@@ -32,6 +32,7 @@ var secretFiles = []string{
 	".zshrc", ".zprofile", ".zshenv", ".bashrc", ".bash_profile", ".profile",
 	".zsh_history", ".bash_history", ".config/fish/config.fish", ".local/share/fish/fish_history",
 	".aws/credentials", ".npmrc", // .netrc, .pypirc, .git-credentials, Docker…: see credLocations
+	".gradle/gradle.properties", // signing and repository passwords for every Gradle build
 	"AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt",
 	"Documents/PowerShell/Microsoft.PowerShell_profile.ps1",
 	"Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1",
@@ -91,6 +92,7 @@ type secretFinding struct {
 	severe bool        // the rule itself is high severity, e.g. a private key
 	chat   bool        // in an AI assistant's conversation history (secrets_aichats.go)
 	signIn bool        // a cloud CLI's sign-in cache, reported for information (signInKinds)
+	store  bool        // a Java/Android keystore where it belongs, reported for information
 	synced string      // the cloud service the file is synced with (syncedBy), if any
 	ctx    chatContext // where in that conversation; for bordercheck full-scan only
 }
@@ -218,9 +220,19 @@ func scanSecrets(ctx context.Context, p policy.Secrets) (home string, found []se
 
 	}
 	for _, b := range bs {
-		if shown := tildePath(home, b); !s.ignored(shown) {
-			bundles = append(bundles, shown)
+		shown := tildePath(home, b)
+		if s.ignored(shown) {
+			continue
 		}
+		// A keystore needs its passwords to be used, and those are reported where
+		// they sit (a .properties file, a shell file). On its own it is
+		// information, unless it is in the Trash or a synced folder.
+		if bundleLabel(b) == keystoreKind && !inTrash(shown) {
+			synced := syncedBy(home, b)
+			found = append(found, secretFinding{path: shown, kind: keystoreKind, synced: synced, store: synced == ""})
+			continue
+		}
+		bundles = append(bundles, shown)
 	}
 	// Claude Code is used here and the guard is not all on: say how to turn it on.
 	if settings := guard.SettingsPath(home); len(guard.Installed(settings)) < len(guard.Hooks) {
@@ -407,6 +419,18 @@ func isPlaceholder(v string) bool {
 	return strings.Trim(l, l[:1]) == "" // one character repeated
 }
 
+// bundleLabel is how a bundle is listed: a certificate bundle, or a Java or Android keystore.
+func bundleLabel(p string) string {
+	switch strings.ToLower(filepath.Ext(p)) {
+	case ".jks", ".keystore", ".bks":
+		return keystoreKind
+	}
+	return bundleKind + " (may hold a private key)"
+}
+
+// keystoreKind is how a Java or Android keystore is listed.
+const keystoreKind = "Java/Android keystore (a signing key behind a password)"
+
 // bundleKind is the kind a certificate bundle is matched and listed by.
 const bundleKind = "certificate bundle"
 
@@ -430,13 +454,15 @@ func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool
 	// What was found in AI chat history is information: it is named in the
 	// summary and the evidence, and does not count toward the check.
 	// So are cloud CLIs' sign-in caches (signInKinds), with how to sign out.
-	var chats, signIns []secretFinding
+	var chats, signIns, stores []secretFinding
 	found = slices.DeleteFunc(found, func(f secretFinding) bool {
 		switch {
 		case f.chat:
 			chats = append(chats, f)
 		case f.signIn:
 			signIns = append(signIns, f)
+		case f.store:
+			stores = append(stores, f)
 		default:
 			return false
 		}
@@ -464,6 +490,9 @@ func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool
 		}
 		note = append(info, note...)
 	}
+	if len(stores) > 0 {
+		note = append(msg.Of("secrets.keystoreInfo", "n", len(stores)), note...)
+	}
 	if cs.unguarded {
 		note = append(note, msg.P("secrets.chatGuard"))
 	}
@@ -480,9 +509,12 @@ func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool
 	for _, f := range chats {
 		chatEv = append(chatEv, f.String()+"  [AI chat, information]")
 	}
+	for _, f := range stores {
+		chatEv = append(chatEv, f.String()+"  [keystore, information]")
+	}
 	if len(found)+len(bundles) == 0 {
 		head, keep := msg.Of("secrets.pass"), note
-		if len(signIns) > 0 {
+		if len(signIns)+len(stores) > 0 {
 			head = msg.Of("secrets.passExceptInfo")
 		} else if len(chats) > 0 {
 			head = msg.Of("secrets.passOutsideChats")
@@ -507,7 +539,7 @@ func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool
 	}
 	for _, b := range bundles {
 		files[b] = true
-		ev = append(ev, b+"  "+bundleKind+" (may hold a private key)")
+		ev = append(ev, b+"  "+bundleLabel(b))
 	}
 	ev = capEvidence(append(ev, chatEv...))
 	summary := msg.Of("secrets.found", "n", len(found)+len(bundles), "files", len(files))
@@ -558,6 +590,7 @@ var credFix = map[string]string{
 	"Insomnia environment secret":                                 "secrets.fix.insomnia",
 	"Insomnia request credential":                                 "secrets.fix.insomnia",
 	dbeaverKind:                                                   "secrets.fix.dbeaver",
+	keystoreKind:                                                  "secrets.fix.keystore",
 }
 
 // inTrash: a shown path in the Trash.
@@ -574,10 +607,18 @@ func fixFor(general msg.Text, found []secretFinding, bundles []string) msg.Text 
 	seen := map[string]bool{}
 	other := len(bundles) > 0
 	trash := slices.ContainsFunc(bundles, inTrash)
+	if slices.ContainsFunc(bundles, func(b string) bool { return bundleLabel(b) == keystoreKind }) {
+		seen["secrets.fix.keystore"] = true
+		specific = append(specific, msg.P("secrets.fix.keystore"))
+	}
 	synced := false
 	for _, f := range found {
 		trash = trash || inTrash(f.path)
 		synced = synced || f.synced != ""
+		if strings.HasSuffix(f.path, ".properties") && !seen["secrets.fix.keystore"] {
+			seen["secrets.fix.keystore"] = true // a signing password next to a keystore
+			specific = append(specific, msg.P("secrets.fix.keystore"))
+		}
 		key, ok := credFix[f.kind]
 		if !ok {
 			other = true

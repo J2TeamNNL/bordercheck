@@ -54,6 +54,10 @@ func trashDir(home, goos string) string {
 // looked into, not a deleted copy of a whole disk.
 const trashDepth = 4
 
+// signingProperties: the files Android and Java builds keep signing passwords
+// in (storePassword=…, MYAPP_UPLOAD_STORE_PASSWORD=…).
+var signingProperties = regexp.MustCompile(`(?i)^(gradle|local|.*(key|sign|keystore|release|upload).*)\.properties$`)
+
 // sshKeyName: the names ssh-keygen gives private keys (id_ed25519, id_rsa,
 // id_ecdsa…), which a deleted ~/.ssh leaves in the Trash.
 var sshKeyName = regexp.MustCompile(`^id_[a-z0-9_-]+$`)
@@ -103,8 +107,16 @@ func (s *secretScanner) lookAt(p, name string, info fs.FileInfo, inTrash bool, a
 	case ".pem", ".key", ".p8":
 		add(p)
 		return
-	case ".p12", ".pfx":
-		*bundles = append(*bundles, p)
+	case ".p12", ".pfx", ".jks", ".keystore", ".bks":
+		if strings.EqualFold(name, "debug.keystore") {
+			return // the Android SDK's debug key: its password is "android" for everyone
+		}
+		*bundles = append(*bundles, p) // a Java or Android keystore is one too: a signing key behind a password
+		return
+	case ".properties":
+		if signingProperties.MatchString(name) {
+			add(p) // keystore.properties, key.properties, gradle.properties: storePassword=…, *_PASSWORD=…
+		}
 		return
 	case ".json":
 		if strings.HasSuffix(name, ".postman_environment.json") || strings.HasSuffix(name, ".postman_globals.json") {
