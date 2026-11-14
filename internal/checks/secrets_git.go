@@ -37,6 +37,9 @@ type GitFinding struct {
 	Pushed  bool   `json:"pushed"`  // that commit is on a remote branch this clone knows of
 	Current bool   `json:"current"` // the files at HEAD still hold it
 	Stash   bool   `json:"stash"`   // found in the stash only
+	// Verified is what the provider said of the token (KeyLive…), with -verify only.
+	Verified string `json:"verified,omitempty"`
+	tokenKey string
 }
 
 // Item is the finding in a few words, as ChatFinding.Item.
@@ -92,6 +95,7 @@ func ScanGitHistory(ctx context.Context, p policy.Secrets) (found []GitFinding, 
 	if err != nil {
 		return nil, 0, nil, err
 	}
+	s.tokens = tokensFrom(ctx)
 	s.find(ctx, home)
 	seen := map[string]bool{}
 	for _, cfg := range s.gitCfgs {
@@ -239,6 +243,9 @@ func (s *secretScanner) scanRepo(ctx context.Context, repo, shown string) ([]Git
 		a := byKey[key]
 		if a == nil {
 			a = &acc{f: GitFinding{Repo: shown, Kind: h.rule.kind, Name: h.name, Stash: ln.stash}, match: h.match, set: map[string]bool{}}
+			if h.rule.showTail {
+				a.f.tokenKey = s.tokens.keep(h.rule.kind, h.match)
+			}
 			if s.showTail && h.rule.showTail && len(h.match) >= 20 {
 				a.f.Tail = h.match[len(h.match)-4:]
 			} else if s.showTail && len(h.value) >= 12 {

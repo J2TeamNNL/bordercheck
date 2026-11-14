@@ -163,7 +163,7 @@ func (s *secretScanner) scanLocations(home, goos string, on policy.SecretLocatio
 // fromHit turns a hit into a finding, dropping placeholders and keeping at
 // most the last 4 characters of a provider token.
 func (s *secretScanner) fromHit(shown string, h credHit) secretFinding {
-	f := secretFinding{path: shown, line: h.line, kind: h.kind, name: h.name, severe: h.severe,
+	f := secretFinding{path: shown, line: h.line, kind: h.kind, name: safeName(h.name), severe: h.severe,
 		prod: s.prodRe.MatchString(shown) || s.prodRe.MatchString(h.name)}
 	if s.showTail && len(h.value) >= 20 {
 		for _, r := range s.rules {

@@ -1,7 +1,9 @@
 // Package update replaces an installed bordercheck with the latest GitHub
 // release of its repo, but only a binary whose hash is listed in a SHA256SUMS
-// signed by a key this binary trusts. Taking over the GitHub account is not
-// enough to push code to installed machines; the signing key is also needed.
+// signed by a key this binary trusts. The point is that the GitHub release alone
+// is not enough to push code to installed machines; the signing key is also
+// needed. While that key is a secret of the release workflow, anyone who can
+// push a tag to the repository can have it signed (docs/threat-model.md).
 //
 // It reads releases/latest/download/SHA256SUMS (served by GitHub's CDN, not the
 // rate-limited API) and takes the version from the asset name,
@@ -21,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -28,8 +31,15 @@ import (
 )
 
 // OfficialKey is the base64 ed25519 public key that signs the SHA256SUMS of
-// github.com/ptrinh/bordercheck releases. A policy may name another key for a fork.
-const OfficialKey = "Q5Mw8yJQUgKSEtPNBVNnEP7HiSvhwT2y9Te4mEPOlcs="
+// github.com/ptrinh/bordercheck releases. Its private half is kept on the
+// maintainer's Mac behind Touch ID (touchenv), never in CI. A policy may name
+// another key for a fork.
+const OfficialKey = "5HtcE21ff8OvmWFHZxz6zdCXXlCnNWLqxz5n7hcVAkw="
+
+// PreviousKey signed releases up to v0.5.17 from the release workflow. It is
+// still trusted for one release, so installed copies can move to a release
+// signed with OfficialKey; the release after that trusts OfficialKey only.
+const PreviousKey = "Q5Mw8yJQUgKSEtPNBVNnEP7HiSvhwT2y9Te4mEPOlcs="
 
 // Source is where releases come from.
 type Source struct {
@@ -123,17 +133,23 @@ func FetchAsset(ctx context.Context, client *http.Client, src Source, version, n
 }
 
 // VerifySums checks that sig (base64, as in SHA256SUMS.sig) is an ed25519
-// signature of sums by the base64 key pubKey ("" = OfficialKey).
+// signature of sums by the base64 key pubKey ("" = OfficialKey, or PreviousKey
+// while it is still trusted).
 func VerifySums(sums, sig []byte, pubKey string) error {
 	key, err := publicKey(pubKey)
 	if err != nil {
 		return err
 	}
 	rawSig, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(sig)))
-	if err != nil || !ed25519.Verify(key, sums, rawSig) {
-		return errors.New("SHA256SUMS is not signed by the trusted key")
+	if err == nil && ed25519.Verify(key, sums, rawSig) {
+		return nil
 	}
-	return nil
+	if pubKey == "" && PreviousKey != "" {
+		if prev, perr := publicKey(PreviousKey); perr == nil && err == nil && ed25519.Verify(prev, sums, rawSig) {
+			return nil
+		}
+	}
+	return errors.New("SHA256SUMS is not signed by the trusted key")
 }
 
 // SumFor returns the SHA-256 that sums ("<hex>  <name>" lines) lists for name.
@@ -227,6 +243,10 @@ func replace(ctx context.Context, bin string, data []byte, version string) error
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+	if err := sameSigner(ctx, bin, tmp); err != nil {
+		os.Remove(tmp)
+		return err
+	}
 	out, err := exec.CommandContext(ctx, tmp, "-version").Output()
 	if err != nil || !strings.Contains(string(out), version) {
 		os.Remove(tmp)
@@ -282,3 +302,38 @@ func newer(a, b string) bool {
 	}
 	return pa > pb
 }
+
+// sameSigner: on macOS, when the running binary is signed with a Developer ID,
+// the new one must be signed by the same team before it is run. The signed
+// SHA256SUMS already vouches for it; this is a second, independent lock, held
+// by Apple's certificate rather than by the release key. Unsigned builds (from
+// source, forks) are left alone.
+func sameSigner(ctx context.Context, bin, next string) error {
+	if runtime.GOOS != "darwin" {
+		return nil
+	}
+	team := teamOf(ctx, bin)
+	if team == "" {
+		return nil
+	}
+	req := `=anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "` + team + `"`
+	if out, err := exec.CommandContext(ctx, "/usr/bin/codesign", "--verify", "--strict", "--test-requirement", req, next).CombinedOutput(); err != nil {
+		return fmt.Errorf("the new binary is not signed by Developer ID team %s (%s); keeping the current one", team, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// teamOf is the Team ID a binary is signed with, "" when none can be read.
+func teamOf(ctx context.Context, bin string) string {
+	out, _ := exec.CommandContext(ctx, "/usr/bin/codesign", "--display", "--verbose=2", bin).CombinedOutput()
+	for _, line := range strings.Split(string(out), "\n") {
+		if v, ok := strings.CutPrefix(line, "TeamIdentifier="); ok {
+			if v = strings.TrimSpace(v); teamRe.MatchString(v) {
+				return v
+			}
+		}
+	}
+	return ""
+}
+
+var teamRe = regexp.MustCompile(`^[A-Z0-9]{10}$`)

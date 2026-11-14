@@ -18,6 +18,12 @@
 #                   ASC_KEY_ID / ASC_ISSUER_ID, e.g. after touchenv grant --for 2h ASC_KEY_PATH:
 #     touchenv run --intent "release v1.2.3" ASC_KEY_PATH:file -- scripts/sign-macos-release.sh v1.2.3 notes.md
 #
+# With BORDERCHECK_SIGNING_KEY set (the release key, kept in touchenv: run the
+# script under touchenv run --intent "release v1.2.3" BORDERCHECK_SIGNING_KEY
+# ASC_KEY_PATH:file -- ...), it also builds the Linux and Windows binaries here,
+# writes SHA256SUMS over every file and signs it, so the key never leaves this
+# Mac; the workflow then only checks and publishes.
+#
 # The workflow accepts the binaries only if they were built from exactly the
 # tagged commit with a clean tree (and the app only if its Info.plist names
 # that commit), so run this on that commit, before pushing the tag.
@@ -88,7 +94,26 @@ spctl --assess --type execute --verbose=2 "$app"
 notifier_zip="$work/bordercheck-notifier-$tag-darwin-universal.zip"
 ditto -c -k --norsrc --noextattr --keepParent "$app" "$notifier_zip"
 
+files="$work/bordercheck-$tag-darwin-arm64 $work/bordercheck-$tag-darwin-amd64 $notifier_zip"
+if [ -n "${BORDERCHECK_SIGNING_KEY:-}" ]; then
+	for target in linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+		os=${target%/*} arch=${target#*/} ext=""
+		[ "$os" = windows ] && ext=.exe
+		out="$work/bordercheck-$tag-$os-$arch$ext"
+		CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$tag" -o "$out" .
+		files="$files $out"
+	done
+	(cd "$work" && shasum -a 256 -- bordercheck-* >SHA256SUMS)
+	go run ./scripts/sign "$work/SHA256SUMS"
+	# The key must be the one this commit's bordercheck trusts, or every installed copy would refuse the release.
+	# shellcheck disable=SC2086
+	go run . verify "$work/SHA256SUMS" "$work/SHA256SUMS.sig" $files
+	files="$files $work/SHA256SUMS $work/SHA256SUMS.sig"
+else
+	echo "sign-macos-release: BORDERCHECK_SIGNING_KEY is not set; SHA256SUMS will be signed by the workflow (only up to v0.5.17)" >&2
+fi
+
 if [ -n "$notes" ]; then set -- --notes-file "$notes"; else set -- --notes ""; fi
-gh release create "$tag" --draft --title "$tag" --target "$(git rev-parse HEAD)" "$@" \
-	"$work/bordercheck-$tag-darwin-arm64" "$work/bordercheck-$tag-darwin-amd64" "$notifier_zip"
-echo "Draft release $tag holds the signed macOS binaries and notification app. Now: git tag $tag && git push origin $tag"
+# shellcheck disable=SC2086
+gh release create "$tag" --draft --title "$tag" --target "$(git rev-parse HEAD)" "$@" $files
+echo "Draft release $tag holds the signed binaries. Now: git tag $tag && git push origin $tag"

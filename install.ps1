@@ -35,14 +35,18 @@ $KeySet = [bool]$Key -or [bool]$env:BORDERCHECK_PUBLIC_KEY
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue' # Invoke-WebRequest is very slow with the progress bar
 
-# Keep equal to OfficialKey in internal/update/update.go (a test checks).
-$OfficialKey = 'Q5Mw8yJQUgKSEtPNBVNnEP7HiSvhwT2y9Te4mEPOlcs='
+# Keep equal to OfficialKey and PreviousKey in internal/update/update.go (a test
+# checks). $PreviousKey is trusted for one release while the key changes; then ''.
+$OfficialKey = '5HtcE21ff8OvmWFHZxz6zdCXXlCnNWLqxz5n7hcVAkw='
+$PreviousKey = 'Q5Mw8yJQUgKSEtPNBVNnEP7HiSvhwT2y9Te4mEPOlcs='
 
 function Say([string]$msg) { Write-Host "bordercheck-install: $msg" }
 # Throw rather than exit: run as a script block, exit would close the user's window.
 function Fail([string]$msg) { throw "bordercheck-install: $msg Nothing was installed." }
 
 if (-not $Key) { $Key = if ($env:BORDERCHECK_PUBLIC_KEY) { $env:BORDERCHECK_PUBLIC_KEY } else { $OfficialKey } }
+# The keys to try: the one given, or the official key (and, while the key changes, the previous one).
+$Keys = if ($KeySet -or -not $PreviousKey) { @($Key) } else { @($Key, $PreviousKey) }
 $GitHub = if ($env:BORDERCHECK_GITHUB) { $env:BORDERCHECK_GITHUB } else { 'https://github.com' }
 
 if (-not $PolicyUrl) { Fail "Give your invite link or your organisation's policies URL, e.g. https://bordercheck.domain.com/policies.json." }
@@ -108,13 +112,15 @@ try {
         $probeSig = [Convert]::FromBase64String('kqAJqfDUyrhyDoILX2QlQKKye1QWUD+Ps3YiI+vbadoIWsHkPhWZbkWPNhPQ8R2MOHsurrQwKu6wDSkWErsMAA==')
         if (Test-ReleaseSignature $openssl.Source $probe $probeKey $probeSig) {
             try {
-                $keyBytes = [Convert]::FromBase64String($Key)
                 $signature = [Convert]::FromBase64String([IO.File]::ReadAllText($sig))
-            } catch { Fail 'The release key or signature is not base64.' }
-            if (-not (Test-ReleaseSignature $openssl.Source $sums $keyBytes $signature)) {
+            } catch { Fail 'The release signature is not base64.' }
+            foreach ($k in $Keys) {
+                try { $keyBytes = [Convert]::FromBase64String($k) } catch { Fail 'The release key is not base64.' }
+                if (Test-ReleaseSignature $openssl.Source $sums $keyBytes $signature) { $sigChecked = $true; break }
+            }
+            if (-not $sigChecked) {
                 Fail 'SHA256SUMS is NOT signed by the BorderCheck release key. Do not install this release; tell your IT team.'
             }
-            $sigChecked = $true
             Say 'SHA256SUMS is signed by the release key (checked with OpenSSL).'
         }
     }
@@ -146,8 +152,11 @@ try {
         return
     }
     if (-not $sigChecked) {
-        & $exe verify -key $Key $sums $sig $exe | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail 'SHA256SUMS is NOT signed by the BorderCheck release key. Do not install this release; tell your IT team.' }
+        foreach ($k in $Keys) {
+            & $exe verify -key $k $sums $sig $exe 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) { $sigChecked = $true; break }
+        }
+        if (-not $sigChecked) { Fail 'SHA256SUMS is NOT signed by the BorderCheck release key. Do not install this release; tell your IT team.' }
         Say 'SHA256SUMS is signed by the release key (checked by the downloaded binary; no OpenSSL with ed25519 was found).'
     }
     if (-not ((& $exe -version) -match [regex]::Escape($tag))) { Fail "$asset does not report version $tag." }

@@ -119,16 +119,21 @@ built into BorderCheck → GitHub release with the binaries, `SHA256SUMS`, `SHA2
 Homebrew formula `bordercheck.rb`.
 
 Installed copies only update to releases whose `SHA256SUMS` is signed with the release key, and the install
-scripts refuse an unsigned one. `go run ./scripts/sign -keygen` makes a key pair: the private half goes in the
-`BORDERCHECK_SIGNING_KEY` repo secret (never in a file), the public half in `internal/update.OfficialKey` and
-`OFFICIAL_KEY` in `install.sh` and `install.ps1` (a test checks they match). A fork uses its own pair, and its
+scripts refuse an unsigned one. `go run ./scripts/sign -keygen` makes a key pair: the private half goes straight
+into a secret store on the maintainer's Mac (`… -keygen | touchenv set --intent "…" BORDERCHECK_SIGNING_KEY`,
+never in a file or in CI), the public half in `internal/update.OfficialKey` and `OFFICIAL_KEY` in `install.sh` and
+`install.ps1` (a test checks they match). `scripts/sign-macos-release.sh`, run under
+`touchenv run … BORDERCHECK_SIGNING_KEY ASC_KEY_PATH:file -- …`, builds every binary from the tagged commit, writes
+and signs `SHA256SUMS`, and puts it all in a draft release; the workflow checks each file was built from that
+commit and the signature, and publishes. To change the key, put the old one in `update.PreviousKey` (and
+`PREVIOUS_KEY` in the install scripts) for one release, so installed copies can follow, then empty it. A fork uses its own pair, and its
 users set `update.public_key` or install with `--key`.
 
 Repo secrets:
 
 | Secret | |
 |---|---|
-| `BORDERCHECK_SIGNING_KEY` | required; the ed25519 key from `go run ./scripts/sign -keygen` |
+| `BORDERCHECK_SIGNING_KEY` | only for a fork that signs in CI; the official releases are signed on the maintainer's Mac (from v0.5.18) |
 | `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD` | optional; base64 of a `.p12` with the *Developer ID Application* certificate and key, and its password |
 | `MACOS_SIGNING_IDENTITY` | optional, e.g. `Developer ID Application: Sample Ltd (ABCDE12345)` |
 | `APPLE_NOTARY_KEY_P8`, `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID` | optional; an App Store Connect API key for `notarytool` |

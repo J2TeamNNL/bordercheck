@@ -588,7 +588,7 @@ func (s *secretScanner) chatHits(data []byte, segs [][2]int, extra []secretRule)
 						h.vlo, h.vhi = st+loc[2*g], st+loc[2*g+1]
 					}
 					if g := r.nameGroup; g > 0 && loc[2*g] >= 0 {
-						h.name = string(win[loc[2*g]:loc[2*g+1]])
+						h.name = safeName(string(win[loc[2*g]:loc[2*g+1]]))
 						if l := strings.ToLower(h.name); strings.Contains(l, "hash") || strings.Contains(l, "salt") {
 							continue // a password's hash, not the password
 						}
@@ -656,6 +656,9 @@ func (s *secretScanner) findingsOf(data []byte, hits []chatHit, shown string, wi
 		if s.showTail && h.rule.showTail && len(h.match) >= 20 {
 			f.tail = h.match[len(h.match)-4:]
 		}
+		if h.rule.showTail {
+			f.token = s.tokens.keep(h.rule.kind, h.match)
+		}
 		// For `bordercheck full-scan` only, never in a report: where in the
 		// conversation it was, and the end of a password long enough that
 		// four characters give little away.
@@ -710,6 +713,9 @@ type ChatFinding struct {
 	// line it is on: deleting only the first would leave the others.
 	Times int   `json:"times"`
 	Lines []int `json:"lines,omitempty"`
+	// Verified is what the provider said of the token (KeyLive…), with -verify only.
+	Verified string `json:"verified,omitempty"`
+	tokenKey string
 }
 
 // Item is the finding in a few words: "Stripe live key …p7dc",
@@ -811,6 +817,7 @@ func ScanChatsAndLogs(ctx context.Context, p policy.Secrets, since time.Time, lo
 	if err != nil {
 		return nil, err
 	}
+	s.tokens = tokensFrom(ctx)
 	s.find(ctx, home) // for Aider's histories, kept in each project
 	if logs {
 		s.logs = findLogs(ctx, home, runtime.GOOS)
@@ -826,7 +833,7 @@ func (s *secretScanner) chatFindings(ctx context.Context, home string, since tim
 	out := make([]ChatFinding, len(found))
 	for i, f := range found {
 		out[i] = ChatFinding{Path: f.path, Line: f.line, Kind: f.kind, Name: f.name, Tail: f.tail,
-			Host: f.ctx.host, When: f.ctx.when, Source: f.ctx.source, Project: f.ctx.project, Assistant: f.ctx.app, Times: 1}
+			Host: f.ctx.host, When: f.ctx.when, Source: f.ctx.source, Project: f.ctx.project, Assistant: f.ctx.app, Times: 1, tokenKey: f.token}
 		if r := f.ctx.rep; r != nil {
 			out[i].Times, out[i].Lines = r.times, r.lines
 		}

@@ -76,7 +76,8 @@ Everyday
   bordercheck fix                what to fix and how, written for an AI coding assistant to follow with you
   bordercheck full-scan          secrets left where the hourly check looks only in part: all AI chat history
                                  (Claude Code, Codex, Gemini CLI, Copilot, Cursor, Cline, Aider, opencode, Goose),
-                                 Alfred's clipboard, logs, and the history of your git repositories
+                                 Alfred's clipboard, logs, and the history of your git repositories;
+                                 -verify asks each provider whether the tokens found still work
   bordercheck guard install      keep secrets out of Claude Code: stop prompts that hold one, refuse commands
                                  that print them, hide them in commands' output (bordercheck guard: status)
   bordercheck send -force        check now and send a fresh report to your organisation
@@ -302,6 +303,8 @@ func runFullScan(args []string) int {
 	hours := fs.Int("hours", 0, "only chats and logs changed in this many hours (0: all); git history is read in full")
 	jsonOut := fs.Bool("json", false, "print the findings as JSON (never the values)")
 	noGit := fs.Bool("no-git", false, "leave git history out")
+	verify := fs.Bool("verify", false, "ask each provider whether the tokens found still work: "+checks.VerifiableKinds()+
+		" (each token goes only to the provider that issued it, with a read-only request; nothing is sent elsewhere)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -329,6 +332,11 @@ func runFullScan(args []string) int {
 		}
 	}
 	say("Reading " + what + "…")
+	var tokens *checks.Tokens
+	if *verify {
+		tokens = checks.NewTokens()
+		ctx = checks.WithTokens(ctx, tokens)
+	}
 	found, err := checks.ScanChatsAndLogs(ctx, pol.Checks.Secrets, since, true)
 	if err != nil {
 		return fail(err)
@@ -340,6 +348,10 @@ func runFullScan(args []string) int {
 		if git, repos, partial, err = checks.ScanGitHistory(ctx, pol.Checks.Secrets); err != nil {
 			return fail(err)
 		}
+	}
+	if tokens != nil && tokens.Len() > 0 && ctx.Err() == nil {
+		say(fmt.Sprintf("Asking the providers about %d token(s)…", tokens.Len()))
+		checks.Annotate(tokens.Verify(ctx, nil), found, git)
 	}
 	if dir, err := agent.Dir(); err == nil && *hours == 0 && !*noGit && ctx.Err() == nil {
 		_ = agent.RecordFullScan(dir, time.Now()) // only the date, so the hourly check stops suggesting it
@@ -373,6 +385,9 @@ func writeGit(w io.Writer, found []checks.GitFinding, repos int, partial []strin
 	fmt.Fprintf(w, "%d secret(s) in git history. Values are not shown.\n", len(found))
 	for i, f := range found {
 		fmt.Fprintf(w, "\n%3d. %s\n     Where: %s\n     State: %s\n", i+1, f.Item(), f.Where(), f.State())
+		if f.Verified != "" {
+			fmt.Fprintf(w, "     Key:   %s\n", checks.VerifiedText(f.Verified))
+		}
 	}
 	fmt.Fprintf(w, "\n%s\n", checks.GitFix())
 	return 1
@@ -665,6 +680,9 @@ func writeChats(w io.Writer, found []checks.ChatFinding, hours int, what, home s
 	fmt.Fprintf(w, "%d secret(s) in %d conversation(s), in %s, newest first. Values are not shown.\n", len(found), len(files), what)
 	for i, f := range found {
 		fmt.Fprintf(w, "\n%3d. %s\n     Where: %s\n     What:  %s\n", i+1, f.Item(), f.Where(), f.Explain(home))
+		if f.Verified != "" {
+			fmt.Fprintf(w, "     Key:   %s\n", checks.VerifiedText(f.Verified))
+		}
 	}
 	fmt.Fprintf(w, "\n%s\n", checks.ChatFix())
 	return 1

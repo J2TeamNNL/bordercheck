@@ -32,8 +32,12 @@
 
 set -eu
 
-# Keep equal to OfficialKey in internal/update/update.go (a test checks).
-OFFICIAL_KEY='Q5Mw8yJQUgKSEtPNBVNnEP7HiSvhwT2y9Te4mEPOlcs='
+# Keep equal to OfficialKey and PreviousKey in internal/update/update.go (a test
+# checks). PREVIOUS_KEY is trusted for one release while the key changes; then ''.
+OFFICIAL_KEY='5HtcE21ff8OvmWFHZxz6zdCXXlCnNWLqxz5n7hcVAkw='
+PREVIOUS_KEY='Q5Mw8yJQUgKSEtPNBVNnEP7HiSvhwT2y9Te4mEPOlcs='
+# The Developer ID team that signs the official macOS binaries.
+OFFICIAL_TEAM='84T567KMYD'
 
 # RFC 8032 test vector 2 (message 0x72, "r"), to learn whether this OpenSSL can
 # verify ed25519 (OpenSSL refuses an empty message, so not vector 1).
@@ -183,15 +187,24 @@ main() {
 
 	# 1. The signature, with OpenSSL when it can, before anything else is used.
 	sig_checked=no
+	# The keys to try: the one given, or the official key (and, while the key
+	# changes, the previous one).
+	keys=$key
+	[ "$key_set" = yes ] || [ -z "$PREVIOUS_KEY" ] || keys="$key $PREVIOUS_KEY"
 	if openssl_ed25519_works; then
-		der_key "$key" "$tmp/key.der" && [ "$(wc -c <"$tmp/key.der" | tr -d ' ')" -eq 44 ] ||
-			die "the release key is not a base64 ed25519 public key."
 		tr -d '\r\n' <"$tmp/SHA256SUMS.sig" | openssl base64 -d -A >"$tmp/sig.bin" 2>/dev/null ||
 			die "SHA256SUMS.sig is not base64."
-		openssl pkeyutl -verify -pubin -inkey "$tmp/key.der" -keyform DER -rawin \
-			-in "$tmp/SHA256SUMS" -sigfile "$tmp/sig.bin" >/dev/null 2>&1 ||
+		for k in $keys; do
+			der_key "$k" "$tmp/key.der" && [ "$(wc -c <"$tmp/key.der" | tr -d ' ')" -eq 44 ] ||
+				die "the release key is not a base64 ed25519 public key."
+			if openssl pkeyutl -verify -pubin -inkey "$tmp/key.der" -keyform DER -rawin \
+				-in "$tmp/SHA256SUMS" -sigfile "$tmp/sig.bin" >/dev/null 2>&1; then
+				sig_checked=yes
+				break
+			fi
+		done
+		[ "$sig_checked" = yes ] ||
 			die "SHA256SUMS is NOT signed by the BorderCheck release key. Do not install this release; tell your IT team."
-		sig_checked=yes
 		say "SHA256SUMS is signed by the release key (checked with OpenSSL)."
 	fi
 
@@ -231,9 +244,24 @@ main() {
 	fi
 	chmod 755 "$tmp/$asset"
 
-	# 3. Without OpenSSL 3, the binary checks the signature with the key this script pins.
+	# 3. On a Mac, an official binary must be signed by BorderCheck's Developer
+	# ID before it runs: Apple's certificate vouches for it, not the binary itself.
+	if [ "$os" = darwin ] && [ "$key_set" != yes ] && [ "$repo_set" != yes ]; then
+		/usr/bin/codesign --verify --strict --test-requirement \
+			"=anchor apple generic and certificate leaf[subject.OU] = \"$OFFICIAL_TEAM\"" "$tmp/$asset" 2>/dev/null ||
+			die "$asset is NOT signed by BorderCheck's Developer ID ($OFFICIAL_TEAM). Do not install it; tell your IT team."
+		say "$asset is signed by BorderCheck's Developer ID ($OFFICIAL_TEAM)."
+	fi
+
+	# 4. Without OpenSSL 3, the binary checks the signature with the keys this script pins.
 	if [ "$sig_checked" = no ]; then
-		"$tmp/$asset" verify -key "$key" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.sig" "$tmp/$asset" >/dev/null ||
+		for k in $keys; do
+			if "$tmp/$asset" verify -key "$k" "$tmp/SHA256SUMS" "$tmp/SHA256SUMS.sig" "$tmp/$asset" >/dev/null 2>&1; then
+				sig_checked=yes
+				break
+			fi
+		done
+		[ "$sig_checked" = yes ] ||
 			die "SHA256SUMS is NOT signed by the BorderCheck release key. Do not install this release; tell your IT team."
 		say "SHA256SUMS is signed by the release key (checked by the downloaded binary; OpenSSL 3 was not found)."
 	fi

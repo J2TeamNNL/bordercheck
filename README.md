@@ -106,7 +106,8 @@ A policy only needs what it changes:
 
 - A plain run sends nothing. An installed copy sends a report to the one endpoint in its policy: pass/fail,
   severity, summary and fix per check, plus the email and install ID. Evidence (paths, ports, names) and the
-  machine's own IP addresses are sent only if the policy asks. No location is sent.
+  machine's own IP addresses are sent only if the policy asks; so is the device's location (`include_location`, off by
+  default).
 - Secret values are never printed or sent; at most the last 4 characters of a long provider token.
 - An enrolled machine's token goes only to the portal that issued it.
 - Updates install only releases whose checksums are signed with the release key, and the update source is

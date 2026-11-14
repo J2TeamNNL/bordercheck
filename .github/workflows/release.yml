@@ -266,13 +266,34 @@ jobs:
           done
           echo "PRESIGNED=yes" >>"$GITHUB_ENV"
           echo "## macOS binaries: signed and notarized on the maintainer's Mac (taken from the draft release)" >>"$GITHUB_STEP_SUMMARY"
+          # From v0.5.18 the maintainer's Mac also builds the other binaries and
+          # signs SHA256SUMS (the key never leaves it). Then the release is all
+          # of the draft's files, each checked to be built from this commit.
+          if gh release download "$GITHUB_REF_NAME" --pattern SHA256SUMS --pattern SHA256SUMS.sig --dir signed 2>/dev/null && test -s signed/SHA256SUMS.sig; then
+            gh release download "$GITHUB_REF_NAME" --pattern "bordercheck-$GITHUB_REF_NAME-*" --dir signed
+            for f in signed/bordercheck-"$GITHUB_REF_NAME"-*; do
+              case $f in *.zip) continue ;; esac # the notification app: checked by the notifier job
+              info=$(go version -m "$f")
+              printf '%s\n' "$info" | grep -q "vcs.revision=$GITHUB_SHA\$" || { echo "::error::$f was not built from $GITHUB_SHA"; exit 1; }
+              printf '%s\n' "$info" | grep -q "vcs.modified=false\$" || { echo "::error::$f was built from a modified tree"; exit 1; }
+            done
+            rm -f dist/*
+            cp -f signed/* dist/
+            echo "SIGNED_LOCALLY=yes" >>"$GITHUB_ENV"
+            echo "## SHA256SUMS: signed on the maintainer's Mac (taken from the draft release)" >>"$GITHUB_STEP_SUMMARY"
+          fi
       # SHA256SUMS.sig is what installed copies and the install scripts trust.
+      # It is made on the maintainer's Mac; signing here, with the repo secret,
+      # is only for releases up to v0.5.17 (the previous key), and the secret is
+      # then deleted.
       - name: Write and sign SHA256SUMS
+        if: env.SIGNED_LOCALLY != 'yes'
         run: test -n "$BORDERCHECK_SIGNING_KEY" && scripts/sums.sh && test -s dist/SHA256SUMS.sig
         env:
           BORDERCHECK_SIGNING_KEY: ${{ secrets.BORDERCHECK_SIGNING_KEY }}
-      # Fails if the secret is not the key behind update.OfficialKey: such a
-      # release would be refused by every installed copy and installer.
+      # Fails unless SHA256SUMS is signed by a key this commit's bordercheck
+      # trusts and every file matches it: such a release would be refused by
+      # every installed copy and installer.
       - name: Check the release against the key built into bordercheck
         run: go run . verify dist/SHA256SUMS dist/SHA256SUMS.sig dist/bordercheck-*
       - name: Render the Homebrew formula

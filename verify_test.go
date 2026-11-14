@@ -65,4 +65,13 @@ func TestInstallScriptsPinOfficialKey(t *testing.T) {
 			t.Errorf("%s pins %q, want update.OfficialKey %q", file, m, update.OfficialKey)
 		}
 	}
+	for file, re := range map[string]*regexp.Regexp{
+		"install.sh":  regexp.MustCompile(`(?m)^PREVIOUS_KEY='([^']*)'`),
+		"install.ps1": regexp.MustCompile(`(?m)^\$PreviousKey = '([^']*)'`),
+	} {
+		data, _ := os.ReadFile(file)
+		if m := re.FindSubmatch(data); m == nil || string(m[1]) != update.PreviousKey {
+			t.Errorf("%s: previous key %q, want update.PreviousKey %q", file, m, update.PreviousKey)
+		}
+	}
 }

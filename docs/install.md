@@ -293,7 +293,15 @@ It takes a minute or so on a busy computer.
   it, the file, whether the current files still hold it and whether it was pushed. The value is given to `git grep`
   on its standard input, never on its command line.
 
-`-json` prints it all for scripts. The `secrets` check reads every prompt typed but of the conversations only the last
+**`-verify`** asks each provider whether the tokens found still work: GitHub, OpenAI, Anthropic, Stripe, Slack and npm
+tokens. Each token goes only to the provider that issued it, over HTTPS, with a read-only request that costs nothing
+(who am I, list models, read the balance); nothing goes to the portal or anywhere else, and the values are kept in
+memory only while the scan runs. Each finding then says **LIVE** (the provider accepted it just now), **dead**
+(refused: revoked, expired or not real, so deleting the copies is enough) or **unknown** (no clear answer). It is off
+unless asked for, and the hourly check never does it: sending a key out, even to its own provider, is the person's
+call. AWS keys (the secret half is needed too) and Google API keys (each is limited to its own APIs) are not checked.
+
+`-json` prints it all for scripts (with `"verified"` when `-verify` was given). The `secrets` check reads every prompt typed but of the conversations only the last
 `ai_chat_hours` (48), and reports what it finds there for information ([details](policies.md#secrets)).
 
 **Keeping secrets out of Claude Code.** `bordercheck guard install` adds three hooks to Claude Code's

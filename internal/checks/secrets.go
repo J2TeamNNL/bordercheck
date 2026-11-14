@@ -78,6 +78,41 @@ var secretRules = []secretRule{
 		re: regexp.MustCompile(`(?i)\b([A-Z0-9_.-]*(?:SECRET|TOKEN|PASSWORD|PASSWD|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|CREDENTIALS?)[A-Z0-9_]*)["']?\s*[:=]\s*["']?([^\s"'#;,]{8,})`)},
 }
 
+// safeName is a variable name fit to report, or "" when the "name" is itself a
+// secret: a token used as a JSON key ("ghp_…": …) or before a colon
+// (ghp_…:x-oauth-basic) is caught as the name by assignNameRe. A name is sent
+// with the report, so it must never be a value.
+func safeName(name string) string {
+	for _, r := range secretRules {
+		if r.showTail && r.re.MatchString(name) {
+			return ""
+		}
+	}
+	if len(name) > 40 || (len(name) >= 20 && looksRandom(name)) {
+		return ""
+	}
+	return name
+}
+
+// looksRandom: mixed case and digits with no word breaks, as a token is and a
+// variable name (API_KEY, apiKey, stripeSecret2) is not.
+func looksRandom(s string) bool {
+	var lower, upper, digit, sep int
+	for _, c := range s {
+		switch {
+		case c >= 'a' && c <= 'z':
+			lower++
+		case c >= 'A' && c <= 'Z':
+			upper++
+		case c >= '0' && c <= '9':
+			digit++
+		default:
+			sep++
+		}
+	}
+	return sep == 0 && lower > 0 && upper > 2 && digit > 2
+}
+
 var assignNameRe = regexp.MustCompile(`(?:^|[\s;:{,])(?:export\s+|set\s+|\$env:)?["']?([A-Za-z_][A-Za-z0-9_]*)["']?\s*[:=]`)
 
 // secretFinding locates a secret. It never holds the value, only the last 4
@@ -94,6 +129,7 @@ type secretFinding struct {
 	signIn bool        // a cloud CLI's sign-in cache, reported for information (signInKinds)
 	store  bool        // a Java/Android keystore where it belongs, reported for information
 	synced string      // the cloud service the file is synced with (syncedBy), if any
+	token  string      // for full-scan -verify: the key of the token kept in Tokens, never the value
 	ctx    chatContext // where in that conversation; for bordercheck full-scan only
 }
 
@@ -121,6 +157,7 @@ func (f secretFinding) String() string {
 
 // secretScanner applies one policy's secret rules.
 type secretScanner struct {
+	tokens   *Tokens // full-scan -verify only: where the provider tokens found are kept
 	rules    []secretRule
 	prodRe   *regexp.Regexp
 	showTail bool
@@ -388,9 +425,9 @@ func (s *secretScanner) scan(r io.Reader, path string, rules []secretRule) []sec
 			f := secretFinding{path: path, line: n, kind: rule.kind, severe: rule.high,
 				prod: pathProd || s.prodRe.MatchString(line)}
 			if rule.nameGroup > 0 {
-				f.name = m[rule.nameGroup]
+				f.name = safeName(m[rule.nameGroup])
 			} else if a := assignNameRe.FindStringSubmatch(line); a != nil {
-				f.name = a[1]
+				f.name = safeName(a[1])
 			}
 			if s.showTail && rule.showTail && len(m[0]) >= 20 {
 				f.tail = m[0][len(m[0])-4:]
