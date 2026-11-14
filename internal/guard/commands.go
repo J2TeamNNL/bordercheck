@@ -113,9 +113,73 @@ func simpleCommands(line string) [][]string {
 		}
 	}
 	quote := byte(0)
+	// Here-documents (cmd <<EOF … EOF) whose bodies start after the current line:
+	// a body is data given to the command on its input, not commands, except
+	// that $( … ) and `…` in an unquoted one still run.
+	type heredoc struct {
+		delim         string
+		quoted, strip bool
+	}
+	var pending []heredoc
 	for i := 0; i < len(line); i++ {
 		c := line[i]
 		switch {
+		case quote == 0 && c == '<' && strings.HasPrefix(line[i:], "<<") && !strings.HasPrefix(line[i:], "<<<"):
+			endWord()
+			j := i + 2
+			h := heredoc{}
+			if j < len(line) && line[j] == '-' {
+				h.strip = true
+				j++
+			}
+			for j < len(line) && (line[j] == ' ' || line[j] == '\t') {
+				j++
+			}
+			var d strings.Builder
+			for ; j < len(line) && !strings.ContainsRune(" \t\n;|&<>()", rune(line[j])); j++ {
+				switch line[j] {
+				case '\'', '"', '\\':
+					h.quoted = true
+				default:
+					d.WriteByte(line[j])
+				}
+			}
+			if h.delim = d.String(); h.delim != "" {
+				pending = append(pending, h)
+			}
+			i = j - 1
+		case quote == 0 && c == '\n' && len(pending) > 0:
+			endCommand()
+			// The bodies follow, one after the other, each up to a line that is its delimiter.
+			pos := i + 1
+			for _, h := range pending {
+				body := pos
+				for pos < len(line) {
+					end := strings.IndexByte(line[pos:], '\n')
+					if end < 0 {
+						end = len(line) - pos
+					}
+					l := line[pos : pos+end]
+					if h.strip {
+						l = strings.TrimLeft(l, "\t")
+					}
+					next := pos + end + 1
+					if l == h.delim {
+						if !h.quoted {
+							out = append(out, substitutions(line[body:pos])...)
+						}
+						pos = next
+						body = -1
+						break
+					}
+					pos = next
+				}
+				if body >= 0 && !h.quoted { // no end line: the body runs to the end
+					out = append(out, substitutions(line[body:min(pos, len(line))])...)
+				}
+			}
+			pending = nil
+			i = pos - 1
 		case quote == '\'':
 			if c == '\'' {
 				quote = 0
@@ -169,6 +233,30 @@ func simpleCommands(line string) [][]string {
 		}
 	}
 	endCommand()
+	return out
+}
+
+// substitutions are the commands that $( … ) and `…` in text (an unquoted
+// here-document's body) run.
+func substitutions(text string) [][]string {
+	var out [][]string
+	for i := 0; i < len(text); i++ {
+		switch {
+		case text[i] == '\\' && i+1 < len(text):
+			i++
+		case text[i] == '$' && i+1 < len(text) && text[i+1] == '(':
+			end := matchParen(text, i+1)
+			out = append(out, simpleCommands(text[i+2:end])...)
+			i = end
+		case text[i] == '`':
+			end := strings.IndexByte(text[i+1:], '`')
+			if end < 0 {
+				end = len(text) - i - 1
+			}
+			out = append(out, simpleCommands(text[i+1:i+1+end])...)
+			i += end + 1
+		}
+	}
 	return out
 }
 

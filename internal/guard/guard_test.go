@@ -186,6 +186,8 @@ func TestRiskyCommands(t *testing.T) {
 		"security find-generic-password -s x -w", "op read op://vault/item/password", "gh auth token", "pass show work/db",
 		"/opt/homebrew/bin/touchenv get K", `echo "$(touchenv get K)"`, "x=`printenv API_TOKEN`", "sudo cat /srv/app/.env",
 		"cd a\nenv",
+		// A here-document is data, but what runs after it, and $( ) in an unquoted one, are commands.
+		"cat <<EOF\n$(printenv API_TOKEN)\nEOF", "cat <<'EOF' >x\nexport\nEOF\nenv", "cat <<-EOF\n\tok\n\tEOF\ncat .env",
 	} {
 		if why, bad := Risky(c); !bad || !strings.HasPrefix(why, "BorderCheck refused this command: ") {
 			t.Errorf("%q not refused", c)
@@ -197,7 +199,8 @@ func TestRiskyCommands(t *testing.T) {
 		"go test ./internal/env/...", "security find-generic-password -s x", "make set-version", "./setup.sh",
 		// The same words inside quotes are not a command.
 		"git commit -m \"1.8.1: touchenv get ends the line\n\nenv and cat .env are refused\"", `echo 'run env'`,
-		`grep -n "touchenv get" README.md`, "gh pr view 1", "op run -- make", "env > /dev/null 2>&1 && echo ok",
+		`grep -n "touchenv get" README.md`, "python3 - <<'EOF'\nprint('| `export` / `import` | env |')\nEOF",
+		"cat <<EOF | grep x\nenv and export are words here\nEOF\necho done", "cat <<< \"x\"", "git commit -F - <<\"END\"\ncat .env\nEND", "gh pr view 1", "op run -- make", "env > /dev/null 2>&1 && echo ok",
 	} {
 		if why, bad := Risky(c); bad {
 			t.Errorf("%q refused: %s", c, why)
