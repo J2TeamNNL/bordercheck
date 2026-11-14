@@ -75,7 +75,7 @@ func TestGitHistory(t *testing.T) {
 		byKind[f.Kind] = f
 	}
 	gh, ant, aws := byKind["GitHub token"], byKind["Anthropic API key"], byKind["AWS access key"]
-	if gh.Commit != first || gh.File != ".env" || !gh.Pushed || gh.Current || gh.Repo != "~/code/api" || gh.Date != "2026-03-02" {
+	if gh.Commit != first || gh.File != ".env" || !gh.Pushed || gh.Current || filepath.ToSlash(gh.Repo) != "~/code/api" || gh.Date != "2026-03-02" {
 		t.Errorf("removed token: %+v", gh)
 	}
 	if ant.File != "config.yml" || ant.Pushed || !ant.Current || ant.Stash {
@@ -104,7 +104,9 @@ func TestRawStoresAndLogs(t *testing.T) {
 	writeTestFile(t, filepath.Join(home, ".local", "share", "goose", "sessions", "sessions.db"), "SQLite format 3\x00\x00binary "+tok+" \x00more")
 	writeTestFile(t, filepath.Join(home, ".local", "share", "opencode", "opencode.db-wal"), "x") // a -wal without its db is not read
 	logDir := filepath.Join(t.TempDir(), "logs")
-	t.Setenv("TMPDIR", logDir)
+	t.Setenv("TMPDIR", logDir) // the temporary folder: TMPDIR on macOS and Linux, TEMP / TMP on Windows
+	t.Setenv("TEMP", logDir)
+	t.Setenv("TMP", logDir)
 	writeTestFile(t, filepath.Join(logDir, "app", "run.log"), "> Authorization: Bearer x\nnpm token npm_"+strings.Repeat("Ab1", 12)+"\n")
 	writeTestFile(t, filepath.Join(logDir, "notes.txt"), tok)
 
