@@ -101,7 +101,7 @@ export function validateRolePolicy(p: unknown, now: Date): Msg[] {
     if (!isObj(p.report)) must("v.mustObject", "report");
     else {
       const r = p.report;
-      keysIn(r, ["url", "headers", "interval", "check_interval", "include_evidence", "email_domains", "include_ips", "include_location", "fix_prompt", "compromise_alert"], "report", errs);
+      keysIn(r, ["url", "headers", "interval", "check_interval", "fail_interval", "include_evidence", "email_domains", "include_ips", "include_location", "fix_prompt", "compromise_alert"], "report", errs);
       if (r.url !== undefined && typeof r.url !== "string") must("v.mustString", "report.url");
       if (r.headers !== undefined) {
         if (!isObj(r.headers)) must("v.mustObject", "report.headers");
@@ -118,6 +118,10 @@ export function validateRolePolicy(p: unknown, now: Date): Msg[] {
       if (r.check_interval !== undefined && r.check_interval !== "") {
         const d = goDuration(r.check_interval);
         if (d === null || d < 15 * 60 * 1000) errs.push(msg("v.minDuration", { where: "report.check_interval", min: "15m" }));
+      }
+      if (r.fail_interval !== undefined && r.fail_interval !== "" && r.fail_interval !== "0") {
+        const d = goDuration(r.fail_interval);
+        if (d === null || d < 60 * 60 * 1000) errs.push(msg("v.minDuration", { where: "report.fail_interval", min: "1h" }));
       }
       for (const k of ["include_evidence", "include_ips", "include_location", "fix_prompt", "compromise_alert"]) {
         if (r[k] !== undefined && typeof r[k] !== "boolean") must("v.mustBool", `report.${k}`);

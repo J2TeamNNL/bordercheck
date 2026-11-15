@@ -60,6 +60,12 @@ type Report struct {
 	// about a new problem within a day, IT gets one report a week. "" = check
 	// only when a report is due.
 	CheckInterval   string   `json:"check_interval"`
+	// FailInterval is how often to report while the last check found the
+	// machine non-compliant (a fail) or with signs of compromise, when that is
+	// sooner than Interval: IT sees each day whether a weekly-reporting
+	// machine got fixed. "" = 24h; "0" = always Interval. Warnings alone
+	// ("attention") keep Interval.
+	FailInterval string `json:"fail_interval"`
 	IncludeEvidence bool     `json:"include_evidence"` // send file paths, ports, etc., not just pass/fail
 	EmailDomains    []string `json:"email_domains"`    // if set, the user's email must be in one of these
 	// IncludeIPs adds the machine's own interface addresses (host.ips) to the
@@ -83,6 +89,23 @@ type Report struct {
 func (r Report) Every() time.Duration {
 	d, _ := time.ParseDuration(r.Interval)
 	return d
+}
+
+// FailEvery is the interval between reports while the machine is
+// non-compliant or compromised: FailInterval (24h when ""), never longer than
+// the report interval; the report interval when FailInterval is "0".
+func (r Report) FailEvery() time.Duration {
+	every := r.Every()
+	if r.FailInterval == "0" {
+		return every
+	}
+	d := 24 * time.Hour
+	if r.FailInterval != "" {
+		if v, err := time.ParseDuration(r.FailInterval); err == nil {
+			d = v
+		}
+	}
+	return min(d, every)
 }
 
 // CheckEvery returns the interval between checks: CheckInterval, or the
@@ -557,6 +580,11 @@ func (p Policy) validate() error {
 		}
 		if d > p.Report.Every() {
 			return fmt.Errorf("report.check_interval (%s) must not be longer than report.interval (%s)", ci, p.Report.Interval)
+		}
+	}
+	if fi := p.Report.FailInterval; fi != "" && fi != "0" {
+		if d, err := time.ParseDuration(fi); err != nil || d < time.Hour {
+			return fmt.Errorf("report.fail_interval must be \"0\" (always report.interval), \"\" (24h) or a duration of at least 1h, like \"24h\", not %q", fi)
 		}
 	}
 	u := p.Update

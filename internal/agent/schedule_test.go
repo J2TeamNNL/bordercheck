@@ -73,3 +73,53 @@ func TestChecksBetweenReports(t *testing.T) {
 		t.Errorf("status:\n%s", status)
 	}
 }
+
+// While the last check found a fail (or signs of compromise), reports come
+// every report.fail_interval (24h by default) instead of every week; once the
+// fails are gone, weekly again. Warnings alone do not count.
+func TestFailingReportsDaily(t *testing.T) {
+	reports := 0
+	var srv *httptest.Server
+	srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/policies.json":
+			fmt.Fprintf(w, `{"name": "Weekly", "report": {"url": %q, "interval": "168h", "check_interval": "24h"}, %s}`,
+				srv.URL+"/report", allChecksOff)
+		case "/report":
+			reports++
+		}
+	}))
+	defer srv.Close()
+	out := &strings.Builder{}
+	env := Env{Dir: filepath.Join(t.TempDir(), "bc"), Version: "test", Client: srv.Client(), Out: out}
+	if err := Install(t.Context(), env, InstallOptions{Policy: srv.URL + "/policies.json", Email: "an@example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	set := func(sinceCheck, sinceSent time.Duration, failing bool) {
+		st := readState(t, env)
+		st.LastCheck, st.LastSent, st.Failing = time.Now().Add(-sinceCheck), time.Now().Add(-sinceSent), failing
+		if err := writeJSON(filepath.Join(env.Dir, "state.json"), st); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run := func() string {
+		out.Reset()
+		if err := Send(t.Context(), env, false); err != nil {
+			t.Fatal(err)
+		}
+		return out.String()
+	}
+	// Failing, a day after the last report: a report goes out (not a check only).
+	set(25*time.Hour, 25*time.Hour, true)
+	if log := run(); reports != 2 || !strings.Contains(log, "report sent") {
+		t.Fatalf("failing, a day later: %d reports\n%s", reports, log)
+	}
+	// That check found no fail (every check is off): weekly again.
+	if st := readState(t, env); st.Failing {
+		t.Errorf("still failing after a clean check: %+v", st)
+	}
+	set(25*time.Hour, 25*time.Hour, false)
+	if log := run(); reports != 2 || !strings.Contains(log, "checked (no report due") {
+		t.Errorf("not failing, a day later: %d reports\n%s", reports, log)
+	}
+}

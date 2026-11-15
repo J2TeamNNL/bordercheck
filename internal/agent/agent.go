@@ -113,6 +113,9 @@ type State struct {
 	LastTry         time.Time `json:"last_try,omitzero"`
 	LastError       string    `json:"last_error,omitempty"`
 	LastUpdateCheck time.Time `json:"last_update_check,omitzero"`
+	// Failing: the last check found a fail or signs of compromise, so reports
+	// come every report.fail_interval instead of every report.interval.
+	Failing bool `json:"failing,omitempty"`
 	// CommandSetUp: the person's shell profile (macOS) or PATH (Windows) was
 	// given what plain `bordercheck` needs, once (see command).
 	CommandSetUp bool `json:"command_set_up,omitempty"`
@@ -355,13 +358,18 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 // wakes every hour, but only to see whether anything is due (and to refresh
 // the policy): the checks themselves run every CheckEvery.
 func schedule(r policy.Report) string {
-	every := func(d time.Duration) string { return strings.TrimSuffix(strings.TrimSuffix(d.String(), "0s"), "0m") }
 	s := fmt.Sprintf("Checks this computer every %s and reports every %s to %s.", every(r.CheckEvery()), every(r.Every()), hostOf(r.URL))
 	if r.CheckEvery() == r.Every() {
 		s = fmt.Sprintf("Checks this computer and reports every %s to %s.", every(r.Every()), hostOf(r.URL))
 	}
+	if fe := r.FailEvery(); fe < r.Every() {
+		s = strings.TrimSuffix(s, ".") + " (every " + every(fe) + " while it fails a check)."
+	}
 	return s + " (It wakes hourly for a moment to see if either is due.)"
 }
+
+// every is a duration as people write it: 24h, not 24h0m0s.
+func every(d time.Duration) string { return strings.TrimSuffix(strings.TrimSuffix(d.String(), "0s"), "0m") }
 
 // printSends says, at install, when the report carries more than results.
 func printSends(w io.Writer, pol policy.Policy) {
@@ -474,8 +482,12 @@ func Send(ctx context.Context, env Env, force bool) error {
 	if pol.Report.URL == "" {
 		return errors.New("the policy has no report.url")
 	}
+	reportEvery := pol.Report.Every()
+	if st.Failing {
+		reportEvery = pol.Report.FailEvery()
+	}
 	switch {
-	case force || now.Sub(st.LastSent) >= pol.Report.Every():
+	case force || now.Sub(st.LastSent) >= reportEvery:
 		err = sendReport(ctx, env, cfg, pol, &st, now, force, tok, nil)
 	case pol.Report.CompromiseAlert && st.compromiseChanged():
 		// The last check found the signs of compromise changed, but that
@@ -495,7 +507,7 @@ func Send(ctx context.Context, env Env, force bool) error {
 		err = checkOnly(ctx, env, cfg, pol, &st, now, tok)
 	default:
 		fmt.Fprintf(env.Out, "%s nothing due: next check %s, next report %s\n", now.Format(time.RFC3339),
-			st.LastCheck.Add(pol.Report.CheckEvery()).Format(time.RFC3339), st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339))
+			st.LastCheck.Add(pol.Report.CheckEvery()).Format(time.RFC3339), st.LastSent.Add(reportEvery).Format(time.RFC3339))
 	}
 	if errors.Is(err, ErrRevoked) {
 		revoked(ctx, env, &st, now, force)
@@ -519,6 +531,7 @@ func checkOnly(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *
 	st.LastCheck = now
 	rep := newReport(env, pol, results)
 	st.CompromiseFound = rep.CompromiseLines()
+	st.Failing = rep.Counts.Fail > 0 || len(st.CompromiseFound) > 0
 	if pol.Report.CompromiseAlert && st.compromiseChanged() {
 		what := "found"
 		if len(st.CompromiseFound) == 0 {
@@ -528,8 +541,12 @@ func checkOnly(ctx context.Context, env Env, cfg Config, pol policy.Policy, st *
 		return sendReport(ctx, env, cfg, pol, st, now, false, tok, results)
 	}
 	c := rep.Counts
+	next := st.LastSent.Add(pol.Report.Every())
+	if st.Failing {
+		next = st.LastSent.Add(pol.Report.FailEvery())
+	}
 	fmt.Fprintf(env.Out, "%s checked (no report due until %s): %d fail, %d warn, %d pass, %d waived\n", now.Format(time.RFC3339),
-		st.LastSent.Add(pol.Report.Every()).Format(time.RFC3339), c.Fail, c.Warn, c.Pass, c.Waived)
+		next.Format(time.RFC3339), c.Fail, c.Warn, c.Pass, c.Waived)
 	notifyUser(ctx, env, pol.Notify, results, st, now, false, pol.Report.URL)
 	return nil
 }
@@ -548,6 +565,7 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 	rep := newReport(env, pol, results)
 	found := rep.CompromiseLines() // before evidence is left out: the details tell one sign from another
 	st.CompromiseFound = found
+	st.Failing = rep.Counts.Fail > 0 || len(found) > 0
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID
 	if pol.Report.IncludeIPs {
 		rep.Host.IPs = hostinfo.IPs()
@@ -703,8 +721,12 @@ func Status(env Env) (string, error) {
 	if refreshedFrom != "" {
 		fmt.Fprintf(&b, " (refreshed from %s)", refreshedFrom)
 	}
+	reports := pol.Report.Interval
+	if fe := pol.Report.FailEvery(); fe < pol.Report.Every() {
+		reports += " (every " + every(fe) + " while it fails a check)"
+	}
 	fmt.Fprintf(&b, "\nChecks:     every %s\nReports:    every %s to %s\nSends:      results, anything you ignored with your reason, and files set aside as likely sample keys; %s\nService:    %s\n",
-		pol.Report.CheckEvery(), pol.Report.Interval, hostOf(pol.Report.URL), sends(pol.Report), services.status())
+		pol.Report.CheckEvery(), reports, hostOf(pol.Report.URL), sends(pol.Report), services.status())
 	if pol.Report.CompromiseAlert {
 		fmt.Fprintf(&b, "Compromise: looked for every hour, and reported as soon as a sign is found (the other checks run every %s)\n", pol.Report.CheckEvery())
 	} else {
