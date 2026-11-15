@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+// noFailingChecks also turns off admin-rights, which fails where the tests run
+// as root (CI): these tests are about the schedule, and a fail would make the
+// machine report daily (report.fail_interval).
+var noFailingChecks = strings.TrimSuffix(allChecksOff, "}") + `, "admin-rights": {"enabled": false}}`
+
 // With report.check_interval the service checks more often than it reports:
 // a check between reports sends nothing.
 func TestChecksBetweenReports(t *testing.T) {
@@ -19,7 +24,7 @@ func TestChecksBetweenReports(t *testing.T) {
 		switch r.URL.Path {
 		case "/policies.json":
 			fmt.Fprintf(w, `{"name": "Weekly", "report": {"url": %q, "interval": "168h", "check_interval": "24h"}, %s}`,
-				srv.URL+"/report", allChecksOff)
+				srv.URL+"/report", noFailingChecks)
 		case "/report":
 			reports++
 		}
@@ -84,7 +89,7 @@ func TestFailingReportsDaily(t *testing.T) {
 		switch r.URL.Path {
 		case "/policies.json":
 			fmt.Fprintf(w, `{"name": "Weekly", "report": {"url": %q, "interval": "168h", "check_interval": "24h"}, %s}`,
-				srv.URL+"/report", allChecksOff)
+				srv.URL+"/report", noFailingChecks)
 		case "/report":
 			reports++
 		}
