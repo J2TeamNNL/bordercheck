@@ -5,15 +5,29 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ptrinh/bordercheck/internal/policy"
 )
 
-// noFailingChecks also turns off admin-rights, which fails where the tests run
-// as root (CI): these tests are about the schedule, and a fail would make the
-// machine report daily (report.fail_interval).
-var noFailingChecks = strings.TrimSuffix(allChecksOff, "}") + `, "admin-rights": {"enabled": false}}`
+// noFailingChecks turns off every check the policy knows (read from
+// policy.Checks, so a new check is covered too): these tests are about the
+// schedule, and a check that fails where they run (admin-rights as root on CI,
+// os-protections on a CI Mac) would make the machine report daily
+// (report.fail_interval).
+var noFailingChecks = func() string {
+	var parts []string
+	t := reflect.TypeOf(policy.Checks{})
+	for i := range t.NumField() {
+		if name, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ","); name != "" && name != "-" {
+			parts = append(parts, fmt.Sprintf("%q: {\"enabled\": false}", name))
+		}
+	}
+	return `"checks": {` + strings.Join(parts, ", ") + "}"
+}()
 
 // With report.check_interval the service checks more often than it reports:
 // a check between reports sends nothing.

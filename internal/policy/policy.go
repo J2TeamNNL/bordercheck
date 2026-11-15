@@ -59,13 +59,13 @@ type Report struct {
 	// reports, e.g. "24h" with a weekly report: the person at the machine hears
 	// about a new problem within a day, IT gets one report a week. "" = check
 	// only when a report is due.
-	CheckInterval   string   `json:"check_interval"`
+	CheckInterval string `json:"check_interval"`
 	// FailInterval is how often to report while the last check found the
 	// machine non-compliant (a fail) or with signs of compromise, when that is
 	// sooner than Interval: IT sees each day whether a weekly-reporting
 	// machine got fixed. "" = 24h; "0" = always Interval. Warnings alone
 	// ("attention") keep Interval.
-	FailInterval string `json:"fail_interval"`
+	FailInterval    string   `json:"fail_interval"`
 	IncludeEvidence bool     `json:"include_evidence"` // send file paths, ports, etc., not just pass/fail
 	EmailDomains    []string `json:"email_domains"`    // if set, the user's email must be in one of these
 	// IncludeIPs adds the machine's own interface addresses (host.ips) to the

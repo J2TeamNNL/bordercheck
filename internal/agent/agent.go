@@ -369,7 +369,9 @@ func schedule(r policy.Report) string {
 }
 
 // every is a duration as people write it: 24h, not 24h0m0s.
-func every(d time.Duration) string { return strings.TrimSuffix(strings.TrimSuffix(d.String(), "0s"), "0m") }
+func every(d time.Duration) string {
+	return strings.TrimSuffix(strings.TrimSuffix(d.String(), "0s"), "0m")
+}
 
 // printSends says, at install, when the report carries more than results.
 func printSends(w io.Writer, pol policy.Policy) {
