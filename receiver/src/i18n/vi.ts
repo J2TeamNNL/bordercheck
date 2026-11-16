@@ -124,7 +124,7 @@ export const vi: Catalog = {
   "mcp.tokenRead": "Chỉ đọc (tuỳ chọn)",
   "mcp.tokenCut": "Để cắt quyền, xoá secret (npx wrangler secret delete MCP_TOKEN) hoặc đặt token mới.",
   "mcp.addTitle": "2. Thêm vào Claude Code",
-  "mcp.addText": "Đặt token vào biến môi trường BORDERCHECK_MCP_TOKEN cho riêng lệnh này (đọc từ trình quản lý mật khẩu, đừng gõ để nó nằm lại trong lịch sử shell), rồi chạy:",
+  "mcp.addText": "Chép lệnh này, dán vào terminal rồi Enter; lệnh sẽ chờ token: dán token (không hiện gì) rồi Enter lần nữa. Token không bị lưu vào lịch sử shell.",
   "mcp.addCode": "Claude Code",
   "mcp.addNote": "Thêm --scope user để dùng trong mọi project. Claude Code lưu token dạng chữ trong file cài đặt của nó, nên với đồng nghiệp chỉ cần xem thì đưa token chỉ đọc.",
   "mcp.others": "Claude Desktop cần cầu nối mcp-remote, còn connector thêm trên claude.ai thì không dùng được (cần OAuth): xem mục “MCP server” trong README của portal.",

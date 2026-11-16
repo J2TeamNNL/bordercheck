@@ -28,6 +28,11 @@ import { randomB64url, sha256hex } from "./tokens";
 export const newAdminToken = () => ADMIN_TOKEN_PREFIX + randomB64url(32);
 export const newMcpToken = () => MCP_ADMIN_PREFIX + randomB64url(32);
 
+// mcpAddCommand: one line to paste as is. It waits for the token (pasted, not
+// echoed, never in the shell history), adds the server, and forgets it.
+export const mcpAddCommand = (url: string) =>
+  `read -rs BORDERCHECK_MCP_TOKEN && claude mcp add --transport http bordercheck ${url} --header "Authorization: Bearer $BORDERCHECK_MCP_TOKEN"; unset BORDERCHECK_MCP_TOKEN`;
+
 // ---- Names ----
 
 export const MAX_NAME = 40;
@@ -304,7 +309,7 @@ export function mcpTokenPage(
 ): Response {
   const access = L.s(write ? "admins.mcpWrite" : "admins.mcpRead");
   const name = o.name ?? "";
-  const add = `claude mcp add --transport http bordercheck ${url} --header "Authorization: Bearer $BORDERCHECK_MCP_TOKEN"`;
+  const add = mcpAddCommand(url);
   const [nav, back, backKey, current] = o.owner
     ? (["nav.mcp", "/admin/mcp", "mcp.back", "MCP"] as const)
     : (["nav.admins", "/admin/admins", "admins.back", "Admins"] as const);

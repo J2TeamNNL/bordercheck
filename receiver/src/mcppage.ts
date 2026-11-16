@@ -7,7 +7,7 @@
 // page), never wrangler commands they could not run.
 //   POST /admin/mcp/token          the owner's MCP token, read or write: shown once
 //   POST /admin/mcp/token-delete   remove it
-import { mcpTokenPage, newMcpToken } from "./admins";
+import { mcpAddCommand, mcpTokenPage, newMcpToken } from "./admins";
 import { audit } from "./audit";
 import { OWNER_MCP_KEY, ownerMcp, usableToken, type Viewer } from "./auth";
 import { publicOrigin } from "./enroll";
@@ -35,7 +35,7 @@ export async function mcpPage(env: Env, req: Request, v: Viewer, L: I18n, messag
   const list = (w: boolean) => html`<ul>${tools(w).map((t) => html`<li><code>${t.name}</code> <span class="muted">${t.annotations.title}</span></li>`)}</ul>`;
   const add = html`<h2>${L.t("mcp.addTitle")}</h2>
 <div class="panel"><p>${L.t("mcp.addText")}</p>
-${cmd("mcp-add", "mcp.addCode", `claude mcp add --transport http bordercheck ${url} --header "Authorization: Bearer $BORDERCHECK_MCP_TOKEN"`)}
+${cmd("mcp-add", "mcp.addCode", mcpAddCommand(url))}
 <p class="muted small">${L.t("mcp.addNote")}</p>
 <p class="muted small">${L.t("mcp.others")}</p></div>`;
 

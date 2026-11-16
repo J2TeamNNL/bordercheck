@@ -123,7 +123,7 @@ export const zh: Catalog = {
   "mcp.tokenRead": "只读（可选）",
   "mcp.tokenCut": "要撤销访问，删除该 secret（npx wrangler secret delete MCP_TOKEN）或设置新令牌。",
   "mcp.addTitle": "2. 添加到 Claude Code",
-  "mcp.addText": "仅为这一条命令把令牌放入环境变量 BORDERCHECK_MCP_TOKEN（从密码管理器读取，不要直接输入以免留在 shell 历史中），然后运行：",
+  "mcp.addText": "复制此命令，粘贴到终端并回车；命令会等待令牌：粘贴令牌（不会显示）后再次回车。令牌不会留在 shell 历史中。",
   "mcp.addCode": "Claude Code",
   "mcp.addNote": "加上 --scope user 可在所有项目中使用。Claude Code 会把令牌以明文保存在自己的设置文件中，因此只需查看的同事请给只读令牌。",
   "mcp.others": "Claude Desktop 需要 mcp-remote 桥接；在 claude.ai 上添加的连接器无法使用（需要 OAuth）：详见门户 README 中的“MCP server”一节。",

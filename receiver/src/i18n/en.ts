@@ -135,7 +135,7 @@ export const en = {
   "mcp.tokenRead": "Read only (optional)",
   "mcp.tokenCut": "To cut access, delete the secret (npx wrangler secret delete MCP_TOKEN) or set a new one.",
   "mcp.addTitle": "2. Add it to Claude Code",
-  "mcp.addText": "Put the token in the BORDERCHECK_MCP_TOKEN environment variable for this one command (read it from your password manager, not typed into the shell history), then run:",
+  "mcp.addText": "Copy this, paste it into a terminal and press Enter; it then waits for the token: paste it (nothing is shown) and press Enter again. The token is not kept in the shell history.",
   "mcp.addCode": "Claude Code",
   "mcp.addNote": "Add --scope user to have it in every project. Claude Code keeps the token in its own settings file in plain text, so give a colleague the read-only token where looking is enough.",
   "mcp.others": "Claude Desktop needs the mcp-remote bridge, and connectors added on claude.ai do not work (they need OAuth): see “MCP server” in the portal's README.",
