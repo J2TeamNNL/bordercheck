@@ -551,7 +551,7 @@ export const vi: Catalog = {
   "rep.howToFix": "Cách khắc phục",
   "rep.fixPromptTitle": "Sửa bằng trợ lý AI",
   "rep.fixPromptSub": "Dán vào Claude Code, ChatGPT Codex hoặc một trợ lý lập trình tương tự trên máy tính này",
-  "rep.fixPrompt": "BorderCheck (https://github.com/ptrinh/BorderCheck) là công cụ kiểm tra bảo mật mà tổ chức của tôi chạy trên máy tính này. Chạy `{cmd}` trên Claude Code/ChatGPT Codex rồi làm theo những gì nó in ra để sửa các vấn đề nó tìm thấy.",
+  "rep.fixPrompt": "BorderCheck (https://github.com/ptrinh/BorderCheck) là công cụ kiểm tra bảo mật mà tổ chức của tôi chạy trên máy tính này. Sử dụng Claude Code/ChatGPT Codex để chạy `{cmd}` rồi làm theo những gì nó in ra để sửa các vấn đề nó tìm thấy.",
   "rep.exemptedTitle": "Tạm miễn trừ ({n})",
   "rep.exemptedText": "IT đã đồng ý cho phép các mục này chờ đến ngày ghi bên dưới.",
   "rep.until": "Đến {date}",
