@@ -69,7 +69,8 @@ bordercheck -only secrets,mesh-vpn
 bordercheck -list
 ```
 
-A check marked **ℹ Info** found something worth knowing that is not a problem (an Android signing keystore, a
+A check marked **ℹ Info** found something worth knowing that is not a problem (an Android signing keystore, a key in [touchenv](https://github.com/ptrinh/touch-env) that looks highly
+sensitive yet is synced through iCloud or can be granted from afar, a
 cloud CLI's sign-in cache, keys in AI chat history): it keeps its status, never counts as a problem or alerts,
 and the portal can filter on it ("With info").
 

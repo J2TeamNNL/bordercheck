@@ -212,7 +212,9 @@ func secrets(p policy.Secrets, local Local) func(context.Context) check.Result {
 		}
 		u := newUserIgnore("secrets", local, p.UserIgnore, home)
 		sc := newSampleClassifier(ctx, p, home)
-		return evalSecretsSamples(found, bundles, incomplete, chats, secretFix(), u, sc)
+		r := evalSecretsSamples(found, bundles, incomplete, chats, secretFix(), u, sc)
+		text, ev := touchenvInfo(readTouchenv(ctx, runtime.GOOS), runtime.GOOS)
+		return withTouchenvInfo(r, text, ev)
 	}
 }
 

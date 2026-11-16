@@ -362,6 +362,18 @@
     "one": "For information: 1 cloud CLI sign-in is kept in plain text, as the CLI does by design; signing out removes it.",
     "other": "For information: {n} cloud CLI sign-ins are kept in plain text, as the CLIs do by design; signing out removes them."
   },
+  "secrets.touchenvCodes": {
+    "one": "For information: touchenv approves grants from afar with a code from an authenticator app; 1 key is within a code's reach.",
+    "other": "For information: touchenv approves grants from afar with a code from an authenticator app; {n} keys are within a code's reach."
+  },
+  "secrets.touchenvSensitive": {
+    "one": "For information: 1 key in touchenv that looks highly sensitive (an SSH key, or a production or signing key by its name) is synced through iCloud, so touchenv's own check guards it rather than the Touch ID lock. It is safest kept on this Mac only: [code]{cmd}[/code].",
+    "other": "For information: {n} keys in touchenv that look highly sensitive (SSH keys, or production or signing keys by their names) are synced through iCloud, so touchenv's own check guards them rather than the Touch ID lock. They are safest kept on this Mac only: [code]{cmd}[/code]."
+  },
+  "secrets.touchenvSensitiveWin": {
+    "one": "For information: 1 key in touchenv that looks highly sensitive (a production or signing key by its name) can be granted from afar, so the touchenv service keeps a copy of it outside Windows Hello. It is safest behind Windows Hello only: [code]{cmd}[/code].",
+    "other": "For information: {n} keys in touchenv that look highly sensitive (production or signing keys by their names) can be granted from afar, so the touchenv service keeps a copy of them outside Windows Hello. They are safest behind Windows Hello only: [code]{cmd}[/code]."
+  },
   "sharing.allowed": "On but allowed by policy: {services}.",
   "sharing.fix.cups": "[code]sudo cupsctl --no-share-printers[/code]",
   "sharing.fix.linuxGnome": "Settings → Sharing → File Sharing → off.",
