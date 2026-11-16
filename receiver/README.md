@@ -363,12 +363,17 @@ answers a score per device from BorderCheck's view of that machine:
 | Machine | Score |
 |---|---|
 | Compliant | 100 |
-| Warnings or errors only ("attention") | 80 (`POSTURE_SCORE_ATTENTION`) |
-| A check fails ("non-compliant") | 50 (`POSTURE_SCORE_FAILING`) |
-| Signs of compromise, silent for `SILENT_DAYS`, revoked, never reported, not enrolled, unknown | 0 |
+| Warnings or errors only ("attention"), within the role's `access.warn_grace` (default 7 days) | 90 |
+| A check fails ("non-compliant"), within the role's `access.fail_grace` (default 3 days) | 70 |
+| Past those grace periods | 0 |
+| Signs of compromise (always, no grace), silent for `SILENT_DAYS`, revoked, never reported, not enrolled, unknown | 0 |
 
-A policy requiring **score ≥ 60** keeps failing, compromised, silent and unknown machines out; **≥ 90** also
-those needing attention. Devices are matched by hardware serial number (BorderCheck v0.5.19 and later send it),
+A posture rule **score ≥ 60** then gives a machine time to fix what it found and takes access away after; a
+compromised machine loses it at once. The grace runs from when the oldest current warning (or fail) began,
+waived checks do not count, and each role sets its own in its policy:
+`"access": {"warn_grace": "168h", "fail_grace": "72h"}` (Go durations up to 90 days, `"0"` = no grace). Only the
+owner changes them: a named admin and MCP can't (spelling out the defaults is no change), and the portal leaves
+the section out of the policy it serves, so machines of any version accept the role. Devices are matched by hardware serial number (BorderCheck v0.5.19 and later send it),
 else by the user's email (from the invite) and short hostname; several matches take the lowest score. Devices
 need the Cloudflare One client (WARP; "Posture only" mode is enough), signed in with the same email the person
 was invited with.

@@ -372,6 +372,7 @@ export const zh: Catalog = {
   "v.mustList": "{where} 必须是列表",
   "v.noToken": "{where}：角色中不能包含报告令牌，每台设备使用自己的令牌",
   "v.minDuration": "{where} 必须是不短于 {min} 的时长，例如“24h”",
+  "v.grace": "{where} 必须为 \"0\" 或不超过 2160h（90 天）的时长，例如 \"72h\"。",
   "v.repo": "{where} 的格式应为 owner/name",
   "v.publicKey": "{where} 必须是 base64 编码的 ed25519 公钥",
   "v.duration": "{where} 必须是时长，例如“24h”或“0”",

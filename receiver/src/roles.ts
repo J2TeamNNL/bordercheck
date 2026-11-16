@@ -38,6 +38,38 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === "object" && !Array.isArray(v);
 
 // goDuration parses a Go time.Duration string ("24h", "1h30m", "0") into ms, or null.
+// The longest grace a role's access section may give (internal/policy MaxGrace).
+export const MAX_GRACE_MS = 90 * DAY;
+
+// accessGrace: a role's grace periods in ms (posture.ts): "0" = none, unset or
+// unreadable = the defaults, 7 days for warnings or errors, 3 days for a fail.
+export function accessGrace(policyText: string | null | undefined): { warn: number; fail: number } {
+  const out = { warn: 7 * DAY, fail: 3 * DAY };
+  try {
+    const a = (JSON.parse(policyText ?? "{}") as Obj).access;
+    if (isObj(a)) {
+      for (const [k, key] of [["warn", "warn_grace"], ["fail", "fail_grace"]] as const) {
+        const v = a[key];
+        if (v === "0") out[k] = 0;
+        else if (v !== undefined) {
+          const d = goDuration(v);
+          if (d !== null && d >= 0 && d <= MAX_GRACE_MS) out[k] = d;
+        }
+      }
+    }
+  } catch {
+    // keep the defaults
+  }
+  return out;
+}
+
+// sameGrace: two policies give the same grace periods (unset = the defaults).
+export function sameGrace(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = accessGrace(a);
+  const y = accessGrace(b);
+  return x.warn === y.warn && x.fail === y.fail;
+}
+
 export function goDuration(s: unknown): number | null {
   if (typeof s !== "string" || s === "") return null;
   if (s === "0") return 0;
@@ -94,7 +126,19 @@ export function validateRolePolicy(p: unknown, now: Date): Msg[] {
   const errs: Msg[] = [];
   const must = (key: "v.mustString" | "v.mustObject" | "v.mustBool" | "v.mustList", where: string) => errs.push(msg(key, { where }));
   if (!isObj(p)) return [msg("v.notObject")];
-  keysIn(p, ["name", "report", "update", "notify", "waivers", "checks"], "policy", errs);
+  keysIn(p, ["name", "report", "update", "notify", "access", "waivers", "checks"], "policy", errs);
+  if (p.access !== undefined) {
+    if (!isObj(p.access)) must("v.mustObject", "access");
+    else {
+      keysIn(p.access, ["warn_grace", "fail_grace"], "access", errs);
+      for (const k of ["warn_grace", "fail_grace"]) {
+        const v = p.access[k];
+        if (v === undefined || v === "0") continue;
+        const d = goDuration(v);
+        if (d === null || d < 0 || d > MAX_GRACE_MS) errs.push(msg("v.grace", { where: `access.${k}` }));
+      }
+    }
+  }
   if (p.name !== undefined && typeof p.name !== "string") must("v.mustString", "name");
 
   if (p.report !== undefined) {
@@ -244,6 +288,8 @@ export function composePolicy(
 ): Obj {
   const p = structuredClone(rolePolicy);
   if (typeof p.name !== "string" || !p.name) p.name = roleName;
+  // For the portal only (posture.ts): a machine older than v0.5.19 would refuse a policy with it.
+  delete p.access;
 
   const report = isObj(p.report) ? p.report : {};
   const headers: Obj = {};

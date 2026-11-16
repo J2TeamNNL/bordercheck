@@ -373,6 +373,7 @@ export const vi: Catalog = {
   "v.mustList": "{where} phải là danh sách",
   "v.noToken": "{where}: vai trò không được chứa token báo cáo; mỗi máy dùng token riêng",
   "v.minDuration": "{where} phải là thời lượng ít nhất {min}, ví dụ \"24h\"",
+  "v.grace": "{where} phải là \"0\" hoặc một khoảng thời gian tối đa 2160h (90 ngày), ví dụ \"72h\".",
   "v.repo": "{where} phải có dạng owner/name",
   "v.publicKey": "{where} phải là khoá công khai ed25519 dạng base64",
   "v.duration": "{where} phải là thời lượng, ví dụ \"24h\" hoặc \"0\"",

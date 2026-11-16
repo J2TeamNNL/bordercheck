@@ -393,6 +393,7 @@ export const en = {
   "v.mustList": "{where} must be a list",
   "v.noToken": "{where}: no report token in a role; each machine sends its own",
   "v.minDuration": "{where} must be a duration of at least {min}, like \"24h\"",
+  "v.grace": "{where} must be \"0\" or a duration up to 2160h (90 days), like \"72h\".",
   "v.repo": "{where} must look like owner/name",
   "v.publicKey": "{where} must be a base64 ed25519 public key",
   "v.duration": "{where} must be a duration like \"24h\" or \"0\"",

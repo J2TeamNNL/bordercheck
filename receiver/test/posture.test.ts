@@ -98,12 +98,33 @@ describe("device posture for Cloudflare Zero Trust", () => {
     ]);
     expect(r.status).toBe(200);
     const score = Object.fromEntries(Object.entries(r.body.result).map(([k, v]: [string, any]) => [k, v.score]));
-    expect(score).toEqual({ "d-ok": 100, "d-fail": 50, "d-warn": 80, "d-comp": 0, "d-rev": 0, "d-old": 0, "d-name": 100, "d-unknown": 0, "d-blank": 0 });
+    // Fresh fail and warning: within their grace; compromised: never.
+    expect(score).toEqual({ "d-ok": 100, "d-fail": 70, "d-warn": 90, "d-comp": 0, "d-rev": 0, "d-old": 0, "d-name": 100, "d-unknown": 0, "d-blank": 0 });
     expect(r.body.result["d-ok"].s2s_id).toBe("");
 
-    // Scores are configurable.
-    const strict = await ask([dev("d-warn", { serial_number: "C02WARN" })], service(), { ...E, POSTURE_SCORE_ATTENTION: "40" });
-    expect(strict.body.result["d-warn"].score).toBe(40);
+    // Past the grace (defaults: 3 days for a fail, 7 for a warning): 0.
+    const back = (id: string, days: number) =>
+      env.DB.prepare("UPDATE checks SET since = ? WHERE install_id = ?").bind(new Date(Date.now() - days * 86400_000).toISOString(), id).run();
+    await back(failing.install_id, 2.9);
+    await back(warn.install_id, 6.9);
+    let s2 = (await ask([dev("f", { serial_number: "C02FAIL" }), dev("w", { serial_number: "C02WARN" })])).body.result;
+    expect([s2.f.score, s2.w.score]).toEqual([70, 90]);
+    await back(failing.install_id, 3.1);
+    await back(warn.install_id, 7.1);
+    s2 = (await ask([dev("f", { serial_number: "C02FAIL" }), dev("w", { serial_number: "C02WARN" })])).body.result;
+    expect([s2.f.score, s2.w.score]).toEqual([0, 0]);
+  });
+
+  it("takes the grace periods from the role's access section", async () => {
+    stubCerts();
+    const m = await enrolled("an@domain.com", "Strict");
+    await env.DB.prepare("UPDATE roles SET policy = ? WHERE id = ?")
+      .bind(JSON.stringify({ access: { warn_grace: "720h", fail_grace: "0" } }), m.roleId).run();
+    await post(report(host("C02S"), [result("firewall", "fail", { severity: "high" })]), { token: m.token });
+    expect((await ask([dev("d", { serial_number: "C02S" })])).body.result.d.score).toBe(0); // no grace for a fail
+    await post(report(host("C02S"), [result("firewall", "warn")]), { token: m.token });
+    await env.DB.prepare("UPDATE checks SET since = ? WHERE install_id = ?").bind(new Date(Date.now() - 20 * 86400_000).toISOString(), m.install_id).run();
+    expect((await ask([dev("d", { serial_number: "C02S" })])).body.result.d.score).toBe(90); // 30 days for a warning
   });
 
   it("the serial from enrollment counts before the first report: still 0 (never reported)", async () => {
@@ -123,5 +144,40 @@ describe("device posture for Cloudflare Zero Trust", () => {
     const none = await call(new Request(`${BASE}/posture/cloudflare`, { method: "POST", body: "{}" }), E);
     expect(none.status).toBe(401);
     expect((await ask(Array.from({ length: 1001 }, (_, i) => dev(`d${i}`)))).status).toBe(400);
+  });
+});
+
+describe("the access section of a role", () => {
+  it("is validated, and never served to machines", async () => {
+    const { validateRolePolicy } = await import("../src/roles");
+    const now = new Date();
+    expect(validateRolePolicy({ access: { warn_grace: "168h", fail_grace: "0" } }, now)).toEqual([]);
+    for (const bad of [{ fail_grace: "3d" }, { warn_grace: "2161h" }, { extra: "1h" }]) {
+      expect(validateRolePolicy({ access: bad }, now).length).toBeGreaterThan(0);
+    }
+    const m = await enrolled("an@domain.com", "Dev");
+    await env.DB.prepare("UPDATE roles SET policy = ? WHERE id = ?").bind(JSON.stringify({ access: { fail_grace: "24h" } }), m.roleId).run();
+    const { getPolicy } = await import("./helpers");
+    const served = await (await getPolicy(m.token)).json<Record<string, unknown>>();
+    expect(served.access).toBeUndefined();
+    expect(served.report).toBeTruthy();
+  });
+});
+
+describe("who may change the grace periods", () => {
+  it("not MCP, not a named admin; spelling out the defaults is no change", async () => {
+    const { MCP_ROLE_RULES, policyGuard } = await import("../src/fleet");
+    expect(policyGuard({ access: { warn_grace: "168h", fail_grace: "72h" } }, {}, MCP_ROLE_RULES)).toEqual([]);
+    expect(policyGuard({ access: { fail_grace: "720h" } }, {}, MCP_ROLE_RULES).join()).toContain("access");
+
+    const { saveRole } = await import("../src/portal");
+    const adminId = (await env.DB.prepare("INSERT INTO admins (name, token_hash, created_at, created_by) VALUES ('Kien', 'x', '2026-01-01', 'test') RETURNING id").first<number>("id"))!;
+    const scope = { admin: adminId, roles: [] as number[] };
+    const ok = await saveRole(env, "Kien", { name: "Mine", policyText: JSON.stringify({ access: { warn_grace: "168h" } }) }, {}, scope);
+    expect(ok.ok).toBe(true);
+    const longer = await saveRole(env, "Kien", { name: "Mine2", policyText: JSON.stringify({ access: { fail_grace: "720h" } }) }, {}, scope);
+    expect(longer.ok).toBe(false);
+    const owner = await saveRole(env, "admin token", { name: "Mine3", policyText: JSON.stringify({ access: { fail_grace: "720h" } }) });
+    expect(owner.ok).toBe(true);
   });
 });

@@ -42,8 +42,20 @@ A small policy:
 | `report` | | Where and how often an installed copy reports; [below](#report) |
 | `update` | | Policy refresh and self-update; [below](#update) |
 | `notify` | | Desktop notifications; [below](#notify) |
+| `access` | | Grace periods for Zero Trust device posture, read by the portal only; [below](#access) |
 | `waivers` | `[]` | Per-machine exemptions; [below](#waivers) |
 | `checks` | | One object per check ID; [below](#checks) |
+
+## access
+
+Read by the portal only, for Zero Trust device posture (see the portal's README, "Device posture for
+Cloudflare Zero Trust"): how long a machine keeps access after it starts needing attention or failing a check.
+BorderCheck accepts the section and does nothing with it; the portal does not send it to machines.
+
+| Field | Default | |
+|---|---|---|
+| `warn_grace` | `"168h"` | Warnings or errors only: access is kept this long from when the oldest current one began. `"0"` = none. At most `2160h` (90 days). |
+| `fail_grace` | `"72h"` | A check fails: the same, from when the oldest current fail began. Signs of compromise never get any. |
 
 ## report
 

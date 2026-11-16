@@ -35,3 +35,18 @@ func TestFailIntervalValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestAccessGraceValidation(t *testing.T) {
+	if d := Default(); d.Access.WarnGrace != "168h" || d.Access.FailGrace != "72h" {
+		t.Errorf("defaults: %+v", d.Access)
+	}
+	for v, ok := range map[string]bool{"0": true, "72h": true, "2160h": true, "2161h": false, "-1h": false, "3d": false, "": false} {
+		p := Default()
+		p.Report.URL = "https://example.com/report"
+		p.Access.FailGrace = v
+		err := p.validate()
+		if ok != (err == nil) || (err != nil && !strings.Contains(err.Error(), "access.fail_grace")) {
+			t.Errorf("fail_grace %q: %v", v, err)
+		}
+	}
+}

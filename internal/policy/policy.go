@@ -25,12 +25,26 @@ type Policy struct {
 	Report Report `json:"report"`
 	Update Update `json:"update"`
 	Notify Notify `json:"notify"` // desktop notifications, see notify.go
+	Access Access `json:"access"` // read by the portal only, see Access
 
 	// Waivers exempt one machine from one check until a date; see waiver.go.
 	Waivers []Waiver `json:"waivers"`
 
 	Checks Checks `json:"checks"`
 }
+
+// Access is how long a machine keeps access through a Zero Trust device
+// posture check (the portal's /posture/cloudflare) after it starts needing
+// attention (warnings or errors) or failing a check: Go durations, "0" = not
+// at all. The portal reads them from the role; bordercheck itself only
+// accepts them (the portal leaves them out of the policy it serves).
+type Access struct {
+	WarnGrace string `json:"warn_grace"` // default "168h" (7 days)
+	FailGrace string `json:"fail_grace"` // default "72h" (3 days)
+}
+
+// MaxGrace is the longest grace period a policy may give.
+const MaxGrace = 90 * 24 * time.Hour
 
 // Update keeps an installed bordercheck and its policy current.
 type Update struct {
@@ -445,6 +459,7 @@ func Default() Policy {
 		Report: Report{Headers: map[string]string{}, Interval: "24h", EmailDomains: []string{}, IncludeIPs: false, IncludeLocation: false, FixPrompt: true, CompromiseAlert: true},
 		Update: Update{Interval: "24h", Repo: "ptrinh/bordercheck"},
 		Notify: defaultNotify(),
+		Access: Access{WarnGrace: "168h", FailGrace: "72h"},
 
 		Waivers: []Waiver{},
 
@@ -585,6 +600,14 @@ func (p Policy) validate() error {
 	if fi := p.Report.FailInterval; fi != "" && fi != "0" {
 		if d, err := time.ParseDuration(fi); err != nil || d < time.Hour {
 			return fmt.Errorf("report.fail_interval must be \"0\" (always report.interval), \"\" (24h) or a duration of at least 1h, like \"24h\", not %q", fi)
+		}
+	}
+	for name, v := range map[string]string{"access.warn_grace": p.Access.WarnGrace, "access.fail_grace": p.Access.FailGrace} {
+		if v == "0" {
+			continue
+		}
+		if d, err := time.ParseDuration(v); err != nil || d < 0 || d > MaxGrace {
+			return fmt.Errorf("%s must be \"0\" or a duration up to 2160h (90 days), like \"72h\", not %q", name, v)
 		}
 	}
 	u := p.Update

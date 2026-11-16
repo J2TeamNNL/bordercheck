@@ -37,7 +37,7 @@ import {
   saveRole,
 } from "./portal";
 import { type DeviceLocation, parseReport, statusRank } from "./report";
-import { POLICY_CHECKS } from "./roles";
+import { POLICY_CHECKS, sameGrace } from "./roles";
 import { inviteVisible, machineIn, machineVisible, roleAllowed, roleIn, type Scope, scopeBind } from "./scope";
 import { countLikelySamples, SAMPLE_RULES } from "./samples";
 
@@ -563,6 +563,7 @@ export function auditArgs(args: Record<string, unknown>): unknown {
 // together, rather than stopping at the guard rails.
 export interface RoleRules {
   surface: string; // "MCP", "the API": goes into the messages
+  lockAccess?: boolean; // the access grace periods can't be changed (compared by effect)
   locked: string[][];
   noEnable: string[][];
   allProblems: boolean;
@@ -581,6 +582,8 @@ export const MCP_ROLE_RULES: RoleRules = {
   locked: [...WHERE_TO, ["waivers"]],
   noEnable: [["report", "include_evidence"], ["report", "include_ips"], ["report", "include_location"]],
   allProblems: false,
+  // Lengthening how long a failing machine keeps access would loosen enforcement.
+  lockAccess: true,
 };
 
 // A script author holds a credential as strong as a dashboard admin's and
@@ -607,6 +610,9 @@ export function policyGuard(next: unknown, current: unknown, rules: RoleRules): 
   }
   for (const p of rules.noEnable) {
     if (at(next, p) === true && at(current, p) !== true) errs.push(`${p.join(".")}: can't be turned on through ${rules.surface} (it collects more data from laptops); change it in the dashboard`);
+  }
+  if (rules.lockAccess && !sameGrace(JSON.stringify(next ?? {}), JSON.stringify(current ?? {}))) {
+    errs.push(`access: the grace periods can't be changed through ${rules.surface}; change them in the dashboard`);
   }
   return errs;
 }

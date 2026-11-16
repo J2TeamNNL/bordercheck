@@ -22,14 +22,17 @@
 // a device whose serial matches no machine is matched by email and short
 // hostname instead. Several machines matching: the lowest score wins.
 //
-// Scores: 100 compliant; POSTURE_SCORE_ATTENTION (80) warnings or errors only;
-// POSTURE_SCORE_FAILING (50) a check fails; 0 signs of compromise, silent for
-// SILENT_DAYS, revoked, never reported, not enrolled, or unknown. So a policy
-// "score >= 60" blocks failing machines, ">= 90" also those needing attention.
+// Scores: 100 compliant; 90 warnings or errors only, within the role's
+// access.warn_grace (7 days) of when they began; 70 a check fails, within
+// access.fail_grace (3 days); 0 past those, and always for signs of
+// compromise, silent for SILENT_DAYS, revoked, never reported, not enrolled,
+// or unknown. A posture rule "score >= 60" then gives a machine time to fix
+// what it found and takes access away after; a compromised one loses it at once.
 
 import { accessClaims } from "./auth";
-import { config, type Env, num } from "./env";
+import { config, DAY, type Env } from "./env";
 import { json, readLimited, TooLarge } from "./ingest";
+import { accessGrace } from "./roles";
 
 export const MAX_POSTURE_DEVICES = 1000;
 const MAX_POSTURE_BYTES = 1024 * 1024;
@@ -52,18 +55,26 @@ interface Candidate {
   warn: number | null;
   error: number | null;
   compromised_since: string | null;
+  failing_since: string | null; // the oldest current fail began
+  attention_since: string | null; // the oldest current warn or error began
+  policy: string | null; // the role's policy (access grace periods)
 }
+
+export const SCORE = { ok: 100, attentionGrace: 90, failingGrace: 70, none: 0 } as const;
 
 const s = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 // The short hostname: "Kiens-MacBook-Pro.local" and "kiens-macbook-pro" are the same machine.
 export const shortHost = (h: string | null | undefined) => (h ?? "").trim().toLowerCase().split(".")[0];
 
 export function postureScore(c: Candidate, env: Env, now: Date): number {
-  const silentIso = new Date(now.getTime() - config(env).silentDays * 86400_000).toISOString();
-  if (c.revoked_at || !c.last_seen || c.compromised_since || c.last_seen < silentIso) return 0;
-  if ((c.fail ?? 0) > 0) return Math.min(100, Math.floor(num(env.POSTURE_SCORE_FAILING, 50, 0)));
-  if ((c.warn ?? 0) > 0 || (c.error ?? 0) > 0) return Math.min(100, Math.floor(num(env.POSTURE_SCORE_ATTENTION, 80, 0)));
-  return 100;
+  const silentIso = new Date(now.getTime() - config(env).silentDays * DAY).toISOString();
+  // Signs of compromise: no grace, ever.
+  if (c.compromised_since || c.revoked_at || !c.last_seen || c.last_seen < silentIso) return SCORE.none;
+  const grace = accessGrace(c.policy);
+  const within = (since: string | null, ms: number) => !!since && now.getTime() - Date.parse(since) < ms;
+  if ((c.fail ?? 0) > 0) return within(c.failing_since, grace.fail) ? SCORE.failingGrace : SCORE.none;
+  if ((c.warn ?? 0) > 0 || (c.error ?? 0) > 0) return within(c.attention_since, grace.warn) ? SCORE.attentionGrace : SCORE.none;
+  return SCORE.ok;
 }
 
 export async function handlePosture(req: Request, env: Env, now = new Date()): Promise<Response> {
@@ -99,8 +110,10 @@ export async function handlePosture(req: Request, env: Env, now = new Date()): P
     ? (
         await env.DB.prepare(
           `SELECT e.install_id, e.email, COALESCE(m.hostname, e.hostname) AS hostname, COALESCE(m.serial, e.serial) AS serial,
-                  e.revoked_at, m.last_seen, m.fail, m.warn, m.error, m.compromised_since
-           FROM enrollments e LEFT JOIN machines m ON m.install_id = e.install_id
+                  e.revoked_at, m.last_seen, m.fail, m.warn, m.error, m.compromised_since, r.policy,
+                  (SELECT MIN(c.since) FROM checks c WHERE c.install_id = e.install_id AND c.status = 'fail') AS failing_since,
+                  (SELECT MIN(c.since) FROM checks c WHERE c.install_id = e.install_id AND c.status IN ('warn', 'error')) AS attention_since
+           FROM enrollments e LEFT JOIN machines m ON m.install_id = e.install_id LEFT JOIN roles r ON r.id = e.role_id
            WHERE upper(COALESCE(m.serial, e.serial)) IN (SELECT value FROM json_each(?1))
               OR lower(e.email) IN (SELECT value FROM json_each(?2))`,
         ).bind(JSON.stringify(serials), JSON.stringify(emails)).all<Candidate>()

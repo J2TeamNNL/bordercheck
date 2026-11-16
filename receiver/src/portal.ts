@@ -12,7 +12,7 @@ import { commandBlock, installCommands, publicOrigin } from "./enroll";
 import { config, DAY, type Env } from "./env";
 import { COPY_HEADERS, copyButton, html, Html, layout, note, page, pill } from "./html";
 import { type I18n, type Key, type Msg, msg } from "./i18n";
-import { CHECK_ID_RE, POLICY_CHECKS, today, validateRolePolicy, waiverDateError } from "./roles";
+import { CHECK_ID_RE, POLICY_CHECKS, sameGrace, today, validateRolePolicy, waiverDateError } from "./roles";
 import { roleAllowed, roleIn, type Scope, scopeBind } from "./scope";
 import { newCode, newLinkId, sha256hex } from "./tokens";
 
@@ -148,7 +148,11 @@ function ownerOnlyChanges(next: string, current: string | null): string[] {
   };
   const a = parse(next);
   const b = parse(current);
-  return OWNER_ONLY_POLICY.filter((p) => at(a, p) !== at(b, p)).map((p) => p.join("."));
+  const out = OWNER_ONLY_POLICY.filter((p) => at(a, p) !== at(b, p)).map((p) => p.join("."));
+  // How long a machine keeps access while it fails decides enforcement: the
+  // owner's. Compared by effect, so spelling out the defaults is no change.
+  if (!sameGrace(next, current)) out.push("access");
+  return out;
 }
 
 export async function saveRole(
