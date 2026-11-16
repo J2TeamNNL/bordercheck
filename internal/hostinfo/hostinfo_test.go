@@ -47,3 +47,22 @@ func TestLocationNeverPrompts(t *testing.T) {
 		t.Errorf("Location = %v, %v", loc, err)
 	}
 }
+
+func TestSerialParsing(t *testing.T) {
+	out := `+-o J316sAP  <class IOPlatformExpertDevice>
+    {
+      "IOPlatformSerialNumber" = "C02XK1ABJG5H"
+      "IOPlatformUUID" = "00000000-0000-0000-0000-000000000000"
+    }`
+	if got := ioregSerial(out); got != "C02XK1ABJG5H" {
+		t.Errorf("ioreg: %q", got)
+	}
+	for in, want := range map[string]string{" ABC123\n": "ABC123", "To be filled by O.E.M.": "", "Default string": "", "0": "", "": "", "a\nb": ""} {
+		if got := cleanSerial(in); got != want {
+			t.Errorf("cleanSerial(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if s := Serial(t.Context()); len(s) > 64 {
+		t.Errorf("Serial: %q", s)
+	}
+}

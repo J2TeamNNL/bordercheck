@@ -14,6 +14,13 @@ export interface Env {
   // Vars (wrangler.jsonc "vars").
   ACCESS_TEAM_DOMAIN?: string; // e.g. sample.cloudflareaccess.com
   ACCESS_AUD?: string; // the Access application's AUD tag
+  // Cloudflare Zero Trust device posture (posture.ts): the AUD tag of the
+  // Access application in front of /posture/cloudflare (with ACCESS_TEAM_DOMAIN).
+  // Unset: that path answers 404.
+  POSTURE_ACCESS_AUD?: string;
+  POSTURE_CLIENT_ID?: string; // optional: only this Access service token's client ID may call it
+  POSTURE_SCORE_ATTENTION?: string; // score for warnings/errors only (default 80)
+  POSTURE_SCORE_FAILING?: string; // score while a check fails (default 50)
   DASHBOARD_URL?: string; // e.g. https://bordercheck.domain.com, for links in alerts
   ALLOWED_EMAIL_DOMAINS?: string; // comma-separated; reports from other emails are refused
   SILENT_DAYS?: string; // alert when a machine has not reported for this many days (default 7)

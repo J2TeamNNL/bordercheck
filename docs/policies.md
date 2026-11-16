@@ -47,7 +47,9 @@ A small policy:
 
 ## report
 
-Used only by an installed copy. A plain `bordercheck` never sends anything.
+Used only by an installed copy. A plain `bordercheck` never sends anything. From v0.5.19 the installed service's
+reports (and its enrollment) carry `host.serial`, the hardware serial number, so the portal can match a Zero
+Trust client's device to the machine; firmware placeholders such as "To be filled by O.E.M." are left out.
 
 | Field | Default | |
 |---|---|---|

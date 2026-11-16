@@ -19,6 +19,9 @@ type Host struct {
 	OS       string `json:"os"`
 	Arch     string `json:"arch"`
 	Hostname string `json:"hostname"`
+	// The hardware serial number, sent by the installed service (not a plain
+	// run) so the portal can tell which machine a Zero Trust client means.
+	Serial string `json:"serial,omitempty"`
 	// The machine's own interface addresses, sent by the installed service only
 	// when the policy sets report.include_ips.
 	IPs []string `json:"ips,omitempty"`

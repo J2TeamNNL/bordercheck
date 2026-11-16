@@ -28,6 +28,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/ptrinh/bordercheck/internal/hostinfo"
 	"github.com/ptrinh/bordercheck/internal/notify"
 	"github.com/ptrinh/bordercheck/internal/policy"
 	"github.com/ptrinh/bordercheck/internal/report"
@@ -215,7 +216,7 @@ func enroll(ctx context.Context, env Env, portal, code string) (enrollResponse, 
 	hostname, _ := os.Hostname()
 	body, err := json.Marshal(map[string]any{
 		"code":    code,
-		"host":    report.Host{OS: runtime.GOOS, Arch: runtime.GOARCH, Hostname: hostname},
+		"host":    report.Host{OS: runtime.GOOS, Arch: runtime.GOARCH, Hostname: hostname, Serial: hostinfo.Serial(ctx)},
 		"version": env.Version,
 	})
 	if err != nil {

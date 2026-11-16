@@ -569,6 +569,7 @@ func sendReport(ctx context.Context, env Env, cfg Config, pol policy.Policy, st 
 	st.CompromiseFound = found
 	st.Failing = rep.Counts.Fail > 0 || len(found) > 0
 	rep.Email, rep.InstallID = cfg.Email, cfg.InstallID
+	rep.Host.Serial = hostinfo.Serial(ctx)
 	if pol.Report.IncludeIPs {
 		rep.Host.IPs = hostinfo.IPs()
 	}

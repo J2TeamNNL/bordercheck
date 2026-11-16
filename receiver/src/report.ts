@@ -97,7 +97,7 @@ export interface Report {
   version: string;
   policy: string;
   time: string | null;
-  host: { os: string; arch: string; hostname: string };
+  host: { os: string; arch: string; hostname: string; serial: string }; // serial: newer installed services only, else ""
   email: string;
   installId: string;
   results: Result[];
@@ -263,7 +263,7 @@ export function parseReport(raw: unknown): Report {
     version: str(r.version, 64),
     policy: str(r.policy, 200),
     time: t,
-    host: { os: str(host.os, 32), arch: str(host.arch, 32), hostname: str(host.hostname, 255) },
+    host: { os: str(host.os, 32), arch: str(host.arch, 32), hostname: str(host.hostname, 255), serial: str(host.serial, 64).trim() },
     email: str(r.email, 254).trim().toLowerCase(),
     installId: r.install_id,
     results,

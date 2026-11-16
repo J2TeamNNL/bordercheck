@@ -355,6 +355,48 @@ the English path in parentheses ("系统设置 → 网络 → 防火墙（System
 whichever language the OS is in; apps with no Chinese UI (Tailscale) stay English. Commands, flags, file paths,
 product names and URLs are never translated.
 
+## Device posture for Cloudflare Zero Trust: no access from a machine that fails
+
+Cloudflare One can ask the portal how each device stands before Access or Gateway lets it through. The portal
+answers a score per device from BorderCheck's view of that machine:
+
+| Machine | Score |
+|---|---|
+| Compliant | 100 |
+| Warnings or errors only ("attention") | 80 (`POSTURE_SCORE_ATTENTION`) |
+| A check fails ("non-compliant") | 50 (`POSTURE_SCORE_FAILING`) |
+| Signs of compromise, silent for `SILENT_DAYS`, revoked, never reported, not enrolled, unknown | 0 |
+
+A policy requiring **score ≥ 60** keeps failing, compromised, silent and unknown machines out; **≥ 90** also
+those needing attention. Devices are matched by hardware serial number (BorderCheck v0.5.19 and later send it),
+else by the user's email (from the invite) and short hostname; several matches take the lowest score. Devices
+need the Cloudflare One client (WARP; "Posture only" mode is enough), signed in with the same email the person
+was invited with.
+
+Set it up (Zero Trust dashboard, then `receiver/`):
+
+1. **Access → Service auth → Service tokens**: create one, e.g. `bordercheck-posture`. Keep its client ID and
+   secret in a password manager.
+2. **Access → Applications → Add → Self-hosted**: domain = the portal's host, path `posture/cloudflare`. One
+   policy, action **Service Auth**, include that service token. Copy the application's **AUD tag**.
+3. Tell the portal (`wrangler.jsonc` vars, then deploy): `ACCESS_TEAM_DOMAIN` = `<team>.cloudflareaccess.com`,
+   `POSTURE_ACCESS_AUD` = the AUD tag, optionally `POSTURE_CLIENT_ID` = the service token's client ID (then only
+   that token is answered). Setting `ACCESS_TEAM_DOMAIN` alone does not put the dashboard behind Access; that
+   still needs `ACCESS_AUD`.
+4. **Integrations → Service providers → Add → Custom service provider**: the service token's client ID and
+   secret, REST API URL `https://<portal>/posture/cloudflare`, and a polling frequency.
+5. **Reusable components → Posture checks → Service provider checks → Add**: provider = that integration,
+   **Score** greater than or equal to 60 (or your threshold). Through the API, give the check an expiry of at least
+   twice the polling frequency, so that if the portal cannot be reached devices fail instead of keeping an old
+   pass.
+6. Require that posture check in Access application policies (Require → Device posture) and, for private
+   networks and Tunnel, in Gateway network and HTTP policies ("Passed device posture checks").
+
+Only a service token is answered (an Access JWT for `POSTURE_ACCESS_AUD` with no email; 401 otherwise), at most
+1,000 devices per request; without `POSTURE_ACCESS_AUD` the path is 404. A change shows at Cloudflare's next
+poll, plus up to 5 minutes of Gateway caching, and does not end sessions already open. BorderCheck's view is
+what the machine reports about itself: it raises the bar, it is not hardware attestation.
+
 ## MCP server: ask Claude about the fleet
 
 `/mcp` is an [MCP](https://modelcontextprotocol.io) server, so an admin can have Claude look at the fleet and

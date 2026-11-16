@@ -79,6 +79,15 @@ export function resetAccessKeys() {
 // request carries a valid Access JWT for this application, else null.
 export async function accessIdentity(req: Request, env: Env, now = Date.now()): Promise<string | null> {
   if (!accessConfigured(env)) return null;
+  const p = await accessClaims(req, env, env.ACCESS_AUD!, now);
+  return p ? String(p.email || p.common_name || "Access") : null;
+}
+
+// accessClaims verifies the request's Access JWT (signed by the team in
+// ACCESS_TEAM_DOMAIN, for the application with AUD tag `audTag`, not expired)
+// and returns its claims, else null.
+export async function accessClaims(req: Request, env: Env, audTag: string, now = Date.now()): Promise<Record<string, unknown> | null> {
+  if (!env.ACCESS_TEAM_DOMAIN || !audTag) return null;
   const token = req.headers.get("cf-access-jwt-assertion");
   if (!token) return null;
   const parts = token.split(".");
@@ -97,12 +106,12 @@ export async function accessIdentity(req: Request, env: Env, now = Date.now()): 
     if (!ok) return null;
     const p = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[1])));
     const aud: unknown[] = Array.isArray(p.aud) ? p.aud : [p.aud];
-    if (!aud.includes(env.ACCESS_AUD)) return null;
+    if (!aud.includes(audTag)) return null;
     if (p.iss !== teamOrigin(env)) return null;
     const sec = now / 1000;
     if (typeof p.exp !== "number" || p.exp < sec) return null;
     if (typeof p.nbf === "number" && p.nbf > sec + 60) return null;
-    return String(p.email || p.common_name || "Access");
+    return p as Record<string, unknown>;
   } catch {
     return null;
   }

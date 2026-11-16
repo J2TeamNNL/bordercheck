@@ -71,6 +71,7 @@ export async function handleEnroll(req: Request, env: Env, now = new Date()): Pr
   const ts = now.toISOString();
   const db = env.DB;
   const hostname = str(h.hostname, 255);
+  const serial = str(h.serial, 64).trim() || null;
   const os = str(h.os, 32);
   const arch = str(h.arch, 32);
   const version = str(body.version, 64);
@@ -85,9 +86,9 @@ export async function handleEnroll(req: Request, env: Env, now = new Date()): Pr
        WHERE code_hash = ?3 AND ?4 = 1 AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?1`,
     ).bind(ts, installId, codeHash, wellFormed ? 1 : 0),
     db.prepare(
-      `INSERT INTO enrollments (install_id, token_hash, email, role_id, invite_id, hostname, os, arch, version, enrolled_at)
-       SELECT ?1, ?2, email, role_id, id, ?3, ?4, ?5, ?6, ?7 FROM invites WHERE code_hash = ?8 AND used_install_id = ?1`,
-    ).bind(installId, tokenHash, hostname, os, arch, version, ts, codeHash),
+      `INSERT INTO enrollments (install_id, token_hash, email, role_id, invite_id, hostname, os, arch, version, enrolled_at, serial)
+       SELECT ?1, ?2, email, role_id, id, ?3, ?4, ?5, ?6, ?7, ?9 FROM invites WHERE code_hash = ?8 AND used_install_id = ?1`,
+    ).bind(installId, tokenHash, hostname, os, arch, version, ts, codeHash, serial),
     db.prepare(
       `INSERT INTO audit (at, who, action, target, detail)
        SELECT ?1, 'enrollment', 'machine.enroll', ?2, json_object('invite', id, 'email', email, 'hostname', ?3)
