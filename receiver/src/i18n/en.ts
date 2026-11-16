@@ -577,7 +577,7 @@ export const en = {
   "rep.howToFix": "How to fix",
   "rep.fixPromptTitle": "Fix these with an AI assistant",
   "rep.fixPromptSub": "Paste into Claude Code or another coding assistant on this computer",
-  "rep.fixPrompt": "Run `{cmd}` and follow what it prints.",
+  "rep.fixPrompt": "BorderCheck (https://github.com/ptrinh/BorderCheck) is the security check my organisation runs on this computer. Run `{cmd}` and follow what it prints to fix what it found.",
   "rep.exemptedTitle": "Exempted for now ({n})",
   "rep.exemptedText": "IT has agreed these can wait until the date shown.",
   "rep.until": "Until {date}",

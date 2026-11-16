@@ -551,7 +551,7 @@ export const vi: Catalog = {
   "rep.howToFix": "Cách khắc phục",
   "rep.fixPromptTitle": "Sửa bằng trợ lý AI",
   "rep.fixPromptSub": "Dán vào Claude Code hoặc một trợ lý lập trình khác trên máy tính này",
-  "rep.fixPrompt": "Chạy `{cmd}` rồi làm theo những gì nó in ra.",
+  "rep.fixPrompt": "BorderCheck (https://github.com/ptrinh/BorderCheck) là công cụ kiểm tra bảo mật mà tổ chức của tôi chạy trên máy tính này. Chạy `{cmd}` rồi làm theo những gì nó in ra để sửa các vấn đề nó tìm thấy.",
   "rep.exemptedTitle": "Tạm miễn trừ ({n})",
   "rep.exemptedText": "IT đã đồng ý cho phép các mục này chờ đến ngày ghi bên dưới.",
   "rep.until": "Đến {date}",

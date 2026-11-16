@@ -550,7 +550,7 @@ export const zh: Catalog = {
   "rep.howToFix": "修复方法",
   "rep.fixPromptTitle": "让 AI 助手帮你修复",
   "rep.fixPromptSub": "粘贴到这台电脑上的 Claude Code 或其他编程助手中",
-  "rep.fixPrompt": "运行 `{cmd}`，然后按它输出的内容操作。",
+  "rep.fixPrompt": "BorderCheck（https://github.com/ptrinh/BorderCheck）是我所在的组织在这台电脑上运行的安全检查工具。运行 `{cmd}`，然后按它输出的内容操作，修复它发现的问题。",
   "rep.exemptedTitle": "暂时豁免（{n}）",
   "rep.exemptedText": "IT 团队已同意这些问题可以在所示日期前暂缓处理。",
   "rep.until": "截至 {date}",

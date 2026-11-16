@@ -16,7 +16,7 @@
 // ignore), only the number.
 //
 // When something fails or warns, the page also offers a one-line prompt for an
-// AI coding assistant ("Run `bordercheck fix` and follow what it prints") with
+// AI coding assistant (what BorderCheck is, with its link, then "Run `bordercheck fix` and follow what it prints") with
 // a Copy button. The prompt is the same for every report apart from where the
 // program lives on that OS: nothing the machine reported goes into it, the
 // findings and the rules for handling them are printed by bordercheck itself.
