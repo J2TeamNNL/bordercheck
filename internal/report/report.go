@@ -193,6 +193,9 @@ func (r Report) WriteText(w io.Writer, color bool) {
 		if res.Severity != "" && (res.Status == check.Fail || res.Status == check.Warn || res.Status == check.Waived) {
 			line += paint("\x1b[90m", " ["+string(res.Severity)+"]")
 		}
+		if len(res.Info) > 0 {
+			line += paint("\x1b[34m", "  ℹ Info")
+		}
 		fmt.Fprintln(w, line)
 		if res.Summary != "" {
 			fmt.Fprintln(w, "      "+res.Summary)
@@ -232,6 +235,9 @@ func (r Report) WriteText(w io.Writer, color bool) {
 			parts = append(parts, fmt.Sprintf("%d %s", p.n, p.name))
 		}
 	}
+	if n := r.WithInfo(); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d with info", n))
+	}
 	fmt.Fprintln(w, strings.Join(parts, " · "))
 	fmt.Fprintln(w, paint("\x1b[90m", "BorderCheck "+r.Version+" · "+Credit))
 }
@@ -247,6 +253,17 @@ func IgnoredLine(ig check.Ignored) string {
 		s += " (since " + ig.Since + ")"
 	}
 	return s
+}
+
+// WithInfo counts the results that carry Info (worth knowing, not a problem).
+func (r Report) WithInfo() int {
+	n := 0
+	for _, res := range r.Results {
+		if len(res.Info) > 0 {
+			n++
+		}
+	}
+	return n
 }
 
 // UserIgnored counts the findings set aside by the person at the machine, across all results.

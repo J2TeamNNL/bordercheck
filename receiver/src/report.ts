@@ -35,6 +35,9 @@ export interface Result {
   // Signs that hostile code is already on the machine (newer clients);
   // absent from older clients and from results that are not a fail.
   compromise?: Indicator[];
+  // Things worth knowing that are not a problem, as message parts (newer
+  // clients): shown as "Info", never counted as a problem.
+  info?: Part[];
 }
 
 // Indicator is one sign of compromise: what it is, as a message part, and
@@ -167,6 +170,7 @@ export interface Counts {
   pass: number;
   skip: number;
   other: number;
+  info: number; // checks carrying Info, whatever their status
 }
 
 export const KNOWN_STATUSES = ["fail", "error", "warn", "waived", "pass", "skip"] as const;
@@ -228,6 +232,8 @@ export function parseReport(raw: unknown): Report {
     if (ui?.length) res.user_ignored = ui;
     const ci = parseIndicators(o.compromise);
     if (ci?.length && status === "fail") res.compromise = ci;
+    const inf = parseParts(o.info);
+    if (inf?.length) res.info = inf.slice(0, 20);
     const ls = parseLikelySamples(o.likely_samples);
     if (ls?.length) res.likely_samples = ls;
     const w = obj(o.waived);
@@ -269,10 +275,11 @@ export function parseReport(raw: unknown): Report {
 }
 
 export function countResults(results: Result[]): Counts {
-  const c: Counts = { fail: 0, high_fail: 0, error: 0, warn: 0, waived: 0, pass: 0, skip: 0, other: 0 };
+  const c: Counts = { fail: 0, high_fail: 0, error: 0, warn: 0, waived: 0, pass: 0, skip: 0, other: 0, info: 0 };
   for (const r of results) {
-    if ((KNOWN_STATUSES as readonly string[]).includes(r.status)) c[r.status as keyof Counts]++;
+    if ((KNOWN_STATUSES as readonly string[]).includes(r.status)) c[r.status as (typeof KNOWN_STATUSES)[number]]++;
     else c.other++;
+    if (r.info?.length) c.info++;
     if (r.status === "fail" && r.severity === "high") c.high_fail++;
   }
   return c;

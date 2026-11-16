@@ -585,6 +585,10 @@ export const zh: Catalog = {
 
   "state.compromised": "疑似被入侵",
   "filter.compromised": "疑似被入侵",
+  "filter.info": "有提示信息",
+  "info.label": "ℹ 信息",
+  "rep.infoTitle": "值得了解",
+  "rep.infoText": "不是问题，无需修复：BorderCheck 发现的一些值得了解的情况。",
   "tile.compromised": "疑似被入侵",
   "tile.compromisedSub": "最新报告中有被入侵迹象",
   "machine.compTitle": "这台机器可能已被入侵",

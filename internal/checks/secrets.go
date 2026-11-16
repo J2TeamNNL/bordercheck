@@ -505,7 +505,7 @@ func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool
 		}
 		return true
 	})
-	var note msg.Text
+	var note, info msg.Text // info: the headline of each kind of information, for Result.Info
 	if incomplete {
 		note = msg.Of("secrets.incomplete")
 	}
@@ -515,20 +515,23 @@ func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool
 			chatFiles[f.path] = true
 		}
 		note = append(msg.Of("secrets.chatInfo", "n", len(chats), "files", len(chatFiles)), note...)
+		info = append(info, msg.Of("secrets.chatInfo", "n", len(chats), "files", len(chatFiles))...)
 	}
 	if len(signIns) > 0 {
-		info := msg.Of("secrets.signInInfo", "n", len(signIns))
+		head := msg.Of("secrets.signInInfo", "n", len(signIns))
+		info = append(head, info...)
 		seen := map[string]bool{}
 		for _, f := range signIns {
 			if key := credFix[f.kind]; key != "" && !seen[key] {
 				seen[key] = true
-				info = append(info, msg.P(key))
+				head = append(head, msg.P(key))
 			}
 		}
-		note = append(info, note...)
+		note = append(head, note...)
 	}
 	if len(stores) > 0 {
 		note = append(msg.Of("secrets.keystoreInfo", "n", len(stores)), note...)
+		info = append(msg.Of("secrets.keystoreInfo", "n", len(stores)), info...)
 	}
 	if cs.unguarded {
 		note = append(note, msg.P("secrets.chatGuard"))
@@ -559,7 +562,7 @@ func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool
 		if sn := sc.note(); sn != nil {
 			head, keep = msg.Of("samples.all", "n", len(sc.found)), append(sn, note...)
 		}
-		r := check.Result{Status: check.Pass, Evidence: capEvidence(chatEv)}.WithSummary(append(head, note...))
+		r := check.Result{Status: check.Pass, Evidence: capEvidence(chatEv), Info: info}.WithSummary(append(head, note...))
 		return sc.finish(u.finish(r, keep))
 	}
 	note = append(sc.note(), note...)
@@ -583,7 +586,7 @@ func evalSecretsSamples(found []secretFinding, bundles []string, incomplete bool
 	if prod > 0 {
 		summary = msg.Of("secrets.foundProd", "n", len(found)+len(bundles), "files", len(files), "prod", prod)
 	}
-	r := check.Result{Status: check.Warn, Severity: check.Medium, Evidence: ev}.
+	r := check.Result{Status: check.Warn, Severity: check.Medium, Evidence: ev, Info: info}.
 		WithSummary(append(summary, note...)).WithFix(fixFor(fix, found, bundles))
 	if high {
 		r.Status, r.Severity = check.Fail, check.High

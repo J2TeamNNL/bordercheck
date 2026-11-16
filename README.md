@@ -69,6 +69,10 @@ bordercheck -only secrets,mesh-vpn
 bordercheck -list
 ```
 
+A check marked **ℹ Info** found something worth knowing that is not a problem (an Android signing keystore, a
+cloud CLI's sign-in cache, keys in AI chat history): it keeps its status, never counts as a problem or alerts,
+and the portal can filter on it ("With info").
+
 Exit status: `0` no failures (waived ones do not count), `1` at least one failure, `2` error. A plain run only
 reads: it changes nothing and sends nothing. `sudo bordercheck` also shows ports held by system services on
 macOS. macOS binaries are signed and notarized; Windows binaries are not Authenticode-signed yet.

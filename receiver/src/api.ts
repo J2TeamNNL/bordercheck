@@ -441,7 +441,7 @@ export const ROUTES: Route[] = [
     summary: "Machines, by install_id. Filter by state, role, a check's status, or a substring of email or hostname.",
     description: "state=no_report lists enrolled machines that have not reported yet. Hostname, OS and version are machine-supplied (under untrusted). No evidence or IP addresses here.",
     query: {
-      state: { type: "string", enum: [...Object.keys(FILTERS), "no_report"], default: "all", description: "all, compromised (the latest report shows signs of compromise), failing (a check fails), attention (fail, error or warn), silent, revoked, no_report." },
+      state: { type: "string", enum: [...Object.keys(FILTERS), "no_report"], default: "all", description: "all, compromised (the latest report shows signs of compromise), failing (a check fails), attention (fail, error or warn), silent, revoked, info (a check carries Info: worth knowing, not a problem), no_report." },
       role_id: { type: "integer", minimum: 1, description: "Only machines in this role." },
       check: { type: "string", pattern: "^[a-z0-9][a-z0-9-]{0,63}$", description: "Only machines whose latest report has this check (at check_status)." },
       check_status: { type: "string", enum: KNOWN_STATUSES, default: "fail", description: "With check: the status to match (default fail)." },

@@ -225,6 +225,12 @@ export interface HasText {
   fix_parts?: Part[];
 }
 
+// infoItems: each Info message of a result in the reader's language (unknown
+// keys are left out: Info is a hint, its text is in the summary too).
+export function infoItems(L: I18n, info: Part[] | undefined): Html[] {
+  return (info ?? []).map((p) => renderParts(L, [p])).filter((x): x is Html => !!x);
+}
+
 // summaryHtml: the result's summary in the reader's language, else the English the machine sent.
 export function summaryHtml(L: I18n, r: HasText): Html {
   return renderParts(L, r.summary_parts) ?? new Html(escape(r.summary));

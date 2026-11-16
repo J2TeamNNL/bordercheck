@@ -27,7 +27,7 @@
 
 import { config, type Env } from "./env";
 import { CAPABILITY_HEADERS, SELF, tooManyRequests } from "./enroll";
-import { fixHtml, summaryHtml } from "./checktext";
+import { fixHtml, infoItems, summaryHtml } from "./checktext";
 import { checkTitle, forRequest, type I18n } from "./i18n";
 import { badge, COPY_HEADERS, copyButton, Html, html, layout, MARK, page, sev, statusClass } from "./html";
 
@@ -141,6 +141,7 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
     !compromised && problems.some((r) => r.status === "fail" || r.status === "warn") && fixSupported(version) && fixAllowed(row.role_policy)
       ? html`<div class="cmd fixp"><div class="cmd-h"><b>${L.t("rep.fixPromptTitle")}</b><span>${L.t("rep.fixPromptSub")}</span>${copyButton(L, "fix-prompt", "copy.prompt")}</div><code class="msg" tabindex="0" id="fix-prompt">${L.s("rep.fixPrompt", { cmd: fixCommand(os) })}</code></div>`
       : "";
+  const infoResults = results.filter((r) => infoItems(L, r.info).length > 0);
   const headline = problems.length === 0 ? L.t("rep.allClear") : L.t("rep.toFixHeadline", { n: problems.length });
   const body = html`<div class="status-mark ${tone}">${problems.length === 0 ? GLYPH_OK : GLYPH_ATTENTION}</div>
 <p class="eyebrow">${L.t("rep.eyebrow")}</p>${compBanner}<h1>${headline}</h1>
@@ -164,6 +165,11 @@ ${waived.length
 <div class="waiver">${L.t("rep.until", { date: r.waived?.until ? L.day(r.waived.until) : "?" })}${r.waived?.reason ? html`: <span class="body">${r.waived.reason}</span>` : ""}</div>
 ${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}</div>`,
       )}`
+    : ""}
+${infoResults.length
+    ? html`<h2>${L.t("rep.infoTitle")}</h2><p class="dim">${L.t("rep.infoText")}</p><ul>${infoResults.map(
+        (r) => html`<li><b>${checkTitle(L, r.id, r.title)}</b>: ${infoItems(L, r.info).map((x, i) => html`${i ? " · " : ""}${x}`)}</li>`,
+      )}</ul>`
     : ""}
 ${disabled.length
     ? html`<h2>${L.t("rep.disabledTitle", { n: disabled.length })}</h2><ul>${disabled.map((r) => html`<li>${checkTitle(L, r.id, r.title)}</li>`)}</ul>`

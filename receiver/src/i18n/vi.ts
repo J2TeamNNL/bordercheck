@@ -586,6 +586,10 @@ export const vi: Catalog = {
 
   "state.compromised": "có dấu hiệu bị xâm nhập",
   "filter.compromised": "Bị xâm nhập",
+  "filter.info": "Có thông tin",
+  "info.label": "ℹ Info",
+  "rep.infoTitle": "Thông tin nên biết",
+  "rep.infoText": "Không phải lỗi, không cần sửa: những thứ BorderCheck tìm thấy và bạn nên biết.",
   "tile.compromised": "Bị xâm nhập",
   "tile.compromisedSub": "báo cáo mới nhất có dấu hiệu bị xâm nhập",
   "machine.compTitle": "Máy này có thể đã bị xâm nhập",

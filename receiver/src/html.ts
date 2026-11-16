@@ -409,7 +409,7 @@ details.alt>div{padding:0 22px 22px}
 :lang(vi) h1{line-height:1.15}
 
 /* Status tones last, so they override each component's default --c. */
-.s-fail{--c:var(--fail)}.s-warn{--c:var(--warn)}.s-error{--c:var(--err)}.s-pass{--c:var(--ok)}.s-skip{--c:var(--skip)}.s-waived{--c:var(--waived)}.s-other{--c:var(--other)}
+.s-fail{--c:var(--fail)}.s-warn{--c:var(--warn)}.s-error{--c:var(--err)}.s-pass{--c:var(--ok)}.s-skip{--c:var(--skip)}.s-waived{--c:var(--waived)}.s-other{--c:var(--other)}.s-info{--c:var(--accent)}
 @media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:640px){
 .top{gap:10px 12px;padding:10px 16px}

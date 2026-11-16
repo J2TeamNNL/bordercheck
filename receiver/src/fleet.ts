@@ -190,6 +190,8 @@ export function machineSummary(env: Env, m: MachineListRow, silentIso: string) {
     compromised: !!m.compromised_since,
     compromised_since: m.compromised_since ?? null,
     counts: counts(m),
+    // Checks carrying Info: worth knowing, not a problem (never part of state).
+    info_checks: m.info ?? 0,
     place: cfg.storeGeo ? place(parseGeo(m.geo)) || null : null,
     untrusted: {
       hostname: clean(m.hostname, 100),
@@ -355,6 +357,7 @@ export async function machineDetail(env: Env, id: string, o: { evidence?: boolea
     const ref = checkRef(r.id);
     return {
       check_id: ref.check_id,
+      ...infoOf(r),
       status: statusOf(r.status),
       severity: severityOf(r.severity),
       since: since.get(r.id) ?? null,
@@ -369,7 +372,7 @@ export async function machineDetail(env: Env, id: string, o: { evidence?: boolea
       },
     };
   });
-  out.passing_checks = fine.filter((r) => known(r.id)).map((r) => ({ check_id: r.id, status: r.status }));
+  out.passing_checks = fine.filter((r) => known(r.id)).map((r) => ({ check_id: r.id, status: r.status, ...infoOf(r) }));
   const otherPassing = fine.filter((r) => !known(r.id));
   if (otherPassing.length) out.untrusted = { other_passing_check_ids: otherPassing.slice(0, 50).map((r) => clean(r.id, 64)) };
   // What the person at the machine marked as not sensitive (bordercheck
@@ -451,6 +454,13 @@ export async function machineDetail(env: Env, id: string, o: { evidence?: boolea
     };
   }
   return okData(out);
+}
+
+// infoOf: a result's Info as message keys BorderCheck knows (worth knowing,
+// not a problem); a key it does not know is left out.
+function infoOf(r: { info?: { key: string }[] }): { info?: string[] } {
+  const keys = (r.info ?? []).map((p) => p.key).filter((k) => Object.hasOwn(checksEn, k));
+  return keys.length ? { info: keys } : {};
 }
 
 export function checkStatItem(c: CheckStat) {

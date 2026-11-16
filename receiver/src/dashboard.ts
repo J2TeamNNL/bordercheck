@@ -1,5 +1,5 @@
 import { config, DAY, type Env } from "./env";
-import { fixHtml, renderParts, summaryHtml } from "./checktext";
+import { fixHtml, infoItems, renderParts, summaryHtml } from "./checktext";
 import { badge, count, html, type Html, layout, note, page, pct, pill, sev, statusClass } from "./html";
 import { type Geo, mapLink, parseGeo, place } from "./geo";
 import { checkTitle, type I18n, type Key } from "./i18n";
@@ -27,6 +27,7 @@ export interface MachineRow {
   pass: number;
   skip: number;
   other: number;
+  info: number; // checks carrying Info (migration 0008)
   // When the current run of reports saying "compromised" began; null when the
   // latest report does not say so (and for older clients).
   compromised_since: string | null;
@@ -39,6 +40,7 @@ export const FILTERS = {
   attention: { label: "Fail, error or warn", key: "filter.attention", where: "(m.fail > 0 OR m.error > 0 OR m.warn > 0)" },
   silent: { label: "Silent", key: "filter.silent", where: "m.last_seen < ?2" },
   revoked: { label: "Revoked", key: "filter.revoked", where: "e.revoked_at IS NOT NULL" },
+  info: { label: "With info", key: "filter.info", where: "m.info > 0" },
 } as const satisfies Record<string, { label: string; key: Key; where: string }>;
 export type Filter = keyof typeof FILTERS;
 
@@ -84,7 +86,7 @@ export async function machineRows(env: Env, o: MachineQuery): Promise<MachineLis
     : "m.compromised_since IS NOT NULL DESC, m.fail > 0 DESC, m.high_fail DESC, m.fail DESC, m.last_seen DESC";
   const rows = await env.DB.prepare(
     `SELECT m.install_id, m.email, m.hostname, m.os, m.arch, m.version, m.policy, m.first_seen, m.last_seen, m.report_time,
-            m.fail, m.high_fail, m.error, m.warn, m.waived, m.pass, m.skip, m.other, m.compromised_since, m.public_ip, m.geo,
+            m.fail, m.high_fail, m.error, m.warn, m.waived, m.pass, m.skip, m.other, m.info, m.compromised_since, m.public_ip, m.geo,
             e.install_id IS NOT NULL AS enrolled, e.revoked_at, r.name AS role,
             (SELECT MIN(c.since) FROM checks c WHERE c.install_id = m.install_id AND c.status = 'fail') AS failing_since
      ${MACHINE_FROM}
@@ -138,7 +140,19 @@ function state(L: I18n, m: MachineRow, silentBefore: string): Html {
   else if (m.error || m.warn) parts.push(pill("s-warn", L.t("state.attention")));
   else parts.push(pill("s-pass", L.t("state.ok")));
   if (m.last_seen < silentBefore) parts.push(pill("s-skip", L.t("state.silent")));
+  if (m.info) parts.push(pill("s-info", L.t("info.label")));
   return html`${parts}`;
+}
+
+// unescapeText: entities back to characters (the title attribute escapes again).
+const unescapeText = (s: string) =>
+  s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+
+// infoPill: "ℹ Info" next to a check that carries Info, its messages as the tooltip.
+function infoPill(L: I18n, r: Result): Html | string {
+  if (!r.info?.length) return "";
+  const tip = infoItems(L, r.info).map((h) => unescapeText(h.toString().replace(/<[^>]*>/g, ""))).join(" · ");
+  return html` <span class="pill s-info" title="${tip}">${L.t("info.label")}</span>`;
 }
 
 const machineLink = (id: string) => `/admin/machine/${encodeURIComponent(id)}`;
@@ -335,7 +349,7 @@ function whereSection(L: I18n, m: { public_ip: string; geo: string; local_ips: s
 
 function resultCard(L: I18n, r: Result, since: string | undefined, now: number): Html {
   return html`<div class="result ${statusClass(r.status)}"><div class="head">${badge(L, r.status)} ${sev(L, r.severity)}
-<h3>${checkTitle(L, r.id, r.title)}</h3> <code class="muted">${r.id}</code>${since ? html`<span class="since">${L.t("machine.since", { when: L.when(since) })}</span>` : ""}</div>
+<h3>${checkTitle(L, r.id, r.title)}</h3> <code class="muted">${r.id}</code>${infoPill(L, r)}${since ? html`<span class="since">${L.t("machine.since", { when: L.when(since) })}</span>` : ""}</div>
 ${waiverNote(L, r, now)}
 ${r.summary ? html`<div class="body">${summaryHtml(L, r)}</div>` : ""}
 ${r.evidence.length ? html`<ul class="evidence">${r.evidence.map((e) => html`<li class="ev">${e}</li>`)}</ul>` : ""}
@@ -451,7 +465,7 @@ ${problems.map((r) => resultCard(L, r, since.get(r.id), now))}
 <h2>${L.t("machine.fine", { n: fine.length })}</h2>
 ${fine.length
     ? html`<div class="compact">${fine.map(
-        (r) => html`<div>${badge(L, r.status)}<div><div class="t">${checkTitle(L, r.id, r.title)}</div><div class="sub"><code>${r.id}</code>${r.summary ? html` · ${summaryHtml(L, r)}` : ""}</div>${userIgnoredList(L, r)}${likelySamplesList(L, r.likely_samples)}</div></div>`,
+        (r) => html`<div>${badge(L, r.status)}<div><div class="t">${checkTitle(L, r.id, r.title)}${infoPill(L, r)}</div><div class="sub"><code>${r.id}</code>${r.summary ? html` · ${summaryHtml(L, r)}` : ""}</div>${userIgnoredList(L, r)}${likelySamplesList(L, r.likely_samples)}</div></div>`,
       )}</div>`
     : html`<div class="panel"><p class="muted">${L.t("common.none")}</p></div>`}
 <h2>${L.t("machine.details")}</h2>

@@ -48,6 +48,11 @@ type Result struct {
 	// by Consistent when the text was changed some other way.
 	SummaryParts msg.Text `json:"summary_parts,omitempty"`
 	FixParts     msg.Text `json:"fix_parts,omitempty"`
+	// Info lists things worth knowing that are not a problem (Android signing
+	// keystores, sign-in caches, keys in AI chat history), one message per
+	// kind, shown as "Info". It never changes the status, the counts, alerts
+	// or how often the machine reports. Its text is also in Summary.
+	Info msg.Text `json:"info,omitempty"`
 	// Waived is set when Status is Waived.
 	Waived *Waiver `json:"waived,omitempty"`
 	// WaiverEnded is the end date (YYYY-MM-DD) of a waiver that matched this

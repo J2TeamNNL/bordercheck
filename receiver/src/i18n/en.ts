@@ -613,6 +613,10 @@ export const en = {
   // Signs of compromise
   "state.compromised": "compromised",
   "filter.compromised": "Compromised",
+  "filter.info": "With info",
+  "info.label": "ℹ Info",
+  "rep.infoTitle": "Good to know",
+  "rep.infoText": "Not a problem, nothing to fix: things BorderCheck found that are worth knowing about.",
   "tile.compromised": "Compromised",
   "tile.compromisedSub": "signs of compromise in the latest report",
   "machine.compTitle": "This machine may be compromised",

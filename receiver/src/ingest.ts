@@ -151,16 +151,16 @@ export async function handleReport(
     db.prepare(
       `INSERT INTO machines (install_id, email, hostname, os, arch, version, policy, first_seen, last_seen, report_time,
          fail, high_fail, error, warn, waived, pass, skip, other, report, silent_alerted_at,
-         public_ip, geo, local_ips, device_location, compromised_since)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, NULL, ?19, ?20, ?21, ?22, ?23)
+         public_ip, geo, local_ips, device_location, compromised_since, info)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, NULL, ?19, ?20, ?21, ?22, ?23, ?24)
        ON CONFLICT (install_id) DO UPDATE SET email = ?2, hostname = ?3, os = ?4, arch = ?5, version = ?6,
          policy = ?7, last_seen = ?8, report_time = ?9, fail = ?10, high_fail = ?11, error = ?12, warn = ?13,
          waived = ?14, pass = ?15, skip = ?16, other = ?17, report = ?18, silent_alerted_at = NULL,
-         public_ip = ?19, geo = ?20, local_ips = ?21, device_location = ?22, compromised_since = ?23`,
+         public_ip = ?19, geo = ?20, local_ips = ?21, device_location = ?22, compromised_since = ?23, info = ?24`,
     ).bind(
       id, rep.email, rep.host.hostname, rep.host.os, rep.host.arch, rep.version, rep.policy, ts, rep.time,
       counts.fail, counts.high_fail, counts.error, counts.warn, counts.waived, counts.pass, counts.skip, counts.other,
-      storedText, ip, geoJson, ipsJson, devJson, compromisedSince,
+      storedText, ip, geoJson, ipsJson, devJson, compromisedSince, counts.info,
     ),
   );
 

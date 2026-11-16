@@ -123,6 +123,9 @@ func TestKeystoreAloneIsInformation(t *testing.T) {
 	if r.Status != check.Pass || !strings.Contains(strings.Join(r.Evidence, "\n"), "[keystore, information]") {
 		t.Errorf("status %v, evidence %q", r.Status, r.Evidence)
 	}
+	if len(r.Info) != 1 || r.Info[0].Key != "secrets.keystoreInfo" {
+		t.Errorf("info %+v, want the keystore message", r.Info)
+	}
 	// In the Trash it counts. (The Windows Recycle Bin names files differently; TestRecycledName covers it.)
 	if runtime.GOOS == "windows" {
 		return
