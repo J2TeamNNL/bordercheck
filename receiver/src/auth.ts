@@ -288,6 +288,21 @@ export async function adminByMcpToken(env: Env, token: string): Promise<{ id: nu
   }
 }
 
+// The owner's MCP token, made on the MCP page (mcppage.ts): sees everything,
+// like MCP_TOKEN / MCP_READ_TOKEN. Kept in meta as JSON {hash, write, at}.
+export const OWNER_MCP_KEY = "owner_mcp";
+
+export async function ownerMcp(env: Env): Promise<{ hash: string; write: boolean; at: string } | null> {
+  try {
+    const v = await env.DB.prepare("SELECT value FROM meta WHERE key = ?").bind(OWNER_MCP_KEY).first<string>("value");
+    if (!v) return null;
+    const o = JSON.parse(v) as { hash?: unknown; write?: unknown; at?: unknown };
+    return typeof o.hash === "string" ? { hash: o.hash, write: o.write === true, at: String(o.at ?? "") } : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function adminById(env: Env, id: number): Promise<AdminRow | null> {
   try {
     return await env.DB.prepare("SELECT id, name, gen FROM admins WHERE id = ?").bind(id).first<AdminRow>();

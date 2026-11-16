@@ -52,7 +52,7 @@ import {
   SIGNED_OUT,
 } from "./passkeys";
 import { hit } from "./ratelimit";
-import { mcpPage } from "./mcppage";
+import { deleteOwnerMcp, mcpPage, newOwnerMcp } from "./mcppage";
 import { inviteVisible, machineVisible, roleAllowed } from "./scope";
 
 const MAX_FORM_BYTES = 512 * 1024;
@@ -221,6 +221,8 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
     return m[2] === "revoke" ? revokeInvite(env, url, v.who, Number(m[1]), L, scope) : reissueInvite(env, req, url, v.who, Number(m[1]), L, scope);
   }
   if (path === "/admin/mcp" && req.method === "GET") return mcpPage(env, req, v, L);
+  if (path === "/admin/mcp/token" && req.method === "POST") return newOwnerMcp(env, req, v, await formOf(req), L);
+  if (path === "/admin/mcp/token-delete" && req.method === "POST") return deleteOwnerMcp(env, req, v, L);
   if (path === "/admin/audit" && req.method === "GET") return auditPage(env, url, v.who, L, scope);
 
   // Passkeys: for the token/session sign-in only. Under Cloudflare Access (or

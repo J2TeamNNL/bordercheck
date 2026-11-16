@@ -150,6 +150,26 @@ describe("admin MCP tokens", () => {
     page = await (await call(new Request(`${BASE}/admin/mcp`, { headers: as }))).text();
     expect(page).toContain("read and write");
     const owner = await (await call(new Request(`${BASE}/admin/mcp`, { headers: OWNER }))).text();
-    expect(owner).toContain("wrangler secret put MCP_TOKEN");
+    expect(owner).toContain('action="/admin/mcp/token"');
+    expect(owner).toContain("wrangler secret put MCP_TOKEN"); // folded away, still there
+    // A named admin cannot make the owner's token.
+    expect((await form("/admin/mcp/token", as, [["access", "write"]])).status).toBe(403);
+  });
+
+  it("the owner makes an MCP token on the MCP page: the whole fleet, audited as mcp", async () => {
+    const { dev, ops } = await twoRoles();
+    const res = await form("/admin/mcp/token", OWNER, [["access", "write"]]);
+    expect(res.status).toBe(200);
+    const token = MCP_RE.exec(await res.text())![0];
+    const ids = (await tool(token, "list_machines")).data.machines.map((m: any) => m.install_id).sort();
+    expect(ids).toEqual([dev.install_id, ops.install_id].sort());
+    expect((await tool(token, "revoke_machine", { install_id: ops.install_id })).isError).toBe(false);
+    expect(await env.DB.prepare("SELECT who FROM audit WHERE action = 'machine.revoke'").first("who")).toBe("mcp");
+    // A new one ends the old; removing ends it.
+    const second = MCP_RE.exec(await (await form("/admin/mcp/token", OWNER, [["access", "read"]])).text())![0];
+    expect((await tool(token, "list_roles")).status).toBe(401);
+    expect((await tool(second, "revoke_machine", { install_id: dev.install_id })).isError).toBe(true);
+    expect((await form("/admin/mcp/token-delete", OWNER)).status).toBe(200);
+    expect((await tool(second, "list_roles")).status).toBe(401);
   });
 });

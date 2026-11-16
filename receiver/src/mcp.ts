@@ -16,14 +16,16 @@
 //
 // Access: its own bearer tokens, MCP_TOKEN (read and write tools) and
 // MCP_READ_TOKEN (read tools only), separate from ADMIN_TOKEN, which see the
-// whole fleet; and each named admin's own MCP token (bcp_…, made on the
-// Admins page), which sees and changes only the roles that admin manages and
-// is audited under their name. With none of these, /mcp answers 404 like any
+// whole fleet; the owner's own MCP token (bcp_…, made on the MCP page), the
+// same; and each named admin's own MCP token (bcp_…, made on the Admins
+// page), which sees and changes only the roles that admin manages and is
+// audited under their name. With none of these, /mcp answers 404 like any
 // unknown path. No cookies are involved, and a
 // request with a browser Origin other than this deployment's is refused
 // (DNS rebinding, drive-by pages).
 
-import { adminByMcpToken, bearer, MCP_ADMIN_PREFIX, safeEqual, scopeOf, usableToken } from "./auth";
+import { adminByMcpToken, bearer, MCP_ADMIN_PREFIX, ownerMcp, safeEqual, scopeOf, usableToken } from "./auth";
+import { sha256hex } from "./tokens";
 import { MCP_ACTOR, MCP_READ_ACTOR } from "./audit";
 import { publicOrigin } from "./enroll";
 import type { Env } from "./env";
@@ -92,7 +94,11 @@ export async function mcpAccess(req: Request, env: Env): Promise<McpAccess | nul
   if (!got) return null;
   if (got.startsWith(MCP_ADMIN_PREFIX)) {
     const a = await adminByMcpToken(env, got);
-    return a ? { write: a.write, who: a.name, scope: await scopeOf(env, a.id) } : null;
+    if (a) return { write: a.write, who: a.name, scope: await scopeOf(env, a.id) };
+    // The owner's own MCP token (same prefix): the whole fleet.
+    const o = await ownerMcp(env);
+    if (o && (await safeEqual(await sha256hex(got), o.hash))) return { write: o.write, who: o.write ? MCP_ACTOR : MCP_READ_ACTOR };
+    return null;
   }
   const [w, r] = await Promise.all([
     usableToken(env.MCP_TOKEN) ? safeEqual(got, env.MCP_TOKEN) : Promise.resolve(false),

@@ -389,6 +389,11 @@ Use `--scope user` to have it in every project, or give a colleague `MCP_READ_TO
 view. Claude Desktop: add it under Settings → Connectors if your version lets you set a header for a remote
 server; otherwise bridge it with `mcp-remote`, in `claude_desktop_config.json`:
 
+**The owner's MCP token.** The owner can also make an MCP token on the **MCP** page instead of setting
+the secrets: read only or read and write, `bcp_…`, shown once, only its SHA-256 kept (in `meta`). It reaches
+every role like `MCP_TOKEN`, is audited as `mcp` / `mcp (read-only)`, and a new one or **Remove MCP token**
+ends the old one. The `wrangler secret` commands stay on that page, folded away.
+
 **A named admin's own MCP token.** On **Admins**, the owner (for anyone) or a named admin (for themself) makes
 an MCP token, read only or read and write (`bcp_` + 32 random bytes; shown once, only its SHA-256 kept, in
 migration `0007`). With it `/mcp` sees and changes only the roles that admin manages, exactly as their

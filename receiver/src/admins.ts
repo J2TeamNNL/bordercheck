@@ -286,19 +286,30 @@ export async function setRoles(env: Env, v: Viewer, id: number, form: FormData, 
 
 // ---- MCP tokens ----
 
-// mcpTokenPage shows a named admin's new MCP token once, with the command
-// that adds it to Claude Code.
-function mcpTokenPage(L: I18n, v: Viewer, name: string, token: string, write: boolean, url: string): Response {
+// mcpTokenPage shows a new MCP token once (a named admin's, or the owner's
+// from the MCP page), with the command that adds it to Claude Code.
+export function mcpTokenPage(
+  L: I18n,
+  v: Viewer,
+  token: string,
+  write: boolean,
+  url: string,
+  o: { name?: string; owner?: boolean },
+): Response {
   const access = L.s(write ? "admins.mcpWrite" : "admins.mcpRead");
+  const name = o.name ?? "";
   const add = `claude mcp add --transport http bordercheck ${url} --header "Authorization: Bearer $BORDERCHECK_MCP_TOKEN"`;
-  const body = html`<p class="eyebrow">${L.t("nav.admins")}</p><h1>${L.t("admins.mcpTitle", { name })}</h1>
-${note(L.t("admins.mcpOnce", { name, access }), "s-warn")}
-<div class="panel"><div class="cmd"><div class="cmd-h"><b>${L.t("admins.mcpLabel")}</b><span>${name} · ${access}</span>${copyButton(L, "mcp-token", "copy.token")}</div><code tabindex="0" id="mcp-token">${token}</code></div>
-<p>${L.t("admins.mcpUse", { name })}</p>
+  const [nav, back, backKey, current] = o.owner
+    ? (["nav.mcp", "/admin/mcp", "mcp.back", "MCP"] as const)
+    : (["nav.admins", "/admin/admins", "admins.back", "Admins"] as const);
+  const body = html`<p class="eyebrow">${L.t(nav)}</p><h1>${o.owner ? L.t("mcp.ownTokenTitle") : L.t("admins.mcpTitle", { name })}</h1>
+${note(o.owner ? L.t("mcp.ownOnce", { access }) : L.t("admins.mcpOnce", { name, access }), "s-warn")}
+<div class="panel"><div class="cmd"><div class="cmd-h"><b>${L.t("admins.mcpLabel")}</b><span>${o.owner ? access : html`${name} · ${access}`}</span>${copyButton(L, "mcp-token", "copy.token")}</div><code tabindex="0" id="mcp-token">${token}</code></div>
+<p>${o.owner ? L.t("mcp.ownUse") : L.t("admins.mcpUse", { name })}</p>
 <div class="cmd"><div class="cmd-h"><b>${L.t("mcp.addCode")}</b>${copyButton(L, "mcp-add", "copy.command")}</div><code class="msg" tabindex="0" id="mcp-add">${add}</code></div>
 <p class="muted small">${L.t("mcp.addText")}</p></div>
-<div class="actions"><a class="btn" href="/admin/admins">${L.t("admins.back")}</a></div>`;
-  return page(layout(L, L.s("nav.admins"), v.who, body, "Admins", { switcher: false, copy: true }), 200, COPY_HEADERS);
+<div class="actions"><a class="btn" href="${back}">${L.t(backKey)}</a></div>`;
+  return page(layout(L, L.s(nav), v.who, body, current, { switcher: false, copy: true }), 200, COPY_HEADERS);
 }
 
 // newMcpTokenFor makes (or replaces) an admin's MCP token: the owner for
@@ -320,7 +331,7 @@ export async function newMcpTokenFor(env: Env, req: Request, v: Viewer, id: numb
   } catch {
     return adminsPage(env, v, L, "admins.mcpNoTable", 409);
   }
-  return mcpTokenPage(L, v, name, token, write, `${publicOrigin(env, req)}/mcp`);
+  return mcpTokenPage(L, v, token, write, `${publicOrigin(env, req)}/mcp`, { name });
 }
 
 // deleteMcpToken: the token stops working at once (it is looked up per request).
