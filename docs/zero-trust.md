@@ -1,14 +1,14 @@
 # Enforcing BorderCheck with Cloudflare Zero Trust
 
 BorderCheck itself only looks and reports. To make access depend on it, the portal answers Cloudflare Zero
-Trust's **device posture** checks: before Access lets a person into an application, or Gateway (the Zero Trust
-firewall) lets their traffic through, Cloudflare asks how that device stands. A machine that is not enrolled,
+Trust's **device posture** checks: before Access lets a person into an application, Cloudflare asks how that
+device stands. A machine that is not enrolled,
 has failed a check for too long, shows signs of compromise or has gone silent loses access.
 
 - [How the score works](#how-the-score-works)
 - [What you need](#what-you-need), and [the `warp` check](#turn-on-the-warp-check) that tells people to install the client
 - [Set up the integration](#set-up-the-integration) (once)
-- [Enforce it](#enforce-it): Access applications, Gateway network (firewall) and HTTP policies
+- [Enforce it](#enforce-it): Access applications, and phones
 - [Roll it out](#roll-it-out) without locking everyone out
 - [Troubleshooting](#troubleshooting) and [limits](#limits)
 
@@ -46,10 +46,8 @@ So people must sign in to WARP with the **same email** their BorderCheck invite 
 ## What you need
 
 - A Cloudflare Zero Trust organisation, with the Cloudflare One client (WARP) on every device you want to let in,
-  enrolled in that organisation.
-  - For **Access** policies, WARP's "Posture only" mode is enough.
-  - For **Gateway** network and HTTP policies (the firewall), WARP must send traffic to Gateway ("Traffic and
-    DNS" or "Traffic only"): in posture-only mode Gateway never sees the traffic.
+  enrolled in that organisation, in **Posture only** mode: the client reports the device's posture and routes no
+  traffic, so nothing else changes on people's machines or networks.
 - The portal on a **hostname in a zone of the same Cloudflare account** (a custom domain such as
   `bordercheck.example.com`), so an Access application can sit in front of `/posture/cloudflare`. A
   `*.workers.dev` address can't carry a path-scoped Access application. Keep `workers_dev` on if machines already
@@ -72,8 +70,7 @@ default**; turn it on in the policy of every role whose people must get through 
 
 - `team`: your Zero Trust team name (`<team>.cloudflareaccess.com`). A client registered to another team, or to
   none (the free consumer WARP), does not count.
-- `posture_only`: also expect the "Posture only" service mode, when you enforce through Access only. Leave it
-  out once you move devices to a traffic mode for Gateway.
+- `posture_only`: also expect the "Posture only" service mode.
 
 What it finds is a **warning**, never a fail: the person sees what to do on their report page and in a
 notification, and the machine counts as "attention", within `access.warn_grace` once you enforce. The service
@@ -192,18 +189,9 @@ cf zero-trust devices posture rules create --body '{"name": "Mobile: Android 14 
   "match": [{"platform": "android"}], "input": {"version": "14.0.0", "operator": ">="}}'
 ```
 
-Raise the versions over time (`cf zero-trust devices posture rules update <id> --body …`).
-
-**No WARP or Gateway check.** In Posture only mode the client does not open a tunnel, so Cloudflare's *WARP*
-and *Gateway* checks always fail there: don't require them. They are not needed either: a posture result only
-exists for a device whose client is enrolled in your team, so passing the OS version check (or the BorderCheck
-one) already shows the app is running and signed in to the right team.
-
-**What Zero Trust cannot tell about a phone.** Whether it is jailbroken or rooted, or a simulator or emulator:
-the client has no such check. That takes an MDM or mobile threat defense product (Intune, Jamf, Lookout…)
-connected as another service provider. Until then, let phones into the applications where that risk is
-acceptable and leave the Phones policy out of the sensitive ones (admin panels, databases, SSH, cluster
-consoles): those then stay reachable only from computers that pass BorderCheck.
+Raise the versions over time (`cf zero-trust devices posture rules update <id> --body …`). A posture result
+only exists for a device whose client is enrolled in your team, so passing the OS version check also shows the
+app is running and signed in to the right team.
 
 Then, in each application where you require the BorderCheck check, add a **second Allow policy** next to it:
 
@@ -213,29 +201,13 @@ Then, in each application where you require the BorderCheck check, add a **secon
 | Phones | Device posture: *Mobile: iOS 18 or later*, *Mobile: Android 14 or later* | your people (the same identity rule) |
 
 Access lets a person in when any Allow policy matches, so phones pass the second one and computers must pass the
-first. To keep phones out of an application, leave the Phones policy out of it. For Gateway, add the two
-mobile checks to the Block rule's condition the same way: block when *BorderCheck score >= 60* **and** both
-mobile checks are not passed.
+first. To keep phones out of an application, leave the Phones policy out of it.
 
-### Gateway network policies (the firewall: private networks, Tunnel, SSH, RDP, databases)
-
-**Gateway → Firewall policies → Network → Add a policy**, placed **above** the rules that allow the traffic:
-
-| | |
-|---|---|
-| Selector | Destination IP / Virtual network / Application: what you protect, e.g. your private ranges |
-| And | **Passed Device Posture Checks** · not in · `BorderCheck score >= 60` |
-| Action | **Block** |
-
-Blocking what fails, rather than allowing what passes, keeps your existing allow rules working and makes the
-BorderCheck rule easy to switch off. Gateway caches posture results for up to 5 minutes and does not cut
-connections that are already open.
-
-### Gateway HTTP policies (web traffic through Gateway)
-
-The same shape under **Firewall policies → HTTP**: traffic selector (Domain, Host, Application…) **and**
-**Passed Device Posture Checks not in** `BorderCheck score >= 60` → **Block**. HTTP policies need TLS
-inspection for anything beyond hostnames.
+**What Zero Trust cannot tell about a phone.** Whether it is jailbroken or rooted, or a simulator or emulator:
+the client has no such check. That takes an MDM or mobile threat defense product (Intune, Jamf, Lookout…)
+connected as another service provider. Until then, let phones into the applications where that risk is
+acceptable and leave the Phones policy out of the sensitive ones (admin panels, databases, SSH, cluster
+consoles): those then stay reachable only from computers that pass BorderCheck.
 
 ## Roll it out
 
@@ -248,9 +220,8 @@ inspection for anything beyond hostnames.
    `warn_grace` (or a fail older than `fail_grace`) loses access the moment you enforce: give the date enough
    room, or raise the grace for the first weeks (owner, in the role's `access`).
 3. **Enforce on one application** first, ideally one used daily by people who can report problems quickly.
-4. **Then the rest**, application by application, and the Gateway network rules last (they cover the most).
-5. **Undo** = remove the posture requirement from a policy (or disable the Gateway rule). Nothing on the
-   portal side needs to change.
+4. **Then the rest**, application by application.
+5. **Undo** = remove the posture requirement from a policy. Nothing on the portal side needs to change.
 
 ## Troubleshooting
 
@@ -273,6 +244,6 @@ path and policy, and the portal's `POSTURE_ACCESS_AUD` / `POSTURE_CLIENT_ID`.
 
 - BorderCheck's view is what each machine reports about itself: it raises the bar for everyone, it is not
   hardware attestation, and a person with admin rights on their machine can lie to it.
-- Changes show at Cloudflare's next poll, plus Gateway's cache, and open sessions are not cut.
+- Changes show at Cloudflare's next poll, and open sessions are not cut.
 - Applications that sign people in with Google directly (not through Access) are not covered: put them behind
   Access first.

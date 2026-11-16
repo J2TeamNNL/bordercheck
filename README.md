@@ -127,8 +127,8 @@ A policy only needs what it changes:
 - [Running your own portal](docs/portal.md): deploy, sign in, roles, invites, alerts, custom domain, MCP,
   upgrading.
 - [Policies](docs/policies.md): every field and every check's options, waivers, notifications, examples.
-- [Enforcing with Cloudflare Zero Trust](docs/zero-trust.md): device posture from BorderCheck in Access and
-  Gateway (firewall) policies, grace periods, rolling it out.
+- [Enforcing with Cloudflare Zero Trust](docs/zero-trust.md): device posture from BorderCheck in Access
+  policies, phones, grace periods, rolling it out.
 - [`receiver/README.md`](receiver/README.md): the portal's full reference: wire contract, schema, security
   model, settings.
 
