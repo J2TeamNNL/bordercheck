@@ -181,21 +181,36 @@ phone apart only when it runs the **Cloudflare One Agent** app signed in to your
 who the person is but not what device they are on, and any posture requirement fails.
 
 To let phones through (recommended default), create two Cloudflare One Client checks once, **OS version**,
-operating system iOS and Android, version `>= 1.0.0` (any version):
+iOS and Android, each with the oldest version you accept. A phone that is not kept up to date is the easiest one
+to exploit, so this is the most useful signal Zero Trust has about a phone; the versions the Cloudflare One
+client still supports are a sensible floor (in November 2026: iOS 18, Android 14):
 
 ```sh
-cf zero-trust devices posture rules create --body '{"name": "Mobile: iOS (any version)", "type": "os_version",
-  "match": [{"platform": "ios"}], "input": {"version": "1.0.0", "operator": ">="}}'
-cf zero-trust devices posture rules create --body '{"name": "Mobile: Android (any version)", "type": "os_version",
-  "match": [{"platform": "android"}], "input": {"version": "1.0.0", "operator": ">="}}'
+cf zero-trust devices posture rules create --body '{"name": "Mobile: iOS 18 or later", "type": "os_version",
+  "match": [{"platform": "ios"}], "input": {"version": "18.0.0", "operator": ">="}}'
+cf zero-trust devices posture rules create --body '{"name": "Mobile: Android 14 or later", "type": "os_version",
+  "match": [{"platform": "android"}], "input": {"version": "14.0.0", "operator": ">="}}'
 ```
+
+Raise the versions over time (`cf zero-trust devices posture rules update <id> --body …`).
+
+**No WARP or Gateway check.** In Posture only mode the client does not open a tunnel, so Cloudflare's *WARP*
+and *Gateway* checks always fail there: don't require them. They are not needed either: a posture result only
+exists for a device whose client is enrolled in your team, so passing the OS version check (or the BorderCheck
+one) already shows the app is running and signed in to the right team.
+
+**What Zero Trust cannot tell about a phone.** Whether it is jailbroken or rooted, or a simulator or emulator:
+the client has no such check. That takes an MDM or mobile threat defense product (Intune, Jamf, Lookout…)
+connected as another service provider. Until then, let phones into the applications where that risk is
+acceptable and leave the Phones policy out of the sensitive ones (admin panels, databases, SSH, cluster
+consoles): those then stay reachable only from computers that pass BorderCheck.
 
 Then, in each application where you require the BorderCheck check, add a **second Allow policy** next to it:
 
 | Policy | Include (any of) | Require (all of) |
 |---|---|---|
 | Computers | your people (e.g. emails ending in `@example.com`) | Device posture: *BorderCheck score >= 60* |
-| Phones | Device posture: *Mobile: iOS*, *Mobile: Android* | your people (the same identity rule) |
+| Phones | Device posture: *Mobile: iOS 18 or later*, *Mobile: Android 14 or later* | your people (the same identity rule) |
 
 Access lets a person in when any Allow policy matches, so phones pass the second one and computers must pass the
 first. To keep phones out of an application, leave the Phones policy out of it. For Gateway, add the two
