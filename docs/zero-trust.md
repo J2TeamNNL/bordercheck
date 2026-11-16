@@ -60,7 +60,7 @@ missing, long before you enforce anything.
 
 ### Turn on the `warp` check
 
-From BorderCheck v0.5.20 the `warp` check looks at the Cloudflare One client (WARP) on the machine: installed,
+The `warp` check is **not released yet** (planned for v0.5.21; turning it on in a policy before then is refused). It will look at the Cloudflare One client (WARP) on the machine: installed,
 registered to your Zero Trust team, connected, and, if you ask for it, in "Posture only" mode. It is **off by
 default**; turn it on in the policy of every role whose people must get through Zero Trust:
 
@@ -76,8 +76,8 @@ What it finds is a **warning**, never a fail: the person sees what to do on thei
 notification, and the machine counts as "attention", within `access.warn_grace` once you enforce. The service
 mode comes from your device profile's **Service mode** setting in the Zero Trust dashboard, not from the person:
 set the default profile to **Posture only** before turning `posture_only` on. The portal leaves the check out of
-the policy it serves to machines older than v0.5.20 (they would refuse it), so you can turn it on now: each
-machine starts checking once it updates.
+the policy it serves to machines older than the release that has the check (they would refuse it), so once it
+is out you can turn it on at once: each machine starts checking when it updates.
 
 ## Set up the integration
 
