@@ -58,6 +58,7 @@ import {
 } from "./fleet";
 import { auditRows, type InviteFilter, inviteRows, type MachineAction, type MachineParams, roleRows } from "./portal";
 import { POLICY_CHECKS } from "./roles";
+import type { Scope } from "./scope";
 
 export { auditArgs, clean, validate };
 
@@ -72,9 +73,12 @@ export const MCP_BULK_INVITES = 50;
 export interface Ctx {
   env: Env;
   req: Request;
-  who: string; // MCP_ACTOR or MCP_READ_ACTOR
+  who: string; // MCP_ACTOR, MCP_READ_ACTOR, or a named admin's name (their own token)
   write: boolean;
   now: Date;
+  // A named admin's own token: only what they manage (scope.ts), as in the
+  // dashboard; out of scope answers like something that does not exist.
+  scope?: Scope;
 }
 
 export type ToolOut = Out;
@@ -130,7 +134,7 @@ const fleetSummary: Tool = {
   inputSchema: noArgs,
   annotations: read("Fleet summary"),
   write: false,
-  run: async (_a, { env, now }) => readOut(await fleetSummaryData(env, now)),
+  run: async (_a, { env, now, scope }) => readOut(await fleetSummaryData(env, now, scope)),
 };
 
 const listMachines: Tool = {
@@ -153,11 +157,11 @@ const listMachines: Tool = {
   },
   annotations: read("List machines"),
   write: false,
-  async run(a, { env, now }) {
+  async run(a, { env, now, scope }) {
     const silentIso = silentBefore(env, now);
     const n = (a.limit as number | undefined) ?? 50;
     if (a.filter === "no_report") {
-      const rows = (await waitingRows(env, n)).filter((w) => (a.search ? (w.email + " " + w.hostname).toLowerCase().includes(String(a.search).toLowerCase()) : true));
+      const rows = (await waitingRows(env, n, { scope })).filter((w) => (a.search ? (w.email + " " + w.hostname).toLowerCase().includes(String(a.search).toLowerCase()) : true));
       return readOut({ filter: "no_report", count: rows.length, machines: rows.map(waitingSummary) });
     }
     const filter = (a.filter as Filter | undefined) ?? "all";
@@ -169,6 +173,7 @@ const listMachines: Tool = {
       check: a.check as string | undefined,
       checkStatus: a.check ? ((a.check_status as string | undefined) ?? "fail") : undefined,
       roleId: a.role_id as number | undefined,
+      scope,
     });
     return readOut({
       filter,
@@ -198,8 +203,8 @@ const getMachine: Tool = {
   },
   annotations: read("Get one machine"),
   write: false,
-  run: async (a, { env, now }) =>
-    readResult(await machineDetail(env, a.install_id as string, { evidence: !!a.include_evidence, location: !!a.include_location, history: a.history_limit as number | undefined }, now)),
+  run: async (a, { env, now, scope }) =>
+    readResult(await machineDetail(env, a.install_id as string, { evidence: !!a.include_evidence, location: !!a.include_location, history: a.history_limit as number | undefined, scope }, now)),
 };
 
 const checkStatsTool: Tool = {
@@ -210,7 +215,7 @@ const checkStatsTool: Tool = {
   inputSchema: { type: "object", properties: { limit: limit(20, 100) }, additionalProperties: false },
   annotations: read("Check statistics"),
   write: false,
-  run: async (a, { env }) => readOut({ checks: (await checkStats(env, (a.limit as number | undefined) ?? 20)).map(checkStatItem) }),
+  run: async (a, { env, scope }) => readOut({ checks: (await checkStats(env, (a.limit as number | undefined) ?? 20, scope)).map(checkStatItem) }),
 };
 
 const listRoles: Tool = {
@@ -219,7 +224,7 @@ const listRoles: Tool = {
   inputSchema: noArgs,
   annotations: read("List roles"),
   write: false,
-  run: async (_a, { env }) => readOut({ roles: (await roleRows(env)).map(roleItem) }),
+  run: async (_a, { env, scope }) => readOut({ roles: (await roleRows(env, scope)).map(roleItem) }),
 };
 
 const getRole: Tool = {
@@ -230,7 +235,7 @@ const getRole: Tool = {
   inputSchema: { type: "object", properties: { role_id: roleId }, required: ["role_id"], additionalProperties: false },
   annotations: read("Get role"),
   write: false,
-  run: async (a, { env }) => readResult(await roleDetail(env, a.role_id as number)),
+  run: async (a, { env, scope }) => readResult(await roleDetail(env, a.role_id as number, scope)),
 };
 
 const listInvites: Tool = {
@@ -243,9 +248,9 @@ const listInvites: Tool = {
   },
   annotations: read("List invites"),
   write: false,
-  async run(a, { env }) {
+  async run(a, { env, scope }) {
     const status = ((a.status as string | undefined) ?? "pending") as InviteFilter;
-    const { rows, counts: c } = await inviteRows(env, status, (a.limit as number | undefined) ?? 50);
+    const { rows, counts: c } = await inviteRows(env, status, (a.limit as number | undefined) ?? 50, { scope });
     return readOut({ status, counts: c, invites: rows.map(inviteItem) });
   },
 };
@@ -262,13 +267,13 @@ const listAlerts: Tool = {
   },
   annotations: read("List alerts"),
   write: false,
-  run: async (a, { env }) => readOut({ alerts: (await alertRows(env, (a.limit as number | undefined) ?? 50, a.pending_only !== false)).map(alertItem) }),
+  run: async (a, { env, scope }) => readOut({ alerts: (await alertRows(env, (a.limit as number | undefined) ?? 50, a.pending_only !== false, 0, scope)).map(alertItem) }),
 };
 
 const listAudit: Tool = {
   name: "list_audit",
   description:
-    "Recent audit trail entries, newest first: when, who (an Access email, \"admin token\", \"enrollment\", \"mcp\" or \"mcp (read-only)\"), action, target and detail. mcp_only keeps what was done through this MCP server. " +
+    "Recent audit trail entries, newest first: when, who (an Access email, \"admin token\", an admin's name, \"enrollment\", \"mcp\" or \"mcp (read-only)\"), action, target and detail. mcp_only keeps what was done through this MCP server. With an admin's own token, only that admin's entries. " +
     'The detail is under "untrusted": it can hold hostnames claimed by machines at enrollment.',
   inputSchema: {
     type: "object",
@@ -277,7 +282,8 @@ const listAudit: Tool = {
   },
   annotations: read("Audit trail"),
   write: false,
-  run: async (a, { env }) => readOut({ entries: (await auditRows(env, (a.limit as number | undefined) ?? 50, a.mcp_only === true ? "mcp" : "all")).map(auditItem) }),
+  run: async (a, { env, scope, who }) =>
+    readOut({ entries: (await auditRows(env, (a.limit as number | undefined) ?? 50, a.mcp_only === true ? "mcp" : "all", 0, scope ? who : "")).map(auditItem) }),
 };
 
 // ---- Write tools ----
@@ -295,11 +301,12 @@ function writer(ctx: Ctx, tool: string, args: Record<string, unknown>): Writer {
     who: ctx.who,
     extra: { via: "mcp", tool, args: auditArgs(args) },
     refuse: (errors) => refused(ctx, tool, args, errors),
+    scope: ctx.scope,
   };
 }
 
 async function refused(ctx: Ctx, tool: string, args: Record<string, unknown>, errors: string[]) {
-  await audit(ctx.env, ctx.who, "mcp.refused", tool, { tool, args: auditArgs(args), errors: errors.slice(0, 10).map((e) => clean(e, 300)) });
+  await audit(ctx.env, ctx.who, "mcp.refused", tool, { tool, args: auditArgs(args), errors: errors.slice(0, 10).map((e) => clean(e, 300)), via: "mcp" });
 }
 
 const policySchema: Schema = {
@@ -480,8 +487,8 @@ export async function callTool(name: string, args: Record<string, unknown>, ctx:
   const tool = TOOLS.find((t) => t.name === name);
   if (!tool) return null;
   if (tool.write && !ctx.write) {
-    await audit(ctx.env, ctx.who, "mcp.refused", tool.name, { tool: tool.name, args: auditArgs(args), errors: ["read-only token"] });
-    return fail("This MCP token is read-only; write tools need MCP_TOKEN.");
+    await audit(ctx.env, ctx.who, "mcp.refused", tool.name, { tool: tool.name, args: auditArgs(args), errors: ["read-only token"], via: "mcp" });
+    return fail(ctx.scope ? "This MCP token is read-only; make a read and write one on the Admins page." : "This MCP token is read-only; write tools need MCP_TOKEN.");
   }
   const errs = validate(tool.inputSchema, args);
   if (errs.length) {

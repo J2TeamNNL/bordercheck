@@ -15,18 +15,22 @@
 // so GET and DELETE are 405.
 //
 // Access: its own bearer tokens, MCP_TOKEN (read and write tools) and
-// MCP_READ_TOKEN (read tools only), separate from ADMIN_TOKEN. With neither
-// set, /mcp answers 404 like any unknown path. No cookies are involved, and a
+// MCP_READ_TOKEN (read tools only), separate from ADMIN_TOKEN, which see the
+// whole fleet; and each named admin's own MCP token (bcp_…, made on the
+// Admins page), which sees and changes only the roles that admin manages and
+// is audited under their name. With none of these, /mcp answers 404 like any
+// unknown path. No cookies are involved, and a
 // request with a browser Origin other than this deployment's is refused
 // (DNS rebinding, drive-by pages).
 
-import { bearer, safeEqual, usableToken } from "./auth";
+import { adminByMcpToken, bearer, MCP_ADMIN_PREFIX, safeEqual, scopeOf, usableToken } from "./auth";
 import { MCP_ACTOR, MCP_READ_ACTOR } from "./audit";
 import { publicOrigin } from "./enroll";
 import type { Env } from "./env";
 import { json, readLimited, TooLarge } from "./ingest";
 import { callTool, type Ctx, toolsFor, UNTRUSTED_NOTE } from "./mcp-tools";
 import { hit } from "./ratelimit";
+import type { Scope } from "./scope";
 
 export const MODERN_VERSIONS = ["2026-07-28"];
 export const LEGACY_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
@@ -74,16 +78,27 @@ export function mcpConfigured(env: Env): boolean {
   return usableToken(env.MCP_TOKEN) || usableToken(env.MCP_READ_TOKEN);
 }
 
-// mcpAccess: "write", "read" or null. Both tokens are always compared, in
-// constant time, so timing doesn't say which one (if any) matched.
-export async function mcpAccess(req: Request, env: Env): Promise<"write" | "read" | null> {
+export interface McpAccess {
+  write: boolean;
+  who: string; // the audit actor
+  scope?: Scope; // a named admin's token: only what they manage
+}
+
+// mcpAccess: who the bearer token is, or null. A named admin's token (bcp_…)
+// is looked up by its hash; otherwise both deployment tokens are always
+// compared, in constant time, so timing doesn't say which one (if any) matched.
+export async function mcpAccess(req: Request, env: Env): Promise<McpAccess | null> {
   const got = bearer(req);
   if (!got) return null;
+  if (got.startsWith(MCP_ADMIN_PREFIX)) {
+    const a = await adminByMcpToken(env, got);
+    return a ? { write: a.write, who: a.name, scope: await scopeOf(env, a.id) } : null;
+  }
   const [w, r] = await Promise.all([
     usableToken(env.MCP_TOKEN) ? safeEqual(got, env.MCP_TOKEN) : Promise.resolve(false),
     usableToken(env.MCP_READ_TOKEN) ? safeEqual(got, env.MCP_READ_TOKEN) : Promise.resolve(false),
   ]);
-  return w ? "write" : r ? "read" : null;
+  return w ? { write: true, who: MCP_ACTOR } : r ? { write: false, who: MCP_READ_ACTOR } : null;
 }
 
 // originAllowed: no Origin (not a browser) or this deployment's own origin.
@@ -109,7 +124,8 @@ function decodeHeader(v: string): string | null {
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
 export async function handleMcp(req: Request, env: Env, now = new Date()): Promise<Response> {
-  if (!mcpConfigured(env)) return json({ error: "not found" }, 404);
+  // Without deployment tokens /mcp exists only for a named admin's token.
+  if (!mcpConfigured(env) && !bearer(req)?.startsWith(MCP_ADMIN_PREFIX)) return json({ error: "not found" }, 404);
   if (!originAllowed(req, env)) return rpcError(403, undefined, FORBIDDEN, "Origin not allowed");
   if (req.method !== "POST") {
     return new Response(null, { status: 405, headers: { allow: "POST", "cache-control": "no-store" } });
@@ -155,7 +171,7 @@ export async function handleMcp(req: Request, env: Env, now = new Date()): Promi
   const params = (msg.params ?? {}) as Record<string, unknown>;
   const meta = isObj(params._meta) ? params._meta : {};
   const headerVersion = req.headers.get("mcp-protocol-version");
-  const ctx: Ctx = { env, req, who: access === "write" ? MCP_ACTOR : MCP_READ_ACTOR, write: access === "write", now };
+  const ctx: Ctx = { env, req, who: access.who, write: access.write, now, scope: access.scope };
 
   // ---- Legacy era: initialize opens it; requests without _meta continue it ----
   if (method === "initialize") {

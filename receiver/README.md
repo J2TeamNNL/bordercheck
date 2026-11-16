@@ -247,8 +247,9 @@ anyone's roles, make a token for anyone but themself, or switch token sign-in (4
 cannot set or change `report.url`, `report.headers`, `update.policy_url`, `update.repo` or `update.public_key`
 (403): those decide where reports go and whose binary the laptops install, the same lock the API and MCP have.
 A named admin with no
-role sees empty pages and can still create a role. Scopes apply to the dashboard only: `/api/v1` and `/mcp`
-keep their own tokens and see everything, and named tokens open neither.
+role sees empty pages and can still create a role. `/api/v1` and the deployment MCP tokens (`MCP_TOKEN`,
+`MCP_READ_TOKEN`) see everything, and a named admin's sign-in token opens neither. A named admin can instead
+have an **MCP token of their own** (below), scoped exactly like their dashboard.
 
 The owner can make a new token for an admin (the old token and every session of theirs stop at once; an admin
 can do this for themself and stays signed in), change their roles (from their next request), or remove them
@@ -387,6 +388,16 @@ claude mcp add --transport http bordercheck https://bordercheck.domain.com/mcp \
 Use `--scope user` to have it in every project, or give a colleague `MCP_READ_TOKEN` instead for a read-only
 view. Claude Desktop: add it under Settings → Connectors if your version lets you set a header for a remote
 server; otherwise bridge it with `mcp-remote`, in `claude_desktop_config.json`:
+
+**A named admin's own MCP token.** On **Admins**, the owner (for anyone) or a named admin (for themself) makes
+an MCP token, read only or read and write (`bcp_` + 32 random bytes; shown once, only its SHA-256 kept, in
+migration `0007`). With it `/mcp` sees and changes only the roles that admin manages, exactly as their
+dashboard does (anything else answers as if it did not exist; a role it creates joins their scope), keeps the
+MCP guard rails, and records every change under the admin's name with `"via": "mcp"` (the owner's **MCP
+only** audit filter includes them). It works even when no deployment MCP token is set, and does not depend on
+token sign-in being on. A new one ends the old one; **Remove MCP token**, or removing the admin, ends it at
+once. A named admin's MCP page shows their own token's state instead of the `wrangler` commands, which only
+whoever deploys the portal can run.
 
 ```json
 {

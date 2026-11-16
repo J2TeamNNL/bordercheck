@@ -238,7 +238,7 @@ export async function viewer(req: Request, env: Env, now = Date.now()): Promise<
 
 // scopeOf loads a named admin's roles. A failed query is an empty scope,
 // never everything.
-async function scopeOf(env: Env, admin: number): Promise<Scope> {
+export async function scopeOf(env: Env, admin: number): Promise<Scope> {
   try {
     const r = await env.DB.prepare("SELECT role_id FROM admin_roles WHERE admin_id = ?").bind(admin).all<{ role_id: number }>();
     return { admin, roles: r.results.map((x) => x.role_id) };
@@ -266,6 +266,23 @@ export async function adminByToken(env: Env, token: string): Promise<AdminRow | 
   if (!ADMIN_TOKEN_RE.test(token)) return null;
   try {
     return await env.DB.prepare("SELECT id, name, gen FROM admins WHERE token_hash = ?").bind(await sha256hex(token)).first<AdminRow>();
+  } catch {
+    return null;
+  }
+}
+
+// A named admin's own MCP token (admins.ts makes it, mcp.ts takes it): its own
+// prefix, so it can never be used as their sign-in token or the other way round.
+export const MCP_ADMIN_PREFIX = "bcp_";
+export const MCP_ADMIN_RE = /^bcp_[A-Za-z0-9_-]{43}$/;
+
+// adminByMcpToken: the named admin an MCP token belongs to, and whether it has
+// the write tools. Null for anything else, including before migration 0007.
+export async function adminByMcpToken(env: Env, token: string): Promise<{ id: number; name: string; write: boolean } | null> {
+  if (!MCP_ADMIN_RE.test(token)) return null;
+  try {
+    const r = await env.DB.prepare("SELECT id, name, mcp_write FROM admins WHERE mcp_hash = ?").bind(await sha256hex(token)).first<{ id: number; name: string; mcp_write: number }>();
+    return r ? { id: r.id, name: r.name, write: r.mcp_write === 1 } : null;
   } catch {
     return null;
   }

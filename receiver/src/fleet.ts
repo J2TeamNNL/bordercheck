@@ -18,7 +18,7 @@ import { type AlertListRow, checkStats, type CheckStat, type MachineListRow, par
 import { installCommands, publicOrigin } from "./enroll";
 import { config, DAY, type Env } from "./env";
 import { parseGeo, place } from "./geo";
-import { english, type Msg } from "./i18n";
+import { english, type Msg, msg } from "./i18n";
 import checksEn from "./i18n/checks.en.json";
 import {
   type AuditExtra,
@@ -38,6 +38,7 @@ import {
 } from "./portal";
 import { type DeviceLocation, parseReport, statusRank } from "./report";
 import { POLICY_CHECKS } from "./roles";
+import { inviteVisible, machineIn, machineVisible, roleAllowed, roleIn, type Scope, scopeBind } from "./scope";
 import { countLikelySamples, SAMPLE_RULES } from "./samples";
 
 export const KNOWN_STATUSES = ["fail", "error", "warn", "waived", "pass", "skip"];
@@ -204,21 +205,22 @@ export function waitingSummary(w: { install_id: string; email: string; hostname:
   return { install_id: w.install_id, enrolled: true, role: w.role, email: w.email, enrolled_at: w.enrolled_at, untrusted: { hostname_at_enrollment: clean(w.hostname, 100) } };
 }
 
-export async function fleetSummary(env: Env, now: Date): Promise<Record<string, unknown>> {
+export async function fleetSummary(env: Env, now: Date, scope?: Scope): Promise<Record<string, unknown>> {
   const silentIso = silentBefore(env, now);
+  const sb = scopeBind(scope);
   const t = await env.DB.prepare(
     `SELECT COUNT(*) AS machines, SUM(m.fail > 0) AS failing, SUM(m.fail = 0 AND (m.error > 0 OR m.warn > 0)) AS attention,
             SUM(m.last_seen < ?1) AS silent, SUM(e.revoked_at IS NOT NULL) AS revoked, SUM(m.compromised_since IS NOT NULL) AS compromised
-     FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id`,
-  ).bind(silentIso).first<Record<string, number | null>>();
+     FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id WHERE ${roleIn("e.role_id", 2, scope)}`,
+  ).bind(silentIso, sb).first<Record<string, number | null>>();
   const [waiting, roles, invites, pending, top] = await Promise.all([
     env.DB.prepare(
-      "SELECT COUNT(*) AS n FROM enrollments e WHERE e.revoked_at IS NULL AND NOT EXISTS (SELECT 1 FROM machines m WHERE m.install_id = e.install_id)",
-    ).first<number>("n"),
-    env.DB.prepare("SELECT COUNT(*) AS n FROM roles").first<number>("n"),
-    inviteRows(env, "pending", 1),
-    env.DB.prepare("SELECT COUNT(*) AS n FROM alerts WHERE sent_at IS NULL").first<number>("n"),
-    checkStats(env, 5),
+      `SELECT COUNT(*) AS n FROM enrollments e WHERE e.revoked_at IS NULL AND NOT EXISTS (SELECT 1 FROM machines m WHERE m.install_id = e.install_id) AND ${roleIn("e.role_id", 1, scope)}`,
+    ).bind(sb).first<number>("n"),
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM roles r WHERE ${roleIn("r.id", 1, scope)}`).bind(sb).first<number>("n"),
+    inviteRows(env, "pending", 1, { scope }),
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM alerts WHERE sent_at IS NULL AND ${machineIn("install_id", 1, scope)}`).bind(sb).first<number>("n"),
+    checkStats(env, 5, scope),
   ]);
   return {
     silent_days: config(env).silentDays,
@@ -269,8 +271,9 @@ export async function machineExists(env: Env, id: string): Promise<boolean> {
 
 // machineDetail: one machine (MCP get_machine, REST GET /machines/{id}).
 // Evidence and location only when asked for.
-export async function machineDetail(env: Env, id: string, o: { evidence?: boolean; location?: boolean; history?: number }, now: Date): Promise<Out> {
+export async function machineDetail(env: Env, id: string, o: { evidence?: boolean; location?: boolean; history?: number; scope?: Scope }, now: Date): Promise<Out> {
   const cfg = config(env);
+  if (!(await machineVisible(env, id, o.scope))) return fail("No such machine.", undefined, 404, "err.noSuchMachine");
   const [m, e] = await Promise.all([
     env.DB.prepare(
       `SELECT m.*, e.install_id IS NOT NULL AS enrolled, e.revoked_at, r.name AS role
@@ -463,7 +466,8 @@ export function roleItem(r: { id: number; name: string; machines: number; pendin
   return { role_id: r.id, name: r.name, machines: r.machines, pending_invites: r.pending, updated_at: r.updated_at };
 }
 
-export async function roleDetail(env: Env, id: number): Promise<Out> {
+export async function roleDetail(env: Env, id: number, scope?: Scope): Promise<Out> {
+  if (!roleAllowed(scope, id)) return fail("No such role.", undefined, 404, "err.noSuchRole");
   const r = await env.DB.prepare("SELECT id, name, policy, created_at, updated_at FROM roles WHERE id = ?").bind(id).first<{ id: number; name: string; policy: string; created_at: string; updated_at: string }>();
   if (!r) return fail("No such role.", undefined, 404, "err.noSuchRole");
   const ms = await env.DB.prepare("SELECT install_id, email, hostname, revoked_at FROM enrollments WHERE role_id = ? ORDER BY email LIMIT 200")
@@ -521,6 +525,9 @@ export interface Writer {
   who: string; // the audit actor
   extra: AuditExtra; // merged into the audit row of the change
   refuse(errors: string[]): Promise<void>; // records a refused write
+  // A named admin's scope (their own MCP token): anything outside it answers
+  // like something that does not exist. Absent: everything.
+  scope?: Scope;
 }
 
 // auditArgs is what goes into an audit row: the arguments, capped. Nothing
@@ -603,6 +610,7 @@ function policyText(p: unknown): string {
 export async function writeRole(w: Writer, input: { id?: number; name?: string; policy?: unknown }, rules: RoleRules, now = new Date()): Promise<Out> {
   const { env } = w;
   const id = input.id;
+  if (id !== undefined && !roleAllowed(w.scope, id)) return fail("No such role.", undefined, 404, "err.noSuchRole");
   const cur = id === undefined ? null : await env.DB.prepare("SELECT name, policy FROM roles WHERE id = ?").bind(id).first<{ name: string; policy: string }>();
   if (id !== undefined && !cur) return fail("No such role.", undefined, 404, "err.noSuchRole");
   const name = input.name ?? cur!.name;
@@ -622,7 +630,7 @@ export async function writeRole(w: Writer, input: { id?: number; name?: string; 
       return fail("Not saved.", all, 400);
     }
   }
-  const r = await saveRole(env, w.who, { id, name, policyText: text }, w.extra);
+  const r = await saveRole(env, w.who, { id, name, policyText: text }, w.extra, w.scope);
   if (!r.ok) {
     const errs = r.errors.map(english);
     await w.refuse(errs);
@@ -661,7 +669,7 @@ export async function createInvites(
       days: input.days ?? Math.min(90, Math.floor(config(w.env).inviteDays)),
       note: String(input.note ?? ""),
     },
-    { maxBulk, extra: w.extra },
+    { maxBulk, extra: w.extra, scope: w.scope },
   );
   if (!r.ok) {
     const errs = r.errors.map(english);
@@ -672,12 +680,14 @@ export async function createInvites(
 }
 
 export async function revokeInvite(w: Writer, id: number): Promise<Out> {
+  if (!(await inviteVisible(w.env, id, w.scope))) return failMsg(msg("err.noSuchInvite"), 404);
   const r = await revokeInviteOp(w.env, w.who, id, w.extra);
   if (!r.ok) return failMsg(r.errors[0], r.status);
   return okData({ invite_id: id, email: r.email, status: "revoked" });
 }
 
 export async function reissueInvite(w: Writer, id: number): Promise<{ ok: true; issued: Issued } | (Out & { ok: false })> {
+  if (!(await inviteVisible(w.env, id, w.scope))) return failMsg(msg("err.noSuchInvite"), 404) as Out & { ok: false };
   const r = await reissueInviteOp(w.env, w.who, id, w.extra);
   if (!r.ok) return failMsg(r.errors[0], r.status) as Out & { ok: false };
   return { ok: true, issued: r.issued };
@@ -686,7 +696,9 @@ export async function reissueInvite(w: Writer, id: number): Promise<{ ok: true; 
 // machineWrite: one write on one machine, by install_id.
 export async function machineWrite(w: Writer, id: string, action: MachineAction, params: MachineParams = {}): Promise<Out> {
   if (!INSTALL_ID_RE.test(id)) return fail("install_id has the wrong format.", undefined, 400);
-  if (!(await machineExists(w.env, id))) return fail("No such machine.", undefined, 404, "err.noSuchMachine");
+  if (!(await machineExists(w.env, id)) || !(await machineVisible(w.env, id, w.scope))) return fail("No such machine.", undefined, 404, "err.noSuchMachine");
+  // Moving a machine: the target role must be in scope too.
+  if (action === "role" && !roleAllowed(w.scope, Number(params.role_id))) return failMsg(msg("err.noSuchRole"), 400);
   const r = await machineAction(w.env, w.who, id, action, params, w.extra);
   if (r.error) {
     if (r.status === 400) await w.refuse([english(r.error)]);

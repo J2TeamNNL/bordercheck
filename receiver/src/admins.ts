@@ -11,17 +11,22 @@
 //   POST /admin/admins                 add (owner): the new token, shown once
 //   POST /admin/admins/<id>/token      new token (owner, or that admin): shown once
 //   POST /admin/admins/<id>/delete     remove, with their passkeys (owner)
+//   POST /admin/admins/<id>/mcp        new MCP token, read or write (owner, or that admin): shown once
+//   POST /admin/admins/<id>/mcp-delete remove their MCP token (owner, or that admin)
 //
 // Tokens are "bca_" + 32 random bytes base64url; only their SHA-256 is kept
-// (auth.ts looks them up). Not part of /api/v1 or MCP.
+// (auth.ts looks them up). They open neither /api/v1 nor MCP. An admin's MCP
+// token ("bcp_", the same way) opens only /mcp, scoped like their dashboard.
 
-import { ADMIN_TOKEN_PREFIX, newSession, PASSKEY_WHO, sessionCookie, TOKEN_WHO, type Viewer } from "./auth";
+import { ADMIN_TOKEN_PREFIX, MCP_ADMIN_PREFIX, newSession, PASSKEY_WHO, sessionCookie, TOKEN_WHO, type Viewer } from "./auth";
 import type { Env } from "./env";
+import { publicOrigin } from "./enroll";
 import { COPY_HEADERS, copyButton, type Html, html, layout, note, page } from "./html";
 import { type I18n, type Key, type Msg, msg } from "./i18n";
 import { randomB64url, sha256hex } from "./tokens";
 
 export const newAdminToken = () => ADMIN_TOKEN_PREFIX + randomB64url(32);
+export const newMcpToken = () => MCP_ADMIN_PREFIX + randomB64url(32);
 
 // ---- Names ----
 
@@ -52,20 +57,26 @@ interface AdminListRow {
   created_by: string;
   last_used_at: string | null;
   passkeys: number;
+  // Their own MCP token: null without one (or before migration 0007, mcp: false).
+  mcp_write: number | null;
+  mcp_created_at: string | null;
 }
 
-// null: migration 0006 is not applied yet.
-async function listAdmins(env: Env): Promise<AdminListRow[] | null> {
+// null: migration 0006 is not applied yet. Before 0007, nobody has an MCP token.
+async function listAdmins(env: Env): Promise<(AdminListRow[] & { mcp?: boolean }) | null> {
+  const sql = (mcp: boolean) =>
+    `SELECT a.id, a.name, a.created_at, a.created_by, a.last_used_at,
+       (SELECT COUNT(*) FROM passkeys p WHERE p.admin_id = a.id) AS passkeys,
+       ${mcp ? "CASE WHEN a.mcp_hash IS NULL THEN NULL ELSE a.mcp_write END AS mcp_write, a.mcp_created_at" : "NULL AS mcp_write, NULL AS mcp_created_at"}
+     FROM admins a ORDER BY a.name COLLATE NOCASE, a.id`;
   try {
-    return (
-      await env.DB.prepare(
-        `SELECT a.id, a.name, a.created_at, a.created_by, a.last_used_at,
-           (SELECT COUNT(*) FROM passkeys p WHERE p.admin_id = a.id) AS passkeys
-         FROM admins a ORDER BY a.name COLLATE NOCASE, a.id`,
-      ).all<AdminListRow>()
-    ).results;
+    return Object.assign((await env.DB.prepare(sql(true)).all<AdminListRow>()).results, { mcp: true });
   } catch {
-    return null;
+    try {
+      return Object.assign((await env.DB.prepare(sql(false)).all<AdminListRow>()).results, { mcp: false });
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -127,6 +138,22 @@ export async function adminsPage(env: Env, v: Viewer, L: I18n, message?: Key | M
     return html`${names}<details class="adder"><summary class="btn sm">${L.t("admins.editRoles")}</summary>
 <form method="post" action="/admin/admins/${r.id}/roles">${roleBoxes(L, `ar-${r.id}`, roles, new Set(mine.map((x) => x.id)))}<div class="actions"><button class="sm primary">${L.t("admins.saveRoles")}</button></div></form></details>`;
   };
+  const mcpOn = !!all?.mcp;
+  const mcpCell = (r: AdminListRow) => {
+    const self = r.id === v.adminId;
+    const state = r.mcp_write === null
+      ? html`<span class="muted">${L.t("admins.mcpOff")}</span>`
+      : html`${L.t(r.mcp_write ? "admins.mcpWrite" : "admins.mcpRead")}${r.mcp_created_at ? html` <span class="muted small">${L.when(r.mcp_created_at)}</span>` : ""}`;
+    if (!mcpOn || !(v.owner || self)) return state;
+    const remove = r.mcp_write === null
+      ? ""
+      : html` <form class="inline" method="post" action="/admin/admins/${r.id}/mcp-delete"><button class="sm danger">${L.t("admins.mcpRemove")}</button></form>`;
+    return html`${state}<details class="adder"><summary class="btn sm">${L.t("admins.mcpNew")}</summary>
+<form method="post" action="/admin/admins/${r.id}/mcp"><fieldset class="field"><legend>${L.t("admins.mcpAccess")}</legend>
+<label class="check" for="mcp-r-${r.id}"><input type="radio" id="mcp-r-${r.id}" name="access" value="read" checked> ${L.t("admins.mcpRead")}</label>
+<label class="check" for="mcp-w-${r.id}"><input type="radio" id="mcp-w-${r.id}" name="access" value="write"> ${L.t("admins.mcpWrite")}</label></fieldset>
+<p class="muted small">${L.t("admins.mcpRule")}</p><div class="actions"><button class="sm primary">${L.t("admins.mcpMake")}</button></div></form></details>${remove}`;
+  };
   const action = (r: AdminListRow) => {
     const self = r.id === v.adminId;
     const token = v.owner || self
@@ -138,9 +165,9 @@ export async function adminsPage(env: Env, v: Viewer, L: I18n, message?: Key | M
     return html`${token}${del}`;
   };
   const list = rows
-    ? html`<div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("admins.thName")}</th><th>${L.t("nav.roles")}</th><th>${L.t("admins.thCreated")}</th><th>${L.t("admins.thBy")}</th><th>${L.t("admins.thUsed")}</th><th class="n">${L.t("nav.passkeys")}</th><th></th></tr></thead><tbody>
+    ? html`<div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("admins.thName")}</th><th>${L.t("nav.roles")}</th><th>${L.t("admins.thCreated")}</th><th>${L.t("admins.thBy")}</th><th>${L.t("admins.thUsed")}</th><th class="n">${L.t("nav.passkeys")}</th><th>${L.t("admins.thMcp")}</th><th></th></tr></thead><tbody>
 ${rows.map(
-        (r) => html`<tr><td class="wrap"><b>${r.name}</b>${r.id === v.adminId ? html` <span class="muted">${L.t("admins.you")}</span>` : ""}</td><td class="wrap">${roleCell(r)}</td><td class="nowrap">${L.when(r.created_at)}</td><td class="wrap">${r.created_by}</td><td class="nowrap">${r.last_used_at ? L.when(r.last_used_at) : L.s("time.never")}</td><td class="n">${L.num(r.passkeys)}</td>
+        (r) => html`<tr><td class="wrap"><b>${r.name}</b>${r.id === v.adminId ? html` <span class="muted">${L.t("admins.you")}</span>` : ""}</td><td class="wrap">${roleCell(r)}</td><td class="nowrap">${L.when(r.created_at)}</td><td class="wrap">${r.created_by}</td><td class="nowrap">${r.last_used_at ? L.when(r.last_used_at) : L.s("time.never")}</td><td class="n">${L.num(r.passkeys)}</td><td class="wrap">${mcpCell(r)}</td>
 <td class="n nowrap">${action(r)}</td></tr>`,
       )}</tbody></table></div>${rows.length === 0 ? html`<p class="empty">${L.t("admins.empty")}</p>` : ""}</div>`
     : note(L.t("admins.noTable"), "s-warn");
@@ -255,4 +282,60 @@ export async function setRoles(env: Env, v: Viewer, id: number, form: FormData, 
       .bind(new Date().toISOString(), v.who.slice(0, 200), name, id),
   ]);
   return adminsPage(env, v, L, msg("admins.rolesSaved", { name }), 200);
+}
+
+// ---- MCP tokens ----
+
+// mcpTokenPage shows a named admin's new MCP token once, with the command
+// that adds it to Claude Code.
+function mcpTokenPage(L: I18n, v: Viewer, name: string, token: string, write: boolean, url: string): Response {
+  const access = L.s(write ? "admins.mcpWrite" : "admins.mcpRead");
+  const add = `claude mcp add --transport http bordercheck ${url} --header "Authorization: Bearer $BORDERCHECK_MCP_TOKEN"`;
+  const body = html`<p class="eyebrow">${L.t("nav.admins")}</p><h1>${L.t("admins.mcpTitle", { name })}</h1>
+${note(L.t("admins.mcpOnce", { name, access }), "s-warn")}
+<div class="panel"><div class="cmd"><div class="cmd-h"><b>${L.t("admins.mcpLabel")}</b><span>${name} · ${access}</span>${copyButton(L, "mcp-token", "copy.token")}</div><code tabindex="0" id="mcp-token">${token}</code></div>
+<p>${L.t("admins.mcpUse", { name })}</p>
+<div class="cmd"><div class="cmd-h"><b>${L.t("mcp.addCode")}</b>${copyButton(L, "mcp-add", "copy.command")}</div><code class="msg" tabindex="0" id="mcp-add">${add}</code></div>
+<p class="muted small">${L.t("mcp.addText")}</p></div>
+<div class="actions"><a class="btn" href="/admin/admins">${L.t("admins.back")}</a></div>`;
+  return page(layout(L, L.s("nav.admins"), v.who, body, "Admins", { switcher: false, copy: true }), 200, COPY_HEADERS);
+}
+
+// newMcpTokenFor makes (or replaces) an admin's MCP token: the owner for
+// anyone, an admin for themself. Read only unless "write" is asked for.
+export async function newMcpTokenFor(env: Env, req: Request, v: Viewer, id: number, form: FormData, L: I18n, now = Date.now()): Promise<Response> {
+  if (!v.owner && v.adminId !== id) return adminsPage(env, v, L, "admins.ownerOnly", 403);
+  const name = await adminName(env, id);
+  if (!name) return adminsPage(env, v, L, "admins.notFound", 404);
+  const write = form.get("access") === "write";
+  const token = newMcpToken();
+  const at = new Date(now).toISOString();
+  try {
+    const res = await env.DB.batch([
+      env.DB.prepare("UPDATE admins SET mcp_hash = ?, mcp_write = ?, mcp_created_at = ? WHERE id = ?").bind(await sha256hex(token), write ? 1 : 0, at, id),
+      env.DB.prepare("INSERT INTO audit (at, who, action, target, detail) SELECT ?, ?, 'admin.mcp_token', ?, json_object('access', ?) WHERE changes() > 0")
+        .bind(at, v.who.slice(0, 200), name, write ? "write" : "read"),
+    ]);
+    if (res[0].meta.changes !== 1) return adminsPage(env, v, L, "admins.notFound", 404);
+  } catch {
+    return adminsPage(env, v, L, "admins.mcpNoTable", 409);
+  }
+  return mcpTokenPage(L, v, name, token, write, `${publicOrigin(env, req)}/mcp`);
+}
+
+// deleteMcpToken: the token stops working at once (it is looked up per request).
+export async function deleteMcpToken(env: Env, v: Viewer, id: number, L: I18n): Promise<Response> {
+  if (!v.owner && v.adminId !== id) return adminsPage(env, v, L, "admins.ownerOnly", 403);
+  const name = await adminName(env, id);
+  if (!name) return adminsPage(env, v, L, "admins.notFound", 404);
+  try {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE admins SET mcp_hash = NULL, mcp_write = 0, mcp_created_at = NULL WHERE id = ? AND mcp_hash IS NOT NULL").bind(id),
+      env.DB.prepare("INSERT INTO audit (at, who, action, target, detail) SELECT ?, ?, 'admin.mcp_remove', ?, '{}' WHERE changes() > 0")
+        .bind(new Date().toISOString(), v.who.slice(0, 200), name),
+    ]);
+  } catch {
+    return adminsPage(env, v, L, "admins.mcpNoTable", 409);
+  }
+  return adminsPage(env, v, L, msg("admins.mcpRemoved", { name }), 200);
 }

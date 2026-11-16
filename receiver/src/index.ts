@@ -1,5 +1,5 @@
 import { runCron } from "./alerts";
-import { addAdmin, adminsPage, deleteAdmin, newToken, setRoles } from "./admins";
+import { addAdmin, adminsPage, deleteAdmin, deleteMcpToken, newMcpTokenFor, newToken, setRoles } from "./admins";
 import {
   adminByToken,
   dashboardConfigured,
@@ -220,7 +220,7 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
     if (!(await inviteVisible(env, Number(m[1]), scope))) return invitesPage(env, url, v.who, L, L.m(msg("err.noSuchInvite")), 404, scope);
     return m[2] === "revoke" ? revokeInvite(env, url, v.who, Number(m[1]), L, scope) : reissueInvite(env, req, url, v.who, Number(m[1]), L, scope);
   }
-  if (path === "/admin/mcp" && req.method === "GET") return mcpPage(env, req, v.who, L);
+  if (path === "/admin/mcp" && req.method === "GET") return mcpPage(env, req, v, L);
   if (path === "/admin/audit" && req.method === "GET") return auditPage(env, url, v.who, L, scope);
 
   // Passkeys: for the token/session sign-in only. Under Cloudflare Access (or
@@ -238,10 +238,12 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
   if ((path === "/admin/admins" || path.startsWith("/admin/admins/")) && usableToken(env.ADMIN_TOKEN) && v.via !== "access") {
     if (path === "/admin/admins" && req.method === "GET") return adminsPage(env, v, L);
     if (path === "/admin/admins" && req.method === "POST") return addAdmin(env, v, await formOf(req), L, now);
-    m = /^\/admin\/admins\/(\d{1,12})\/(token|delete|roles)$/.exec(path);
+    m = /^\/admin\/admins\/(\d{1,12})\/(token|delete|roles|mcp|mcp-delete)$/.exec(path);
     if (m && req.method === "POST") {
       const id = Number(m[1]);
       if (m[2] === "token") return newToken(env, v, id, L, now);
+      if (m[2] === "mcp") return newMcpTokenFor(env, req, v, id, await formOf(req), L, now);
+      if (m[2] === "mcp-delete") return deleteMcpToken(env, v, id, L);
       if (m[2] === "delete") return deleteAdmin(env, v, id, L);
       return setRoles(env, v, id, await formOf(req), L);
     }

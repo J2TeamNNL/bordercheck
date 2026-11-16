@@ -778,8 +778,11 @@ export type AuditFilter = "all" | "mcp" | "api";
 export async function auditRows(env: Env, limit: number, filter: AuditFilter = "all", before = 0, byWho = ""): Promise<AuditRow[]> {
   const [a, b] = filter === "api" ? [API_ACTOR, API_READ_ACTOR] : [MCP_ACTOR, MCP_READ_ACTOR];
   const rows = await env.DB.prepare(
-    "SELECT id, at, who, action, target, detail FROM audit WHERE (?1 = 0 OR who IN (?2, ?3)) AND (?5 = 0 OR id < ?5) AND (?6 = '' OR who = ?6) ORDER BY id DESC LIMIT ?4",
-  ).bind(filter === "all" ? 0 : 1, a, b, limit, before, byWho.slice(0, 200)).all<AuditRow>();
+    // MCP: the deployment tokens' actors, and named admins' own tokens (their name, detail.via "mcp").
+    `SELECT id, at, who, action, target, detail FROM audit
+     WHERE (?1 = 0 OR who IN (?2, ?3) OR (?7 = 1 AND json_valid(detail) AND json_extract(detail, '$.via') = 'mcp'))
+       AND (?5 = 0 OR id < ?5) AND (?6 = '' OR who = ?6) ORDER BY id DESC LIMIT ?4`,
+  ).bind(filter === "all" ? 0 : 1, a, b, limit, before, byWho.slice(0, 200), filter === "mcp" ? 1 : 0).all<AuditRow>();
   return rows.results;
 }
 
