@@ -6,7 +6,7 @@ firewall) lets their traffic through, Cloudflare asks how that device stands. A 
 has failed a check for too long, shows signs of compromise or has gone silent loses access.
 
 - [How the score works](#how-the-score-works)
-- [What you need](#what-you-need)
+- [What you need](#what-you-need), and [the `warp` check](#turn-on-the-warp-check) that tells people to install the client
 - [Set up the integration](#set-up-the-integration) (once)
 - [Enforce it](#enforce-it): Access applications, Gateway network (firewall) and HTTP policies
 - [Roll it out](#roll-it-out) without locking everyone out
@@ -55,6 +55,32 @@ So people must sign in to WARP with the **same email** their BorderCheck invite 
   `*.workers.dev` address can't carry a path-scoped Access application. Keep `workers_dev` on if machines already
   report there.
 - The portal at a version with `/posture/cloudflare` and migration `0009` applied.
+
+Without the client, a device is unknown to Cloudflare and fails every posture check. Most people do not have it
+yet when you start, so **turn on the `warp` check** below first: BorderCheck then tells each of them what is
+missing, long before you enforce anything.
+
+### Turn on the `warp` check
+
+From BorderCheck v0.5.20 the `warp` check looks at the Cloudflare One client (WARP) on the machine: installed,
+registered to your Zero Trust team, connected, and, if you ask for it, in "Posture only" mode. It is **off by
+default**; turn it on in the policy of every role whose people must get through Zero Trust:
+
+```json
+{ "checks": { "warp": { "enabled": true, "team": "<your team name>", "posture_only": true } } }
+```
+
+- `team`: your Zero Trust team name (`<team>.cloudflareaccess.com`). A client registered to another team, or to
+  none (the free consumer WARP), does not count.
+- `posture_only`: also expect the "Posture only" service mode, when you enforce through Access only. Leave it
+  out once you move devices to a traffic mode for Gateway.
+
+What it finds is a **warning**, never a fail: the person sees what to do on their report page and in a
+notification, and the machine counts as "attention", within `access.warn_grace` once you enforce. The service
+mode comes from your device profile's **Service mode** setting in the Zero Trust dashboard, not from the person:
+set the default profile to **Posture only** before turning `posture_only` on. The portal leaves the check out of
+the policy it serves to machines older than v0.5.20 (they would refuse it), so you can turn it on now: each
+machine starts checking once it updates.
 
 ## Set up the integration
 
@@ -170,7 +196,8 @@ inspection for anything beyond hostnames.
 
 ## Roll it out
 
-1. **Set up, don't enforce.** Steps 1–5 only. Check device results in Zero Trust and the portal's filters
+1. **Set up, don't enforce.** Steps 1–5 only, and [the `warp` check](#turn-on-the-warp-check) on in each
+   role, so people hear from BorderCheck that they need the client. Check device results in Zero Trust and the portal's filters
    (*Fail, error or warn*, *Silent*): who would lose access today, and why (not enrolled, WARP signed in with
    another email, an old warning past its grace…).
 2. **Announce a date.** Tell people what to do by when: install BorderCheck from their invite, sign in to WARP
@@ -186,6 +213,8 @@ inspection for anything beyond hostnames.
 
 A device scores 0 though the person has BorderCheck:
 
+- **No client, or registered elsewhere.** The `warp` check on the machine says which: not installed, another
+  team, not connected.
 - **Different email.** WARP's user and the BorderCheck invite must be the same address (case does not matter).
 - **No serial and a different hostname.** Before v0.5.19 there is no serial; the short hostname in WARP must
   match the one in the portal. Update BorderCheck (it updates itself daily when the policy allows).
