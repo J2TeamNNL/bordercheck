@@ -240,6 +240,10 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
   if ((path === "/admin/admins" || path.startsWith("/admin/admins/")) && usableToken(env.ADMIN_TOKEN) && v.via !== "access") {
     if (path === "/admin/admins" && req.method === "GET") return adminsPage(env, v, L);
     if (path === "/admin/admins" && req.method === "POST") return addAdmin(env, v, await formOf(req), L, now);
+    if (path === "/admin/admins/mcp" && req.method === "POST") {
+      const f = await formOf(req);
+      return newMcpTokenFor(env, req, v, Number(f.get("admin")), f, L, now);
+    }
     m = /^\/admin\/admins\/(\d{1,12})\/(token|delete|roles|mcp|mcp-delete)$/.exec(path);
     if (m && req.method === "POST") {
       const id = Number(m[1]);

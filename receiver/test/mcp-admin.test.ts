@@ -116,6 +116,12 @@ describe("admin MCP tokens", () => {
     const a = await addAdmin("Kien", [dev.roleId]);
     const b = await addAdmin("Lan", [dev.roleId]);
     expect((await mcpToken(a.id, { authorization: `Bearer ${b.token}` }, "read")).status).toBe(403);
+    // The panel under the table posts the admin's id in the form.
+    expect((await form("/admin/admins/mcp", { authorization: `Bearer ${b.token}` }, [["admin", String(a.id)], ["access", "read"]])).status).toBe(403);
+    const viaPanel = await form("/admin/admins/mcp", OWNER, [["admin", String(b.id)], ["access", "read"]]);
+    expect(MCP_RE.test(await viaPanel.text())).toBe(true);
+    const listing = await (await call(new Request(`${BASE}/admin/admins`, { headers: OWNER }))).text();
+    expect(listing).toContain('action="/admin/admins/mcp"');
     const first = (await mcpToken(a.id, { authorization: `Bearer ${a.token}` }, "read")).token;
     const second = (await mcpToken(a.id, { authorization: `Bearer ${a.token}` }, "write")).token;
     expect((await tool(first, "list_roles")).status).toBe(401);
@@ -127,7 +133,7 @@ describe("admin MCP tokens", () => {
     expect((await form(`/admin/admins/${a.id}/mcp-delete`, OWNER)).status).toBe(200);
     expect((await tool(second, "list_roles")).status).toBe(401);
     const actions = (await env.DB.prepare("SELECT action FROM audit WHERE action LIKE 'admin.mcp%' ORDER BY id").all<{ action: string }>()).results.map((r) => r.action);
-    expect(actions).toEqual(["admin.mcp_token", "admin.mcp_token", "admin.mcp_remove"]);
+    expect(actions).toEqual(["admin.mcp_token", "admin.mcp_token", "admin.mcp_token", "admin.mcp_remove"]);
   });
 
   it("removing the admin ends the token; without any token /mcp is still 404", async () => {

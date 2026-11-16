@@ -144,16 +144,22 @@ export async function adminsPage(env: Env, v: Viewer, L: I18n, message?: Key | M
     const state = r.mcp_write === null
       ? html`<span class="muted">${L.t("admins.mcpOff")}</span>`
       : html`${L.t(r.mcp_write ? "admins.mcpWrite" : "admins.mcpRead")}${r.mcp_created_at ? html` <span class="muted small">${L.when(r.mcp_created_at)}</span>` : ""}`;
-    if (!mcpOn || !(v.owner || self)) return state;
-    const remove = r.mcp_write === null
-      ? ""
-      : html` <form class="inline" method="post" action="/admin/admins/${r.id}/mcp-delete"><button class="sm danger">${L.t("admins.mcpRemove")}</button></form>`;
-    return html`${state}<details class="adder"><summary class="btn sm">${L.t("admins.mcpNew")}</summary>
-<form method="post" action="/admin/admins/${r.id}/mcp"><fieldset class="field"><legend>${L.t("admins.mcpAccess")}</legend>
-<label class="check" for="mcp-r-${r.id}"><input type="radio" id="mcp-r-${r.id}" name="access" value="read" checked> ${L.t("admins.mcpRead")}</label>
-<label class="check" for="mcp-w-${r.id}"><input type="radio" id="mcp-w-${r.id}" name="access" value="write"> ${L.t("admins.mcpWrite")}</label></fieldset>
-<p class="muted small">${L.t("admins.mcpRule")}</p><div class="actions"><button class="sm primary">${L.t("admins.mcpMake")}</button></div></form></details>${remove}`;
+    if (!mcpOn || !(v.owner || self) || r.mcp_write === null) return state;
+    return html`${state} <form class="inline" method="post" action="/admin/admins/${r.id}/mcp-delete"><button class="sm danger">${L.t("admins.mcpRemove")}</button></form>`;
   };
+  // Making an MCP token: its own panel under the table (the owner picks the admin).
+  const mcpFor = rows ?? [];
+  const mcpSection = mcpOn && mcpFor.length
+    ? html`<h2>${L.t("admins.mcpNew")}</h2>
+<form method="post" action="/admin/admins/mcp"><div class="panel">
+${v.owner
+    ? html`<div class="field"><label for="mcp-admin">${L.t("admins.thName")}</label><select id="mcp-admin" name="admin">${mcpFor.map((r) => html`<option value="${r.id}">${r.name}</option>`)}</select></div>`
+    : html`<input type="hidden" name="admin" value="${v.adminId}">`}
+<fieldset class="field"><legend>${L.t("admins.mcpAccess")}</legend>
+<label class="check" for="mcp-r"><input type="radio" id="mcp-r" name="access" value="read" checked> ${L.t("admins.mcpRead")}</label>
+<label class="check" for="mcp-w"><input type="radio" id="mcp-w" name="access" value="write"> ${L.t("admins.mcpWrite")}</label></fieldset>
+<p class="muted small">${L.t("admins.mcpRule")}</p><div class="actions"><button class="primary">${L.t("admins.mcpMake")}</button></div></div></form>`
+    : "";
   const action = (r: AdminListRow) => {
     const self = r.id === v.adminId;
     const token = v.owner || self
@@ -182,7 +188,7 @@ ${roleBoxes(L, "new-role", roles, new Set())}
   const body = html`<div class="hero"><p class="eyebrow">${L.t("passkeys.eyebrow")}</p><h1>${L.t("nav.admins")}</h1>
 <p class="lead">${L.t(v.owner ? "admins.lead" : "admins.leadSelf")}</p></div>
 ${message ? note(L.m(typeof message === "string" ? msg(message) : message), tone(status)) : ""}
-${list}${add}`;
+${list}${mcpSection}${add}`;
   return page(layout(L, L.s("nav.admins"), v.who, body, "Admins"), status);
 }
 
