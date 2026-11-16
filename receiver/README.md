@@ -357,50 +357,13 @@ product names and URLs are never translated.
 
 ## Device posture for Cloudflare Zero Trust: no access from a machine that fails
 
-Cloudflare One can ask the portal how each device stands before Access or Gateway lets it through. The portal
-answers a score per device from BorderCheck's view of that machine:
-
-| Machine | Score |
-|---|---|
-| Compliant | 100 |
-| Warnings or errors only ("attention"), within the role's `access.warn_grace` (default 7 days) | 90 |
-| A check fails ("non-compliant"), within the role's `access.fail_grace` (default 3 days) | 70 |
-| Past those grace periods | 0 |
-| Signs of compromise (always, no grace), silent for `SILENT_DAYS`, revoked, never reported, not enrolled, unknown | 0 |
-
-A posture rule **score ≥ 60** then gives a machine time to fix what it found and takes access away after; a
-compromised machine loses it at once. The grace runs from when the oldest current warning (or fail) began,
-waived checks do not count, and each role sets its own in its policy:
-`"access": {"warn_grace": "168h", "fail_grace": "72h"}` (Go durations up to 90 days, `"0"` = no grace). Only the
-owner changes them: a named admin and MCP can't (spelling out the defaults is no change), and the portal leaves
-the section out of the policy it serves, so machines of any version accept the role. Devices are matched by hardware serial number (BorderCheck v0.5.19 and later send it),
-else by the user's email (from the invite) and short hostname; several matches take the lowest score. Devices
-need the Cloudflare One client (WARP; "Posture only" mode is enough), signed in with the same email the person
-was invited with.
-
-Set it up (Zero Trust dashboard, then `receiver/`):
-
-1. **Access → Service auth → Service tokens**: create one, e.g. `bordercheck-posture`. Keep its client ID and
-   secret in a password manager.
-2. **Access → Applications → Add → Self-hosted**: domain = the portal's host, path `posture/cloudflare`. One
-   policy, action **Service Auth**, include that service token. Copy the application's **AUD tag**.
-3. Tell the portal (`wrangler.jsonc` vars, then deploy): `ACCESS_TEAM_DOMAIN` = `<team>.cloudflareaccess.com`,
-   `POSTURE_ACCESS_AUD` = the AUD tag, optionally `POSTURE_CLIENT_ID` = the service token's client ID (then only
-   that token is answered). Setting `ACCESS_TEAM_DOMAIN` alone does not put the dashboard behind Access; that
-   still needs `ACCESS_AUD`.
-4. **Integrations → Service providers → Add → Custom service provider**: the service token's client ID and
-   secret, REST API URL `https://<portal>/posture/cloudflare`, and a polling frequency.
-5. **Reusable components → Posture checks → Service provider checks → Add**: provider = that integration,
-   **Score** greater than or equal to 60 (or your threshold). Through the API, give the check an expiry of at least
-   twice the polling frequency, so that if the portal cannot be reached devices fail instead of keeping an old
-   pass.
-6. Require that posture check in Access application policies (Require → Device posture) and, for private
-   networks and Tunnel, in Gateway network and HTTP policies ("Passed device posture checks").
-
-Only a service token is answered (an Access JWT for `POSTURE_ACCESS_AUD` with no email; 401 otherwise), at most
-1,000 devices per request; without `POSTURE_ACCESS_AUD` the path is 404. A change shows at Cloudflare's next
-poll, plus up to 5 minutes of Gateway caching, and does not end sessions already open. BorderCheck's view is
-what the machine reports about itself: it raises the bar, it is not hardware attestation.
+`POST /posture/cloudflare` answers Cloudflare One's custom service provider integration: a score from 0 to 100
+per device (100 compliant, 90 attention within the role's `access.warn_grace`, 70 failing within
+`access.fail_grace`, 0 past those, and always 0 for signs of compromise, silent, revoked or unknown machines),
+matched by hardware serial number, else by invite email and short hostname. Only an Access service token for
+`POSTURE_ACCESS_AUD` (with `ACCESS_TEAM_DOMAIN`, optionally `POSTURE_CLIENT_ID`) is answered; without
+`POSTURE_ACCESS_AUD` the path is 404. Set-up, enforcing through Access and Gateway (the Zero Trust firewall),
+and rolling it out: [docs/zero-trust.md](../docs/zero-trust.md).
 
 ## MCP server: ask Claude about the fleet
 

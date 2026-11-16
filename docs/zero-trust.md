@@ -1,0 +1,201 @@
+# Enforcing BorderCheck with Cloudflare Zero Trust
+
+BorderCheck itself only looks and reports. To make access depend on it, the portal answers Cloudflare Zero
+Trust's **device posture** checks: before Access lets a person into an application, or Gateway (the Zero Trust
+firewall) lets their traffic through, Cloudflare asks how that device stands. A machine that is not enrolled,
+has failed a check for too long, shows signs of compromise or has gone silent loses access.
+
+- [How the score works](#how-the-score-works)
+- [What you need](#what-you-need)
+- [Set up the integration](#set-up-the-integration) (once)
+- [Enforce it](#enforce-it): Access applications, Gateway network (firewall) and HTTP policies
+- [Roll it out](#roll-it-out) without locking everyone out
+- [Troubleshooting](#troubleshooting) and [limits](#limits)
+
+## How the score works
+
+Cloudflare polls the portal at `POST /posture/cloudflare` with the devices its client (WARP) knows; the portal
+answers a score from 0 to 100 for each:
+
+| Machine | Score |
+|---|---|
+| Compliant | 100 |
+| Warnings or errors only ("attention"), within the role's `access.warn_grace` (default 7 days) | 90 |
+| A check fails ("non-compliant"), within the role's `access.fail_grace` (default 3 days) | 70 |
+| Past those grace periods | 0 |
+| **Signs of compromise**: always, no grace | 0 |
+| Silent for `SILENT_DAYS`, revoked, never reported, not enrolled, unknown device | 0 |
+
+With a posture rule **score ≥ 60**, a machine gets time to fix what BorderCheck found and loses access after; a
+compromised one loses it at once. The grace runs from when the oldest current warning (or fail) began; waived
+checks do not count. Each role sets its own in its policy ([`access`](policies.md#access)):
+
+```json
+{ "access": { "warn_grace": "168h", "fail_grace": "72h" } }
+```
+
+Go durations up to `2160h` (90 days); `"0"` = no grace. Only the portal's owner can change them (not a named
+admin, not MCP), and the portal leaves the section out of the policy it sends to machines.
+
+**Matching a device to a machine.** By hardware serial number (BorderCheck v0.5.19 and later send it); a device
+whose serial matches no machine is matched by the email the person was invited with and the short hostname
+(`Ans-MacBook-Pro` = `ans-macbook-pro.local`). Several machines matching one device: the lowest score wins.
+So people must sign in to WARP with the **same email** their BorderCheck invite was sent to.
+
+## What you need
+
+- A Cloudflare Zero Trust organisation, with the Cloudflare One client (WARP) on every device you want to let in,
+  enrolled in that organisation.
+  - For **Access** policies, WARP's "Posture only" mode is enough.
+  - For **Gateway** network and HTTP policies (the firewall), WARP must send traffic to Gateway ("Traffic and
+    DNS" or "Traffic only"): in posture-only mode Gateway never sees the traffic.
+- The portal on a **hostname in a zone of the same Cloudflare account** (a custom domain such as
+  `bordercheck.example.com`), so an Access application can sit in front of `/posture/cloudflare`. A
+  `*.workers.dev` address can't carry a path-scoped Access application. Keep `workers_dev` on if machines already
+  report there.
+- The portal at a version with `/posture/cloudflare` and migration `0009` applied.
+
+## Set up the integration
+
+Five steps, in the Zero Trust dashboard or with the [`cf` CLI](https://developers.cloudflare.com/) (set
+`CLOUDFLARE_ACCOUNT_ID`; run each write with `--dry-run` first). Nothing here blocks anyone yet: enforcement is
+the [next section](#enforce-it).
+
+### 1. A service token for Cloudflare to call the portal
+
+Dashboard: **Access → Service auth → Service tokens → Create**, e.g. `BorderCheck posture`, duration one year.
+Copy the **client ID** and **client secret** into your password manager: the secret is shown once.
+
+```sh
+cf zero-trust access service-tokens create --name "BorderCheck posture" --duration 8760h
+```
+
+The response holds the secret: send it straight to your secret store rather than to the terminal or a log.
+Note when the token expires: the integration stops working then (renew it before).
+
+### 2. An Access application in front of the posture path
+
+Dashboard: **Access → Applications → Add an application → Self-hosted**, domain = the portal's hostname, path
+`posture/cloudflare`. One policy: action **Service Auth**, include **Service token** = the token from step 1.
+After saving, copy the application's **Application Audience (AUD) tag**.
+
+```sh
+cf zero-trust access applications create --body '{
+  "type": "self_hosted",
+  "name": "BorderCheck posture",
+  "domain": "bordercheck.example.com/posture/cloudflare",
+  "policies": [{ "name": "Posture service token", "decision": "non_identity",
+                 "include": [{ "service_token": { "token_id": "<service token id>" } }] }]
+}'
+```
+
+Cloudflare's own calls are the only ones that get through: people, even signed-in ones, are refused at the
+door, and the portal also refuses any Access JWT that carries an email.
+
+### 3. Tell the portal
+
+In the portal's Wrangler config, under `vars`, then deploy:
+
+| Var | Value |
+|---|---|
+| `ACCESS_TEAM_DOMAIN` | `<team>.cloudflareaccess.com` |
+| `POSTURE_ACCESS_AUD` | the AUD tag from step 2 |
+| `POSTURE_CLIENT_ID` | optional: the service token's client ID; then only that token gets answers |
+
+Setting `ACCESS_TEAM_DOMAIN` alone does not put the dashboard behind Access (that needs `ACCESS_AUD` too).
+Without `POSTURE_ACCESS_AUD`, `/posture/cloudflare` answers 404.
+
+### 4. The custom service provider
+
+Dashboard: **Integrations → Service providers → Add → Custom service provider**: the client ID and secret from
+step 1, REST API URL `https://<portal hostname>/posture/cloudflare`, polling frequency e.g. 10 minutes.
+
+```sh
+cf zero-trust devices posture integrations create --name "BorderCheck" --type custom_s2s --interval 10m \
+  --config-api-url "https://bordercheck.example.com/posture/cloudflare" \
+  --config-access-client-id "<client id>" --config-access-client-secret "$SECRET"   # from your secret store
+```
+
+### 5. The posture check
+
+Dashboard: **Reusable components → Posture checks → Service provider checks → Add**: provider = the
+integration from step 4, **Score** greater than or equal to **60**. Give it an expiration of at least twice the
+polling frequency (e.g. 20 minutes for 10), so that if the portal can't be reached devices fail instead of
+keeping an old pass.
+
+```sh
+cf zero-trust devices posture rules create --name "BorderCheck score >= 60" --type custom_s2s \
+  --input-connection-id "<integration id>" --input-score-operator ">=" --input-score 60 --expiration 20m
+```
+
+From now on Cloudflare shows each device's result (**My Team → Devices → a device → Posture checks**) but no
+policy uses it yet: a dry run you can watch.
+
+## Enforce it
+
+Add the check from step 5 to the policies that decide who gets in. Start with one application (see
+[Roll it out](#roll-it-out)).
+
+### Access applications (web apps, SSH and databases behind Tunnel)
+
+For each self-hosted application: **Policies → the Allow policy → Add require → Device posture → "BorderCheck
+score >= 60"**. A `require` must hold on top of the `include` rules (who the person is), so existing identity
+rules stay as they are. Bypass and Service Auth policies (webhooks, agents, health checks) are not people's
+devices: leave them alone.
+
+### Gateway network policies (the firewall: private networks, Tunnel, SSH, RDP, databases)
+
+**Gateway → Firewall policies → Network → Add a policy**, placed **above** the rules that allow the traffic:
+
+| | |
+|---|---|
+| Selector | Destination IP / Virtual network / Application: what you protect, e.g. your private ranges |
+| And | **Passed Device Posture Checks** · not in · `BorderCheck score >= 60` |
+| Action | **Block** |
+
+Blocking what fails, rather than allowing what passes, keeps your existing allow rules working and makes the
+BorderCheck rule easy to switch off. Gateway caches posture results for up to 5 minutes and does not cut
+connections that are already open.
+
+### Gateway HTTP policies (web traffic through Gateway)
+
+The same shape under **Firewall policies → HTTP**: traffic selector (Domain, Host, Application…) **and**
+**Passed Device Posture Checks not in** `BorderCheck score >= 60` → **Block**. HTTP policies need TLS
+inspection for anything beyond hostnames.
+
+## Roll it out
+
+1. **Set up, don't enforce.** Steps 1–5 only. Check device results in Zero Trust and the portal's filters
+   (*Fail, error or warn*, *Silent*): who would lose access today, and why (not enrolled, WARP signed in with
+   another email, an old warning past its grace…).
+2. **Announce a date.** Tell people what to do by when: install BorderCheck from their invite, sign in to WARP
+   with the same email, fix what their report page lists. A machine that already has a warning older than
+   `warn_grace` (or a fail older than `fail_grace`) loses access the moment you enforce: give the date enough
+   room, or raise the grace for the first weeks (owner, in the role's `access`).
+3. **Enforce on one application** first, ideally one used daily by people who can report problems quickly.
+4. **Then the rest**, application by application, and the Gateway network rules last (they cover the most).
+5. **Undo** = remove the posture requirement from a policy (or disable the Gateway rule). Nothing on the
+   portal side needs to change.
+
+## Troubleshooting
+
+A device scores 0 though the person has BorderCheck:
+
+- **Different email.** WARP's user and the BorderCheck invite must be the same address (case does not matter).
+- **No serial and a different hostname.** Before v0.5.19 there is no serial; the short hostname in WARP must
+  match the one in the portal. Update BorderCheck (it updates itself daily when the policy allows).
+- **Past the grace.** The machine page in the portal shows each check's "since".
+- **Silent.** No report for `SILENT_DAYS`: the service stopped or the machine was off; `bordercheck status`
+  on the machine says why.
+- **Revoked**, or **signs of compromise**: by design.
+
+The integration shows errors in Zero Trust: check the service token has not expired, the Access application's
+path and policy, and the portal's `POSTURE_ACCESS_AUD` / `POSTURE_CLIENT_ID`.
+
+## Limits
+
+- BorderCheck's view is what each machine reports about itself: it raises the bar for everyone, it is not
+  hardware attestation, and a person with admin rights on their machine can lie to it.
+- Changes show at Cloudflare's next poll, plus Gateway's cache, and open sessions are not cut.
+- Applications that sign people in with Google directly (not through Access) are not covered: put them behind
+  Access first.

@@ -89,7 +89,9 @@ Each machine runs BorderCheck every hour as a per-user service and reports to yo
   ```
 
   Each machine gets its own token, so you can revoke one alone. The portal shows the fleet, posts alerts to
-  Discord or Slack, and can be driven by Claude through its MCP server.
+  Discord or Slack, can be driven by Claude through its MCP server, and can gate access: with Cloudflare Zero
+  Trust, a machine that fails for too long or shows signs of compromise loses access
+  ([Zero Trust guide](docs/zero-trust.md)).
 - **A static `policies.json`**, with no portal: host one policy file and your own report endpoint, or keep the
   file beside the binary and only run it by hand.
 
@@ -125,6 +127,8 @@ A policy only needs what it changes:
 - [Running your own portal](docs/portal.md): deploy, sign in, roles, invites, alerts, custom domain, MCP,
   upgrading.
 - [Policies](docs/policies.md): every field and every check's options, waivers, notifications, examples.
+- [Enforcing with Cloudflare Zero Trust](docs/zero-trust.md): device posture from BorderCheck in Access and
+  Gateway (firewall) policies, grace periods, rolling it out.
 - [`receiver/README.md`](receiver/README.md): the portal's full reference: wire contract, schema, security
   model, settings.
 
