@@ -174,6 +174,34 @@ score >= 60"**. A `require` must hold on top of the `include` rules (who the per
 rules stay as they are. Bypass and Service Auth policies (webhooks, agents, health checks) are not people's
 devices: leave them alone.
 
+### Phones and tablets: let them through (the default) or not
+
+BorderCheck does not run on iOS or Android, so a phone never passes the BorderCheck check. Zero Trust tells a
+phone apart only when it runs the **Cloudflare One Agent** app signed in to your team: without it, Access sees
+who the person is but not what device they are on, and any posture requirement fails.
+
+To let phones through (recommended default), create two Cloudflare One Client checks once, **OS version**,
+operating system iOS and Android, version `>= 1.0.0` (any version):
+
+```sh
+cf zero-trust devices posture rules create --body '{"name": "Mobile: iOS (any version)", "type": "os_version",
+  "match": [{"platform": "ios"}], "input": {"version": "1.0.0", "operator": ">="}}'
+cf zero-trust devices posture rules create --body '{"name": "Mobile: Android (any version)", "type": "os_version",
+  "match": [{"platform": "android"}], "input": {"version": "1.0.0", "operator": ">="}}'
+```
+
+Then, in each application where you require the BorderCheck check, add a **second Allow policy** next to it:
+
+| Policy | Include (any of) | Require (all of) |
+|---|---|---|
+| Computers | your people (e.g. emails ending in `@example.com`) | Device posture: *BorderCheck score >= 60* |
+| Phones | Device posture: *Mobile: iOS*, *Mobile: Android* | your people (the same identity rule) |
+
+Access lets a person in when any Allow policy matches, so phones pass the second one and computers must pass the
+first. To keep phones out of an application, leave the Phones policy out of it. For Gateway, add the two
+mobile checks to the Block rule's condition the same way: block when *BorderCheck score >= 60* **and** both
+mobile checks are not passed.
+
 ### Gateway network policies (the firewall: private networks, Tunnel, SSH, RDP, databases)
 
 **Gateway → Firewall policies → Network → Add a policy**, placed **above** the rules that allow the traffic:
