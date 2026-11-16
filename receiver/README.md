@@ -359,7 +359,8 @@ product names and URLs are never translated.
 
 `POST /posture/cloudflare` answers Cloudflare One's custom service provider integration: a score from 0 to 100
 per device (100 compliant, 90 attention within the role's `access.warn_grace`, 70 failing within
-`access.fail_grace`, 0 past those, and always 0 for signs of compromise, silent, revoked or unknown machines),
+`access.fail_grace`, 0 past those, and always 0 for signs of compromise, silent (`SILENT_DAYS`, or the role's `report.interval` + 2
+days if longer), revoked or unknown machines),
 matched by hardware serial number, else by invite email and short hostname. Only an Access service token for
 `POSTURE_ACCESS_AUD` (with `ACCESS_TEAM_DOMAIN`, optionally `POSTURE_CLIENT_ID`) is answered; without
 `POSTURE_ACCESS_AUD` the path is 404. Set-up, enforcing through Access and Gateway (the Zero Trust firewall),

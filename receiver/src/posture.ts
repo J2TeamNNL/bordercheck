@@ -25,14 +25,15 @@
 // Scores: 100 compliant; 90 warnings or errors only, within the role's
 // access.warn_grace (7 days) of when they began; 70 a check fails, within
 // access.fail_grace (3 days); 0 past those, and always for signs of
-// compromise, silent for SILENT_DAYS, revoked, never reported, not enrolled,
+// compromise, silent (SILENT_DAYS, or the role's report.interval + 2 days when
+// that is longer), revoked, never reported, not enrolled,
 // or unknown. A posture rule "score >= 60" then gives a machine time to fix
 // what it found and takes access away after; a compromised one loses it at once.
 
 import { accessClaims } from "./auth";
-import { config, DAY, type Env } from "./env";
+import { config, type Env } from "./env";
 import { json, readLimited, TooLarge } from "./ingest";
-import { accessGrace } from "./roles";
+import { accessGrace, silentAfter } from "./roles";
 
 export const MAX_POSTURE_DEVICES = 1000;
 const MAX_POSTURE_BYTES = 1024 * 1024;
@@ -67,7 +68,7 @@ const s = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0
 export const shortHost = (h: string | null | undefined) => (h ?? "").trim().toLowerCase().split(".")[0];
 
 export function postureScore(c: Candidate, env: Env, now: Date): number {
-  const silentIso = new Date(now.getTime() - config(env).silentDays * DAY).toISOString();
+  const silentIso = new Date(now.getTime() - silentAfter(c.policy, config(env).silentDays)).toISOString();
   // Signs of compromise: no grace, ever.
   if (c.compromised_since || c.revoked_at || !c.last_seen || c.last_seen < silentIso) return SCORE.none;
   const grace = accessGrace(c.policy);

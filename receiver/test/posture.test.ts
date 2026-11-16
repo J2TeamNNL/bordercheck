@@ -181,3 +181,24 @@ describe("who may change the grace periods", () => {
     expect(owner.ok).toBe(true);
   });
 });
+
+describe("silence follows the role's report interval", () => {
+  it("a weekly role gets interval + 2 days, a daily one SILENT_DAYS", async () => {
+    const { silentAfter } = await import("../src/roles");
+    const day = 86400_000;
+    expect(silentAfter(JSON.stringify({ report: { interval: "168h" } }), 7)).toBe(9 * day);
+    expect(silentAfter(JSON.stringify({ report: { interval: "24h" } }), 7)).toBe(7 * day);
+    expect(silentAfter("{}", 7)).toBe(7 * day);
+    expect(silentAfter("not json", 3)).toBe(3 * day);
+
+    stubCerts();
+    const m = await enrolled("an@domain.com", "Weekly");
+    await env.DB.prepare("UPDATE roles SET policy = ? WHERE id = ?").bind(JSON.stringify({ report: { interval: "168h" } }), m.roleId).run();
+    await post(report(host("C02W"), [result("firewall", "pass")]), { token: m.token });
+    const ago = (days: number) => env.DB.prepare("UPDATE machines SET last_seen = ? WHERE install_id = ?").bind(new Date(Date.now() - days * day).toISOString(), m.install_id).run();
+    await ago(8); // past SILENT_DAYS, before the weekly report + 2 days
+    expect((await ask([dev("d", { serial_number: "C02W" })])).body.result.d.score).toBe(100);
+    await ago(9.1);
+    expect((await ask([dev("d", { serial_number: "C02W" })])).body.result.d.score).toBe(0);
+  });
+});

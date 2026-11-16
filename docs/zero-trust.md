@@ -24,7 +24,8 @@ answers a score from 0 to 100 for each:
 | A check fails ("non-compliant"), within the role's `access.fail_grace` (default 3 days) | 70 |
 | Past those grace periods | 0 |
 | **Signs of compromise**: always, no grace | 0 |
-| Silent for `SILENT_DAYS`, revoked, never reported, not enrolled, unknown device | 0 |
+| Silent: no report for `SILENT_DAYS`, or the role's `report.interval` + 2 days if longer (a weekly role: 9 days) | 0 |
+| Revoked, never reported, not enrolled, unknown device | 0 |
 
 With a posture rule **score ≥ 60**, a machine gets time to fix what BorderCheck found and loses access after; a
 compromised one loses it at once. The grace runs from when the oldest current warning (or fail) began; waived
@@ -189,7 +190,7 @@ A device scores 0 though the person has BorderCheck:
 - **No serial and a different hostname.** Before v0.5.19 there is no serial; the short hostname in WARP must
   match the one in the portal. Update BorderCheck (it updates itself daily when the policy allows).
 - **Past the grace.** The machine page in the portal shows each check's "since".
-- **Silent.** No report for `SILENT_DAYS`: the service stopped or the machine was off; `bordercheck status`
+- **Silent.** No report for `SILENT_DAYS` (or the role's report interval + 2 days): the service stopped or the machine was off; `bordercheck status`
   on the machine says why.
 - **Revoked**, or **signs of compromise**: by design.
 

@@ -63,6 +63,22 @@ export function accessGrace(policyText: string | null | undefined): { warn: numb
   return out;
 }
 
+// silentAfter: how long without a report before a machine of this role counts
+// as silent for device posture: SILENT_DAYS, but never less than the role's
+// report.interval plus 2 days, so a machine reporting weekly is not cut off
+// every week just before its next report (or over a weekend with the lid shut).
+export function silentAfter(policyText: string | null | undefined, silentDays: number): number {
+  let interval = DAY; // bordercheck's default report.interval, 24h
+  try {
+    const r = (JSON.parse(policyText ?? "{}") as Obj).report;
+    const d = isObj(r) ? goDuration(r.interval) : null;
+    if (d !== null && d > 0) interval = d;
+  } catch {
+    // the default
+  }
+  return Math.max(silentDays * DAY, interval + 2 * DAY);
+}
+
 // sameGrace: two policies give the same grace periods (unset = the defaults).
 export function sameGrace(a: string | null | undefined, b: string | null | undefined): boolean {
   const x = accessGrace(a);
