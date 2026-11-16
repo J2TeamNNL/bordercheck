@@ -236,7 +236,7 @@ describe("fix prompt on the report page", () => {
     expect(res.headers.get("content-security-policy")).toBe(COPY_CSP);
     const body = await res.text();
     expect(body).toContain(
-      `id="fix-prompt">BorderCheck (https://github.com/ptrinh/BorderCheck) is the security check my organisation runs on this computer. Run \`&quot;$HOME/Library/Application Support/bordercheck/bordercheck&quot; fix\` and follow what it prints to fix what it found.</code>`,
+      `id="fix-prompt">BorderCheck (https://github.com/ptrinh/BorderCheck) is the security check my organisation runs on this computer. Run \`&quot;$HOME/Library/Application Support/bordercheck/bordercheck&quot; fix\` in Claude Code/ChatGPT Codex and follow what it prints to fix what it found.</code>`,
     );
     expect(body).toMatch(/<button[^>]* hidden data-copy="fix-prompt"/);
     expect(body.split("<script>").length).toBe(2);
@@ -248,7 +248,7 @@ describe("fix prompt on the report page", () => {
   it("is in the page's language, and names the program where each OS installs it", async () => {
     const url = await reportUrl(await post(report({ version: "v0.5.1", host: { os: "windows", arch: "amd64", hostname: "an-pc" } }, failing)));
     const res = await call(new Request(url, { headers: { "cf-connecting-ip": "203.0.113.51", cookie: "bc_lang=vi" } }));
-    expect(await res.text()).toContain("BorderCheck (https://github.com/ptrinh/BorderCheck) là công cụ kiểm tra bảo mật mà tổ chức của tôi chạy trên máy tính này. Chạy `&amp; &quot;$env:LOCALAPPDATA\\bordercheck\\bordercheck.exe&quot; fix` rồi làm theo những gì nó in ra để sửa các vấn đề nó tìm thấy.");
+    expect(await res.text()).toContain("BorderCheck (https://github.com/ptrinh/BorderCheck) là công cụ kiểm tra bảo mật mà tổ chức của tôi chạy trên máy tính này. Chạy `&amp; &quot;$env:LOCALAPPDATA\\bordercheck\\bordercheck.exe&quot; fix` trên Claude Code/ChatGPT Codex rồi làm theo những gì nó in ra để sửa các vấn đề nó tìm thấy.");
     expect(fixCommand("linux")).toBe(`"\${XDG_DATA_HOME:-$HOME/.local/share}/bordercheck/bordercheck" fix`);
     expect(fixCommand("plan9")).toBe("bordercheck fix");
   });
