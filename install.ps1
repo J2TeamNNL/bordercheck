@@ -153,8 +153,15 @@ try {
     }
     if (-not $sigChecked) {
         foreach ($k in $Keys) {
+            # Windows PowerShell 5.1 turns redirected native stderr into a
+            # terminating error under 'Stop': a key that does not match (the
+            # new key on a release signed with the previous one) must only move
+            # on to the next key, not end the install.
+            $ErrorActionPreference = 'Continue'
             & $exe verify -key $k $sums $sig $exe 2>$null | Out-Null
-            if ($LASTEXITCODE -eq 0) { $sigChecked = $true; break }
+            $verified = ($LASTEXITCODE -eq 0)
+            $ErrorActionPreference = 'Stop'
+            if ($verified) { $sigChecked = $true; break }
         }
         if (-not $sigChecked) { Fail 'SHA256SUMS is NOT signed by the BorderCheck release key. Do not install this release; tell your IT team.' }
         Say 'SHA256SUMS is signed by the release key (checked by the downloaded binary; no OpenSSL with ed25519 was found).'
