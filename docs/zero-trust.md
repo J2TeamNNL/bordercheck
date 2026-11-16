@@ -119,14 +119,18 @@ cf zero-trust devices posture integrations create --name "BorderCheck" --type cu
 ### 5. The posture check
 
 Dashboard: **Reusable components → Posture checks → Service provider checks → Add**: provider = the
-integration from step 4, **Score** greater than or equal to **60**. Give it an expiration of at least twice the
-polling frequency (e.g. 20 minutes for 10), so that if the portal can't be reached devices fail instead of
-keeping an old pass.
+integration from step 4, **Score** greater than or equal to **60**. Give it an expiration, so that if the portal
+can't be reached devices fail instead of keeping an old pass. Cloudflare wants a schedule with it, and the
+expiration at least 15 minutes longer than the schedule (e.g. schedule 10 minutes, expiration 30).
 
 ```sh
-cf zero-trust devices posture rules create --name "BorderCheck score >= 60" --type custom_s2s \
-  --input-connection-id "<integration id>" --input-score-operator ">=" --input-score 60 --expiration 20m
+cf zero-trust devices posture rules create --body '{
+  "name": "BorderCheck score >= 60", "type": "custom_s2s", "schedule": "10m", "expiration": "30m",
+  "input": { "connection_id": "<integration id>", "operator": ">=", "score": 60 }
+}'
 ```
+
+(The rule's `description` is limited to 100 characters.)
 
 From now on Cloudflare shows each device's result (**My Team → Devices → a device → Posture checks**) but no
 policy uses it yet: a dry run you can watch.
