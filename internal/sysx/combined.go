@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"time"
 	"unicode/utf16"
 )
 
@@ -25,10 +26,15 @@ func RunCombined(ctx context.Context, name string, args ...string) (string, erro
 // PowerShellScript runs a multi-line Windows PowerShell script passed with
 // -EncodedCommand, so its quotes survive the Windows command line untouched.
 func PowerShellScript(ctx context.Context, script string) (string, error) {
-	u := utf16.Encode([]rune(script))
+	return PowerShellScriptFor(ctx, timeout, script)
+}
+
+// PowerShellScriptFor is PowerShellScript with its own time limit.
+func PowerShellScriptFor(ctx context.Context, limit time.Duration, script string) (string, error) {
+	u := utf16.Encode([]rune(progressOff + script))
 	b := make([]byte, 2*len(u))
 	for i, c := range u {
 		binary.LittleEndian.PutUint16(b[2*i:], c)
 	}
-	return Run(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(b))
+	return RunFor(ctx, limit, "powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(b))
 }

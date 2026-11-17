@@ -8,13 +8,16 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ptrinh/bordercheck/internal/msg"
 	"github.com/ptrinh/bordercheck/internal/sysx"
 )
 
 func updateFactsOS(ctx context.Context) (updateFacts, error) {
-	out, err := sysx.PowerShellScript(ctx, winUpdateScript)
+	// Get-HotFix and the update service's COM object can take long on a slow
+	// PC; the checks together have 90 seconds.
+	out, err := sysx.PowerShellScriptFor(ctx, 60*time.Second, winUpdateScript)
 	if err != nil {
 		return updateFacts{}, err
 	}
