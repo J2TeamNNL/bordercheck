@@ -121,6 +121,20 @@ A policy only needs what it changes:
   pinned at install: whoever controls the policy cannot push a binary.
 - Reports are self-reported: they tell you who needs help, not proof of compliance.
 
+## FAQ
+
+**Does BorderCheck have a GUI?**
+
+No app window, on purpose. The only pages are web pages: the report page each person opens for their own
+machine, and the portal, once you set one up. Desktop notifications tell people when something needs fixing.
+Everything else is done from the command line or by an AI agent: an agentic UI is the new UI.
+
+- On a laptop, `bordercheck` prints what it found, and `bordercheck fix` prints it as instructions for Claude Code,
+  ChatGPT Codex or a similar assistant to work through with the person, asking before every change. The report
+  page offers that prompt with a Copy button.
+- For admins, the portal's [MCP server](receiver/README.md#mcp-server-ask-claude-about-the-fleet) lets Claude
+  read the fleet and manage roles, invites, machines and waivers; scripts use the JSON API.
+
 ## Guides
 
 - [Installing BorderCheck on laptops](docs/install.md): invite links, a static `policies.json`, the service,
