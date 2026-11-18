@@ -10,7 +10,10 @@ on what was left open. BorderCheck looks for:
 - SSH keys with no passphrase
 - tunnels, remote access and AI agents that skip approvals
 
-For each one it finds, it says how to fix it. It runs on macOS, Windows and Linux and needs no admin rights.
+For each one it finds, it says how to fix it, step by step, so you can fix it yourself or hand it to an AI coding
+assistant: `bordercheck fix` prints the findings as instructions for Claude Code, ChatGPT Codex or the like, and
+an installed copy's report page offers the same as a prompt to copy. It runs on macOS, Windows and Linux and needs
+no admin rights.
 A plain run only reads: it changes nothing and sends nothing.
 
 It is small and fast. BorderCheck is one file of about 8 MB with nothing else to install, and a full check takes
@@ -65,7 +68,8 @@ Download `bordercheck-<version>-<os>-<arch>` from [Releases](https://github.com/
 and run it:
 
 ```sh
-bordercheck                    # check and print a report
+bordercheck                    # check and print a report, with how to fix each finding
+bordercheck fix                # the same as instructions for an AI coding assistant
 bordercheck -json              # the same report as JSON
 bordercheck -only secrets,mesh-vpn
 bordercheck -list
