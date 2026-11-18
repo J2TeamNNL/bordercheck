@@ -701,6 +701,7 @@ var Catalog = map[string]Entry{
 	"warp.otherTeam": s("The Cloudflare One client (WARP) is signed in to the Zero Trust team {org}, not {team}."),
 	"warp.disconnected": s("The Cloudflare One client (WARP) is disconnected: Zero Trust cannot check this computer " +
 		"until it is on."),
+	"warp.cannotConnect": s("The Cloudflare One client (WARP) is on but not connected (status {status}: {reason})."),
 	"warp.notPostureOnly": s("The Cloudflare One client (WARP) runs in {mode} mode, not Posture only."),
 	"warp.ok":             s("The Cloudflare One client (WARP) is signed in to {team} and connected."),
 	"warp.teamUnknown":    s("The client did not say which team it is signed in to."),
@@ -730,6 +731,8 @@ var Catalog = map[string]Entry{
 	"warp.fix.linux.connect": s("Run [code]warp-cli connect[/code]."),
 	"warp.fix.logout": s("Sign out of the other team first: the gear → Preferences → Account → Logout from " +
 		"Cloudflare Zero Trust (or [code]warp-cli registration delete[/code])."),
+	"warp.fix.cannotConnect": s("Click the Cloudflare WARP cloud to see the error. If it stays, send IT what it says: " +
+		"an error about the mTLS identity or the certificate is a setting of the organisation, not of this computer."),
 	"warp.fix.mode": s("The mode comes from your organisation's device profile in Zero Trust, not from this " +
 		"computer: tell IT."),
 

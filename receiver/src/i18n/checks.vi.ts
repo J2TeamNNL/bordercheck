@@ -558,6 +558,8 @@ export const checksVi: CheckCatalog = {
   "warp.consumer": "Cloudflare One client (WARP) đang đăng nhập dạng WARP miễn phí cho cá nhân, không phải team Zero Trust của tổ chức ({team}).",
   "warp.otherTeam": "Cloudflare One client (WARP) đang đăng nhập vào team Zero Trust {org}, không phải {team}.",
   "warp.disconnected": "Cloudflare One client (WARP) đang ngắt kết nối: Zero Trust không kiểm tra được máy này cho tới khi bật lại.",
+  "warp.cannotConnect": "Cloudflare One client (WARP) đang bật nhưng không kết nối được (trạng thái {status}: {reason}).",
+  "warp.fix.cannotConnect": "Bấm biểu tượng đám mây Cloudflare WARP để xem lỗi. Nếu lỗi vẫn còn, gửi IT nội dung lỗi: lỗi về mTLS identity hay chứng chỉ là cài đặt của tổ chức, không phải của máy này.",
   "warp.notPostureOnly": "Cloudflare One client (WARP) đang chạy ở chế độ {mode}, không phải Posture only.",
   "warp.ok": "Cloudflare One client (WARP) đã đăng nhập vào {team} và đang kết nối.",
   "warp.teamUnknown": "Client không cho biết nó đăng nhập vào team nào.",

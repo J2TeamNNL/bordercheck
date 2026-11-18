@@ -36,9 +36,14 @@ const (
 )
 
 func TestParseWarpReal(t *testing.T) {
+	// Posture only before the zone's client certificates were turned on.
+	if f := parseWarp("Status update: Unable\nReason: Failed to set mTLS Identity\n", warpRealReg, warpRealSettings); f.Status != "Unable" ||
+		f.Reason != "Failed to set mTLS Identity" || f.Connected {
+		t.Errorf("unable: %+v", f)
+	}
 	f := parseWarp(warpRealStatus, warpRealReg, warpRealSettings)
 	want := warpFacts{Installed: true, Running: true, Registered: true, Account: "Team", Org: "senprints",
-		Status: "Disconnected", Mode: "WarpWithDnsOverHttps"}
+		Status: "Disconnected", Reason: "Manual Disconnection", Mode: "WarpWithDnsOverHttps"}
 	if f != want {
 		t.Errorf("got %+v\nwant %+v", f, want)
 	}
@@ -91,6 +96,8 @@ func TestEvalWarp(t *testing.T) {
 		{"consumer", func(f *warpFacts) { f.Account = "Free"; f.Org = "" }, nil, check.Warn, check.Medium, "free consumer"},
 		{"other team", func(f *warpFacts) { f.Org = "acme" }, nil, check.Warn, check.Medium, "team acme, not SenPrints"},
 		{"disconnected", func(f *warpFacts) { f.Connected = false; f.Status = "Disconnected" }, nil, check.Warn, check.Low, "disconnected"},
+		{"cannot connect", func(f *warpFacts) { f.Connected = false; f.Status = "Unable"; f.Reason = "Failed to set mTLS Identity" }, nil,
+			check.Warn, check.Low, "on but not connected (status Unable: Failed to set mTLS Identity)"},
 		{"traffic mode", func(f *warpFacts) { f.Mode = "WarpWithDnsOverHttps" }, nil, check.Warn, check.Low, "WarpWithDnsOverHttps mode"},
 		{"traffic mode allowed", func(f *warpFacts) { f.Mode = "WarpWithDnsOverHttps" }, func(p *policy.Warp) { p.PostureOnly = false },
 			check.Pass, "", "connected"},

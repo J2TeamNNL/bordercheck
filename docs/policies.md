@@ -744,6 +744,7 @@ signed in. In order, the first of these that holds is reported:
 | Not signed in to any account, or signed in as the free consumer WARP rather than a team | medium |
 | Signed in to another Zero Trust team than `team` | medium |
 | Disconnected | low |
+| Switched on but not connected ("Connecting", or "Unable" with the client's reason, such as a missing mTLS identity) | low |
 | With `posture_only`: in another service mode than Posture only | low |
 
 Every finding is a **warning**, never a fail, with a fix for the person's OS (install, sign in to `team`, start,

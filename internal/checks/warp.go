@@ -32,6 +32,7 @@ type warpFacts struct {
 	Org        string // the Zero Trust team it is registered to; "" when not said
 	Connected  bool
 	Status     string // the status as the client says it, for evidence
+	Reason     string // why it is not connected, as the client says it
 	Mode       string // the service mode as the client says it (PostureOnly, WarpWithDnsOverHttps…); "" when not said
 }
 
@@ -81,6 +82,7 @@ func gatherWarp(ctx context.Context) warpFacts {
 
 var (
 	warpStatusRe  = regexp.MustCompile(`(?mi)^\s*Status update:\s*(.+?)\s*$`)
+	warpReasonRe  = regexp.MustCompile(`(?mi)^\s*Reason:\s*(.+?)\s*$`)
 	warpAccountRe = regexp.MustCompile(`(?mi)^\s*Account type:\s*(.+?)\s*$`)
 	warpOrgRe     = regexp.MustCompile(`(?mi)^\s*(?:\([^)]*\)\s*)?Organization:\s*(.+?)\s*$`)
 	warpModeRe    = regexp.MustCompile(`(?mi)^\s*(?:\([^)]*\)\s*)?Mode:\s*(\S+)`)
@@ -98,6 +100,9 @@ func parseWarp(status, registration, settings string) warpFacts {
 	if m := warpStatusRe.FindStringSubmatch(status); m != nil {
 		f.Status = m[1]
 		f.Connected = strings.HasPrefix(strings.ToLower(m[1]), "connected")
+	}
+	if m := warpReasonRe.FindStringSubmatch(status); m != nil && !f.Connected {
+		f.Reason = m[1]
 	}
 	if m := warpAccountRe.FindStringSubmatch(registration); m != nil {
 		f.Account = m[1]
@@ -160,9 +165,13 @@ func evalWarp(f warpFacts, p policy.Warp, goos string) check.Result {
 	case f.Org != "" && !strings.EqualFold(f.Org, team):
 		return warn(check.Medium, msg.P("warp.otherTeam", "org", f.Org, "team", team),
 			msg.Text{msg.P("warp.fix.logout"), enroll}, "organization: "+f.Org)
-	case !f.Connected:
+	case !f.Connected && (f.Status == "" || strings.HasPrefix(strings.ToLower(f.Status), "disconnected")):
 		return warn(check.Low, msg.P("warp.disconnected"), msg.Text{msg.P(warpFixes[osKey]["connect"])},
 			"status: "+orUnknown(f.Status))
+	case !f.Connected:
+		// Switched on but not connected: "Connecting", or "Unable" with the client's reason.
+		return warn(check.Low, msg.P("warp.cannotConnect", "status", f.Status, "reason", orUnknown(f.Reason)),
+			msg.Text{msg.P("warp.fix.cannotConnect")}, "status: "+f.Status, "reason: "+orUnknown(f.Reason))
 	case p.PostureOnly && f.Mode != "" && !strings.EqualFold(f.Mode, "PostureOnly"):
 		return warn(check.Low, msg.P("warp.notPostureOnly", "mode", f.Mode), msg.Text{msg.P("warp.fix.mode")},
 			"mode: "+f.Mode)

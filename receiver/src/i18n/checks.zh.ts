@@ -536,6 +536,8 @@ export const checksZh: CheckCatalog = {
   "warp.consumer": "Cloudflare One 客户端（WARP）以免费的个人版 WARP 登录，而不是你所在组织的 Zero Trust 团队（{team}）。",
   "warp.otherTeam": "Cloudflare One 客户端（WARP）登录的是 Zero Trust 团队 {org}，而不是 {team}。",
   "warp.disconnected": "Cloudflare One 客户端（WARP）已断开连接：在重新打开之前，Zero Trust 无法检查这台电脑。",
+  "warp.cannotConnect": "Cloudflare One 客户端（WARP）已打开但未连接（状态 {status}：{reason}）。",
+  "warp.fix.cannotConnect": "点击 Cloudflare WARP 云朵图标查看错误。如果错误一直存在，请把错误内容发给 IT：关于 mTLS identity 或证书的错误是组织的设置，而不是这台电脑的问题。",
   "warp.notPostureOnly": "Cloudflare One 客户端（WARP）以 {mode} 模式运行，而不是 Posture only。",
   "warp.ok": "Cloudflare One 客户端（WARP）已登录到 {team} 并已连接。",
   "warp.teamUnknown": "客户端没有说明它登录的是哪个团队。",
