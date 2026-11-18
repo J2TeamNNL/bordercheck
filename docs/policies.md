@@ -84,7 +84,7 @@ already happened. Those findings carry a **sign of compromise**, and only these,
 
 | Check | Sign | Why it counts |
 |---|---|---|
-| `startup-items` | An item that starts at login or on a schedule runs a command that downloads code and runs it (`curl … \| sh`, `powershell -enc …`, `iex (… DownloadString …)`, `mshta http…`, `certutil -urlcache`) | That is how droppers keep themselves on a machine. An item the policy's `allow` list matches is not checked. A program in an odd place, one anyone can change or one that is missing is an ordinary finding. |
+| `startup-items` | An item that starts at login or on a schedule runs a command that downloads code and runs it (`curl … \| sh`, `powershell -enc …`, `iex (… DownloadString …)`, `mshta http…`, `certutil -urlcache`); a Microsoft Defender exclusion of a drive, a common folder or a common kind of program; the hosts file sending a sign-in, payment or bank site elsewhere, or blocking a security vendor | That is how droppers keep themselves on a machine. An item the policy's `allow` list matches is not checked. A program in an odd place, one anyone can change or one that is missing is an ordinary finding. |
 | `extensions` | An installed extension (even disabled) matches the policy's `block` list | IT has declared it malicious or forbidden. An extension from outside a store, or one not on the `allow` list, is an ordinary finding. |
 | `cracked-software` | A closed-source crack tool is installed (KMSpico, AutoKMS, KMSAuto, AAct), and with one, Windows or Office activating against a KMS server on the machine itself (a KMS emulator) | A program from the crack scene that runs with the system's rights, and the usual carrier of bundled malware. A KMS emulator alone (possibly an open-source script), Ohook, a hosts-file line or a firewall rule that keeps a paid program from its licence server is an ordinary finding: it runs nothing from the crack scene, or nothing at all. |
 
@@ -707,6 +707,16 @@ counted or flagged.
 | A program (or the script an interpreter runs) in `/tmp`, `/var/tmp`, `/private/tmp`, `/Users/Shared`, `~/Downloads`, `%TEMP%`, `C:\Windows\Temp`, or a hidden folder directly in home that developer tools don't use (`~/.local`, `~/.cargo`, `~/.nvm`… are fine) | warn, medium |
 | A program, or its folder, that every user can write to (macOS, Linux) | warn, medium |
 | A program that no longer exists | warn, low |
+
+It also looks at three things malware does to keep working unseen; none of them starts at login, but all are
+quick to read on every wake:
+
+| Flagged | |
+|---|---|
+| A Microsoft Defender exclusion so broad that whatever lands there is never scanned: a whole drive, the Windows folder, ProgramData, `C:\Users`, the whole user folder, AppData, a temporary folder, Downloads, the Desktop or Public; a process such as `powershell.exe`, `cmd.exe`, `wscript.exe`, `mshta.exe`, `rundll32.exe` or one in those folders; an extension such as `.exe`, `.dll`, `.ps1`, `.vbs`, `.js`, `.scr`. A narrow exclusion (a project's build folder) is fine. Most versions of Windows show exclusions only to an administrator; then they are not checked. | fail, high, sign of compromise |
+| The hosts file sends a sign-in, mail, payment, crypto or bank site (Google, Microsoft, Apple, GitHub, Cloudflare, PayPal, Binance…, and banks and wallets used in Vietnam: Vietcombank, Techcombank, VPBank, MB, BIDV, VietinBank, ACB, TPBank, MoMo, ZaloPay…) to another address. Pointing a name at `127.0.0.1` or `0.0.0.0` is not this. | fail, high, sign of compromise |
+| The hosts file blocks a security vendor's or scanner's site (VirusTotal, Malwarebytes, Kaspersky, ESET, Avast, Bitdefender…, Defender's cloud and SmartScreen) | fail, high, sign of compromise |
+| A program running now from a temporary or download folder (as above) that is not signed by a known developer: on Windows an Authenticode signature that is not valid, on macOS no Apple or Developer ID signature (an ad-hoc one does not count; `go run` builds are left out); on Linux any program running from `/tmp`, `/var/tmp` or `/dev/shm`. Only this user's processes. | warn, medium |
 
 On macOS, programs under `~/Desktop`, `~/Documents`, `~/Downloads`, other apps' containers and `/Volumes` are
 not looked at on disk (that could raise a privacy prompt), so they are never reported missing.

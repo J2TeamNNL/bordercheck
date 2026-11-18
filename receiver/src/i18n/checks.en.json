@@ -65,7 +65,10 @@
   "check.unsupported": "Not supported on {os} yet.",
   "compromise.blockedExtension": "An extension your organisation has blocked as harmful is installed.",
   "compromise.crackTool": "A software crack or activation tool is installed.",
+  "compromise.defenderExclusion": "Microsoft Defender is set not to scan a whole drive, a common folder or a common kind of program.",
+  "compromise.hostsRedirect": "The hosts file sends a sign-in, payment or bank site to another address.",
   "compromise.kmsEmulator": "{product} is activated by a fake activation server running on this computer.",
+  "compromise.securityBlocked": "The hosts file blocks a security vendor's site.",
   "compromise.startupDownloadRun": "A program set to start automatically downloads code from the internet and runs it.",
   "cracked.alt.adobe": "Adobe: PhotoCraft for Photoshop, VectorCraft for Illustrator, FilmCraft for Premiere Pro, LightCraft for Lightroom, EffectCraft for After Effects, DesignCraft for InDesign, PdfCraft for Acrobat.",
   "cracked.alt.autodesk": "Autodesk: CADCraft for AutoCAD.",
@@ -428,13 +431,24 @@
     "one": "1 key is readable by other users.",
     "other": "{n} keys are readable by other users."
   },
+  "startup.defenderExclusion": {
+    "one": "1 Microsoft Defender exclusion lets anything there go unscanned.",
+    "other": "{n} Microsoft Defender exclusions let anything there go unscanned."
+  },
   "startup.downloadRun": {
     "one": "1 item downloads code and runs it each time it starts.",
     "other": "{n} items download code and run it each time they start."
   },
+  "startup.fix.defenderExclusion": "Windows Security → Virus & threat protection → Manage settings → Exclusions: remove the ones listed, then run a full scan. If you did not add them, treat the computer as compromised and tell IT.",
+  "startup.fix.hosts": "Remove those lines from {path} (it needs administrator rights), change the passwords of the sites listed from another device, and tell IT: something with administrator rights changed that file.",
   "startup.fix.linux": "Look up each item listed. If you don't recognise it, remove it: delete its .desktop file from ~/.config/autostart, [code]systemctl --user disable --now UNIT[/code], or [code]crontab -e[/code]. If one downloads and runs code, check the machine for malware; if you find any, change the passwords used on it.",
   "startup.fix.mac": "Look up each item listed. If you don't recognise it, remove it: [code]launchctl bootout gui/$(id -u)/LABEL[/code] and delete its .plist from ~/Library/LaunchAgents (items in /Library need an administrator); System Settings → General → Login Items & Extensions shows them too. If one downloads and runs code, run a malware scan; if it finds malware, change the passwords used on this Mac. Items whose program is gone are leftovers of uninstalled apps and can simply be removed.",
+  "startup.fix.unsignedRunning": "If you don't recognise a program listed, quit it (Task Manager, Activity Monitor), delete it and run a malware scan.",
   "startup.fix.win": "Look up each item listed. If you don't recognise it, turn it off: Task Manager → Startup apps → Disable, Task Scheduler → the task → Disable, or delete its shortcut from the Startup folder ([code]shell:startup[/code]). If one downloads and runs code, run a full scan in Windows Security; if it finds malware, change the passwords used on this PC. Items whose program is gone are leftovers of uninstalled apps.",
+  "startup.hostsRedirect": {
+    "one": "The hosts file sends 1 sign-in, payment or bank site to another address.",
+    "other": "The hosts file sends {n} sign-in, payment or bank sites to another address."
+  },
   "startup.missing": {
     "one": "1 item points to a program that no longer exists.",
     "other": "{n} items point to programs that no longer exist."
@@ -443,13 +457,25 @@
     "one": "1 item starts at login or on a schedule; nothing unusual.",
     "other": "{n} items start at login or on a schedule; nothing unusual."
   },
+  "startup.securityBlocked": {
+    "one": "The hosts file blocks 1 security vendor's site.",
+    "other": "The hosts file blocks {n} security vendors' sites."
+  },
   "startup.suspicious": {
     "one": "1 item starts a program from a temporary, download or hidden folder.",
     "other": "{n} items start programs from temporary, download or hidden folders."
   },
+  "startup.tempRunning": {
+    "one": "1 program runs from a temporary folder.",
+    "other": "{n} programs run from a temporary folder."
+  },
   "startup.total": {
     "one": "1 item starts at login or on a schedule in all.",
     "other": "{n} items start at login or on a schedule in all."
+  },
+  "startup.unsignedRunning": {
+    "one": "1 program not signed by a known developer runs from a temporary or download folder.",
+    "other": "{n} programs not signed by a known developer run from a temporary or download folder."
   },
   "startup.writable": {
     "one": "1 item starts a program that any user can change.",

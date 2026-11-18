@@ -339,7 +339,7 @@ func startupItems(p policy.StartupItems) func(context.Context) check.Result {
 			return check.Errored(err)
 		}
 		statStartup(items, home, runtime.GOOS)
-		return evalStartup(items, note, newStartupEnv(home, runtime.GOOS, p), startupFix(runtime.GOOS))
+		return evalStartupWith(items, note, newStartupEnv(home, runtime.GOOS, p), startupFix(runtime.GOOS), gatherHidden(ctx, home))
 	}
 }
 
@@ -354,6 +354,11 @@ func startupFix(goos string) msg.Text {
 }
 
 func evalStartup(items []startupItem, note msg.Text, e startupEnv, fix msg.Text) check.Result {
+	return evalStartupWith(items, note, e, fix, hiddenFacts{})
+}
+
+// evalStartupWith also judges what hides malware (startup_hidden.go).
+func evalStartupWith(items []startupItem, note msg.Text, e startupEnv, fix msg.Text, x hiddenFacts) check.Result {
 	var high, medium, low []string
 	var compromise []check.Indicator
 	nDL, nOdd, nW, nMiss, total := 0, 0, 0, 0, 0
@@ -406,6 +411,9 @@ func evalStartup(items []startupItem, note msg.Text, e startupEnv, fix msg.Text)
 			low = append(low, fmt.Sprintf("%s: %s  the program no longer exists", head, prog))
 		}
 	}
+	h := evalHidden(x, e)
+	high, medium = append(high, h.high...), append(medium, h.medium...)
+	compromise = append(compromise, h.compromise...)
 	if len(high)+len(medium)+len(low) == 0 {
 		return check.Result{Status: check.Pass}.WithSummary(append(msg.Of("startup.pass", "n", total), note...))
 	}
@@ -418,9 +426,13 @@ func evalStartup(items []startupItem, note msg.Text, e startupEnv, fix msg.Text)
 			parts = append(parts, msg.P(c.key, "n", c.n))
 		}
 	}
+	parts = append(parts, h.parts...)
 	parts = append(parts, msg.P("startup.total", "n", total))
+	if nDL+nOdd+nW+nMiss == 0 {
+		fix = nil // only the hidden findings: their own fixes
+	}
 	r := check.Result{Status: check.Warn, Severity: check.Low, Evidence: slices.Concat(high, medium, low)}.
-		WithSummary(append(parts, note...)).WithFix(fix)
+		WithSummary(append(parts, note...)).WithFix(append(slices.Clone(fix), h.fix...))
 	switch {
 	case len(high) > 0:
 		r.Status, r.Severity = check.Fail, check.High

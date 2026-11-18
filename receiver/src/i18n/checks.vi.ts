@@ -22,6 +22,9 @@ export const checksVi: CheckCatalog = {
   "compromise.startupDownloadRun": "Một chương trình được đặt để tự chạy khi khởi động tải code từ Internet về rồi chạy nó.",
   "compromise.blockedExtension": "Một extension mà tổ chức của bạn đã chặn vì có hại đang được cài.",
   "compromise.crackTool": "Một công cụ crack hoặc kích hoạt bản quyền lậu đang được cài.",
+  "compromise.defenderExclusion": "Microsoft Defender bị đặt để không quét cả một ổ đĩa, một thư mục chung hay một loại chương trình phổ biến.",
+  "compromise.hostsRedirect": "File hosts chuyển một trang đăng nhập, thanh toán hay ngân hàng sang địa chỉ khác.",
+  "compromise.securityBlocked": "File hosts chặn trang của một hãng bảo mật.",
   "compromise.kmsEmulator": "{product} được kích hoạt bằng một máy chủ kích hoạt giả chạy ngay trên máy này.",
 
   "firewall.mac.off": "Tường lửa macOS đang tắt.",
@@ -529,6 +532,14 @@ export const checksVi: CheckCatalog = {
   "startup.suspicious": "{n} mục chạy chương trình từ thư mục tạm, thư mục tải về hoặc thư mục ẩn.",
   "startup.writable": "{n} mục chạy chương trình mà người dùng nào cũng sửa được.",
   "startup.missing": "{n} mục trỏ tới chương trình không còn tồn tại.",
+  "startup.defenderExclusion": "{n} mục loại trừ của Microsoft Defender khiến mọi thứ ở đó không được quét.",
+  "startup.hostsRedirect": "File hosts chuyển {n} trang đăng nhập, thanh toán hay ngân hàng sang địa chỉ khác.",
+  "startup.securityBlocked": "File hosts chặn {n} trang của hãng bảo mật.",
+  "startup.unsignedRunning": "{n} chương trình không có chữ ký của nhà phát triển đã biết đang chạy từ thư mục tạm hoặc thư mục tải về.",
+  "startup.tempRunning": "{n} chương trình đang chạy từ thư mục tạm.",
+  "startup.fix.defenderExclusion": "Windows Security → Virus & threat protection → Manage settings → Exclusions: xoá các mục được liệt kê, rồi quét toàn bộ máy. Nếu bạn không tự thêm chúng, hãy coi máy đã bị xâm nhập và báo IT.",
+  "startup.fix.hosts": "Xoá các dòng đó khỏi {path} (cần quyền quản trị), đổi mật khẩu các trang được liệt kê từ một thiết bị khác, và báo IT: có thứ gì đó chạy với quyền quản trị đã sửa file này.",
+  "startup.fix.unsignedRunning": "Nếu không nhận ra chương trình nào được liệt kê, hãy tắt nó (Task Manager, Activity Monitor), xoá đi và quét malware.",
   "startup.fix.mac":
     "Tra cứu từng mục được liệt kê. Nếu không nhận ra, hãy gỡ nó: [code]launchctl bootout gui/$(id -u)/LABEL[/code] rồi xoá file .plist của nó trong ~/Library/LaunchAgents (mục trong /Library cần quyền administrator); System Settings → General → Login Items & Extensions cũng liệt kê chúng. Nếu có mục tải code về và chạy, hãy quét mã độc; nếu quét ra mã độc thì đổi các mật khẩu đã dùng trên máy Mac này. Mục có chương trình đã mất là phần sót lại của app đã gỡ, cứ xoá đi.",
   "startup.fix.win":

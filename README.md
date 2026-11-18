@@ -22,7 +22,8 @@ starts it once an hour, it does its work and exits.
 
 It is not an antivirus. It does not catch malware; it limits what malware, or a person, can reach. A few of its
 findings are strong signs that something hostile is already installed (a startup item that downloads and runs
-code, an extension IT has blocked, a crack tool); when it sees one it says so first and, when installed, tells IT
+code, an extension IT has blocked, a crack tool, a Defender exclusion of a whole drive, a hosts file that
+sends a bank's site elsewhere); when it sees one it says so first and, when installed, tells IT
 at once ([signs of compromise](docs/policies.md#signs-of-compromise)).
 
 > **For organisations:** every laptop reports to a management portal you host yourself (fleet, roles, invites,
@@ -55,7 +56,7 @@ at once ([signs of compromise](docs/policies.md#signs-of-compromise)).
 | `browser-passwords` | Passwords saved in the browser's own password manager, which information stealers take first |
 | `trust-store` | Root certificates added to the trust store, and a system proxy, PAC file or proxy variable |
 | `package-managers` | npm, pnpm, Yarn, Bun, pip, uv, Go and Cargo settings: registries over plain http, certificate or checksum checks off, every package's install scripts allowed to run |
-| `startup-items` | What starts at login or on a schedule (LaunchAgents, autostart, systemd user units, crontab, Run keys, scheduled tasks): download-and-run commands, programs in temporary, download or hidden folders, programs anyone can change |
+| `startup-items` | What starts at login or on a schedule (LaunchAgents, autostart, systemd user units, crontab, Run keys, scheduled tasks): download-and-run commands, programs in temporary, download or hidden folders, programs anyone can change; and what hides malware: broad Microsoft Defender exclusions, a hosts file that redirects sign-in or bank sites or blocks security vendors, unsigned programs running from temporary or download folders |
 | `backup` | Time Machine encrypted (and, if the policy asks, set up and recent); Find My Mac or Find my device on |
 | `warp` | Off unless the policy turns it on: the Cloudflare One client (WARP) installed, signed in to your Zero Trust team, connected, and if asked in Posture only mode ([Zero Trust guide](docs/zero-trust.md)) |
 

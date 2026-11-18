@@ -24,6 +24,9 @@ export const checksZh: CheckCatalog = {
   "compromise.startupDownloadRun": "一个设为自动启动的程序会从互联网下载代码并运行。",
   "compromise.blockedExtension": "已安装一个被你的组织列为有害而封禁的扩展。",
   "compromise.crackTool": "已安装软件破解或激活工具。",
+  "compromise.defenderExclusion": "Microsoft Defender 被设置为不扫描整个磁盘、常用文件夹或常见类型的程序。",
+  "compromise.hostsRedirect": "hosts 文件将登录、支付或银行网站指向其他地址。",
+  "compromise.securityBlocked": "hosts 文件屏蔽了安全厂商的网站。",
   "compromise.kmsEmulator": "{product} 通过在这台电脑上运行的伪造激活服务器激活。",
 
   "firewall.mac.off": "macOS 防火墙已关闭。",
@@ -508,6 +511,14 @@ export const checksZh: CheckCatalog = {
   "startup.suspicious": "{n} 个项目从临时、下载或隐藏文件夹启动程序。",
   "startup.writable": "{n} 个项目启动的程序任何用户都能修改。",
   "startup.missing": "{n} 个项目指向已不存在的程序。",
+  "startup.defenderExclusion": "{n} 个 Microsoft Defender 排除项使其中的任何内容都不会被扫描。",
+  "startup.hostsRedirect": "hosts 文件将 {n} 个登录、支付或银行网站指向其他地址。",
+  "startup.securityBlocked": "hosts 文件屏蔽了 {n} 个安全厂商的网站。",
+  "startup.unsignedRunning": "有 {n} 个没有已知开发者签名的程序正在从临时文件夹或下载文件夹运行。",
+  "startup.tempRunning": "有 {n} 个程序正在从临时文件夹运行。",
+  "startup.fix.defenderExclusion": "Windows Security → Virus & threat protection → Manage settings → Exclusions：删除列出的排除项，然后进行全盘扫描。如果不是你添加的，请将这台电脑视为已被入侵并告知 IT。",
+  "startup.fix.hosts": "从 {path} 中删除这些行（需要管理员权限），用另一台设备修改所列网站的密码，并告知 IT：有以管理员权限运行的程序修改了这个文件。",
+  "startup.fix.unsignedRunning": "如果不认识列出的某个程序，请将其退出（Task Manager、Activity Monitor），删除它并进行恶意软件扫描。",
   "startup.fix.mac":
     "逐一查明列出的项目。如果不认识，就将其移除：[code]launchctl bootout gui/$(id -u)/LABEL[/code]，然后从 ~/Library/LaunchAgents 删除其 .plist（/Library 中的项目需要管理员权限）；System Settings → General → Login Items & Extensions 中也能看到它们。如果有项目会下载并运行代码，请进行恶意软件扫描；如果发现恶意软件，再更改在这台 Mac 上使用过的密码。程序已不存在的项目是已卸载应用的残留，直接删除即可。",
   "startup.fix.win":

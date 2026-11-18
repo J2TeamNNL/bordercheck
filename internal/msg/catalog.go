@@ -25,6 +25,9 @@ var Catalog = map[string]Entry{
 	"compromise.startupDownloadRun": s("A program set to start automatically downloads code from the internet and runs it."),
 	"compromise.blockedExtension":   s("An extension your organisation has blocked as harmful is installed."),
 	"compromise.crackTool":          s("A software crack or activation tool is installed."),
+	"compromise.defenderExclusion":  s("Microsoft Defender is set not to scan a whole drive, a common folder or a common kind of program."),
+	"compromise.hostsRedirect":      s("The hosts file sends a sign-in, payment or bank site to another address."),
+	"compromise.securityBlocked":    s("The hosts file blocks a security vendor's site."),
 	"compromise.kmsEmulator":        s("{product} is activated by a fake activation server running on this computer."),
 
 	// ---- What the person at the machine ignored (bordercheck ignore): secrets, ai-agents, ssh-keys ----
@@ -657,6 +660,14 @@ var Catalog = map[string]Entry{
 		"{n} items start programs that any user can change."),
 	"startup.missing": pl("1 item points to a program that no longer exists.",
 		"{n} items point to programs that no longer exist."),
+	"startup.defenderExclusion":     pl("1 Microsoft Defender exclusion lets anything there go unscanned.", "{n} Microsoft Defender exclusions let anything there go unscanned."),
+	"startup.hostsRedirect":         pl("The hosts file sends 1 sign-in, payment or bank site to another address.", "The hosts file sends {n} sign-in, payment or bank sites to another address."),
+	"startup.securityBlocked":       pl("The hosts file blocks 1 security vendor's site.", "The hosts file blocks {n} security vendors' sites."),
+	"startup.unsignedRunning":       pl("1 program not signed by a known developer runs from a temporary or download folder.", "{n} programs not signed by a known developer run from a temporary or download folder."),
+	"startup.tempRunning":           pl("1 program runs from a temporary folder.", "{n} programs run from a temporary folder."),
+	"startup.fix.defenderExclusion": s("Windows Security → Virus & threat protection → Manage settings → Exclusions: remove the ones listed, then run a full scan. If you did not add them, treat the computer as compromised and tell IT."),
+	"startup.fix.hosts":             s("Remove those lines from {path} (it needs administrator rights), change the passwords of the sites listed from another device, and tell IT: something with administrator rights changed that file."),
+	"startup.fix.unsignedRunning":   s("If you don't recognise a program listed, quit it (Task Manager, Activity Monitor), delete it and run a malware scan."),
 	"startup.fix.mac": s("Look up each item listed. If you don't recognise it, remove it: " +
 		"[code]launchctl bootout gui/$(id -u)/LABEL[/code] and delete its .plist from ~/Library/LaunchAgents (items in " +
 		"/Library need an administrator); System Settings → General → Login Items & Extensions shows them too. If one " +
