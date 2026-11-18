@@ -23,6 +23,27 @@ const (
 	warpNoDaemon = "\nwarp-cli: Error communicating with daemon: Unable to connect to the CloudflareWARP daemon"
 )
 
+// Real output of warp-cli 2026.8.2115.0 on macOS, signed in to a team and
+// switched off, IDs removed.
+const (
+	warpRealStatus   = "Status update: Disconnected\nReason: Manual Disconnection\n"
+	warpRealReg      = "Account type: Team\nID: x\nDevice ID: x\nPublic key: x\nAccount ID: x\nOrganization: senprints\n"
+	warpRealSettings = "Merged configuration:\n(not set)\tCompliance Environment: Normal\n(derived)\tAlways On: false\n" +
+		"(override)\tSwitch Locked: false\n(network policy)\tMode: WarpWithDnsOverHttps\n" +
+		"(network policy)\tWARP tunnel protocol: WireGuard\n(not set)\tMASQUE Protocol Settings: \n" +
+		"  HTTP Version: MASQUE (HTTP/3 with HTTP/2 fallback)\n(network policy)\tExclude mode, with hosts/ips:\n" +
+		"  10.0.0.0/8\n(user set)\tOrganization: senprints\n(network policy)\tProfile ID: default\n"
+)
+
+func TestParseWarpReal(t *testing.T) {
+	f := parseWarp(warpRealStatus, warpRealReg, warpRealSettings)
+	want := warpFacts{Installed: true, Running: true, Registered: true, Account: "Team", Org: "senprints",
+		Status: "Disconnected", Mode: "WarpWithDnsOverHttps"}
+	if f != want {
+		t.Errorf("got %+v\nwant %+v", f, want)
+	}
+}
+
 func TestParseWarp(t *testing.T) {
 	f := parseWarp(warpStatusConnected, warpRegTeam, warpSettingsPosture)
 	if !f.Running || !f.Registered || !f.Connected || f.Account != "Team" || f.Org != "senprints" || f.Mode != "PostureOnly" {
