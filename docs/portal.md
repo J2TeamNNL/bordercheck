@@ -18,7 +18,7 @@ npx wrangler d1 create bordercheck            # put the printed database_id in w
 npx wrangler d1 migrations apply bordercheck --remote
 
 openssl rand -hex 32 | npx wrangler secret put ADMIN_TOKEN    # the dashboard login
-npx wrangler secret put ALERT_WEBHOOK_URL                     # optional: a Discord or Slack webhook URL
+npx wrangler secret put ALERT_WEBHOOK_URL                     # optional: Discord, Slack, Telegram or JSON webhooks, comma separated
 
 npx wrangler deploy
 ```
@@ -155,7 +155,8 @@ expires (30 days) and is replaced as new reports come in;
 
 ## 6. Alerts
 
-With `ALERT_WEBHOOK_URL` set, an hourly cron posts to Discord, Slack or any URL that accepts JSON when a machine
+With `ALERT_WEBHOOK_URL` set (one or several webhooks: Discord, Slack, Telegram, or any URL that accepts JSON),
+an hourly cron posts to each when a machine
 newly fails a high-severity check, when a machine has been silent for more than `SILENT_DAYS` (7), and a digest
 every `DIGEST_HOURS` (168 in the sample config; `0` = off). Without a webhook the **Alerts** page still lists
 them. Details: [Alerts](../receiver/README.md#alerts).

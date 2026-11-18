@@ -76,7 +76,8 @@ Who sees it:
   surface exposes; MCP returns evidence only on request (`mcp-tools.ts`).
 - Anyone holding a report link `/r/<id>`: that machine's results, for `REPORT_LINK_DAYS` (default 30), no login
   (`REPORT_LINKS` default on). The link is stored in the agent's `state.json`.
-- The alert webhook (`ALERT_WEBHOOK_URL`, e.g. Slack/Discord): alert lines with email/hostname.
+- The alert webhooks (`ALERT_WEBHOOK_URL`: Slack, Discord, Telegram or JSON): alert lines with email/hostname. A
+  Telegram URL holds the bot's token, so the list is a secret and errors never print a URL.
 
 ## 2. Components and trust boundaries
 

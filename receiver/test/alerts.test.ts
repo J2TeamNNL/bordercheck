@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { chunk, lit, payload, runCron, webhookFormat } from "../src/alerts";
+import { chunk, lit, payload, runCron, webhookFormat, webhooks } from "../src/alerts";
 import type { Env } from "../src/env";
 import { handleReport } from "../src/ingest";
 import { enrolled, env, report, reportRequest, result } from "./helpers";
@@ -80,7 +80,7 @@ describe("cron", () => {
   it("keeps alerts pending while the webhook fails, then delivers them", async () => {
     const e = withHook();
     await handleReport(req(report()), e, day(1));
-    expect(await runCron(e, day(1), recorder(true).send)).toMatchObject({ sent: 0, failed: "webhook answered 500" });
+    expect(await runCron(e, day(1), recorder(true).send)).toMatchObject({ sent: 0, failed: "discord webhook: webhook answered 500" });
     const r = recorder();
     expect((await runCron(e, day(1), r.send)).sent).toBe(1);
     expect((await runCron(e, day(1), r.send)).sent).toBe(0);
@@ -141,5 +141,60 @@ describe("cron", () => {
     await handleReport(req(report()), e, day(5));
     await runCron(e, day(5), recorder().send);
     expect(await env.DB.prepare("SELECT COUNT(*) n FROM reports").first("n")).toBe(1);
+  });
+});
+
+const TG = "https://api.telegram.org/bot123456:SECRET-token/sendMessage";
+
+describe("Telegram and several webhooks", () => {
+  it("reads a list of URLs and takes Telegram's chat from the URL or ALERT_TELEGRAM_CHAT_ID", () => {
+    const hooks = webhooks(withHook(`${DISCORD}, ${TG}?chat_id=-100200\n https://api.telegram.org/bot99:x not-a-url`));
+    expect(hooks.map((h) => h.format)).toEqual(["discord", "telegram", "telegram"]);
+    expect(hooks[1]).toMatchObject({ url: TG, chatId: "-100200" });
+    expect(hooks[2]).toMatchObject({ url: "https://api.telegram.org/bot99:x/sendMessage", chatId: undefined });
+    expect(webhooks(withHook(TG, { ALERT_TELEGRAM_CHAT_ID: "42" }))[0].chatId).toBe("42");
+    expect(webhookFormat(withHook(TG))).toBe("telegram");
+    expect(webhooks(withHook(`${DISCORD} ${DISCORD}`))).toHaveLength(1);
+    expect(payload("telegram", "**x** <b>", {}, "-1")).toEqual({ chat_id: "-1", text: "**x** <b>", disable_web_page_preview: true });
+  });
+
+  it("sends to every webhook; one that fails gets the alert later, the others not again", async () => {
+    const e = withHook(`${SLACK},${TG}?chat_id=-100200`);
+    await handleReport(req(report()), e, day(1));
+    const calls: { url: string; body: any }[] = [];
+    let telegramDown = true;
+    const send = async (url: string, body: unknown) => {
+      if (url.startsWith("https://api.telegram.org/") && telegramDown) throw new Error("webhook answered 502");
+      calls.push({ url, body });
+    };
+    const first = await runCron(e, day(1), send);
+    expect(first).toMatchObject({ sent: 0, failed: "telegram webhook 2: webhook answered 502" });
+    expect(calls.map((c) => c.url)).toEqual([SLACK]);
+    telegramDown = false;
+    expect((await runCron(e, day(1), send)).sent).toBe(1);
+    expect(calls.map((c) => c.url)).toEqual([SLACK, TG]);
+    expect(calls[1].body).toMatchObject({ chat_id: "-100200", disable_web_page_preview: true });
+    expect(calls[1].body.text).toMatch(/^BorderCheck: 1 new alert\n/);
+    expect((await runCron(e, day(1), send)).sent).toBe(0);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("says so when a Telegram webhook has no chat, without its token", async () => {
+    const e = withHook(TG);
+    await handleReport(req(report()), e, day(1));
+    const r = recorder();
+    const out = await runCron(e, day(1), r.send);
+    expect(out.failed).toContain("no chat_id");
+    expect(out.failed).not.toContain("SECRET");
+    expect(r.calls).toHaveLength(0);
+  });
+
+  it("sends the digest to each webhook", async () => {
+    const e = withHook(`${DISCORD} ${TG}?chat_id=-1`, { DIGEST_HOURS: "24" });
+    const r = recorder();
+    expect((await runCron(e, day(1), r.send)).digest).toBe(true);
+    expect(r.calls.map((c) => c.url)).toEqual([DISCORD, TG]);
+    expect(r.calls[0].body.content).toMatch(/^\*\*BorderCheck digest\*\*/);
+    expect(r.calls[1].body.text).toMatch(/^BorderCheck digest:/);
   });
 });

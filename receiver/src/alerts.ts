@@ -9,19 +9,66 @@
 import { config, DAY, type Env } from "./env";
 import { pruneRateLimits } from "./ratelimit";
 
-export type Format = "discord" | "slack" | "json";
+export type Format = "discord" | "slack" | "telegram" | "json";
 
-export function webhookFormat(env: Env): Format {
-  const f = (env.ALERT_WEBHOOK_FORMAT ?? "").toLowerCase();
-  if (f === "discord" || f === "slack" || f === "json") return f;
-  try {
-    const u = new URL(env.ALERT_WEBHOOK_URL ?? "");
-    if (/(^|\.)(discord|discordapp)\.com$/.test(u.hostname) && u.pathname.startsWith("/api/webhooks/")) return "discord";
-    if (u.hostname === "hooks.slack.com") return "slack";
-  } catch {
-    // fall through
+// One place alerts go. ALERT_WEBHOOK_URL holds one URL or several (separated by
+// commas, spaces or new lines); each one's format comes from its address.
+export interface Hook {
+  url: string; // where to POST; for Telegram without chat_id, which goes in the body
+  format: Format;
+  id: string; // a short, stable name for the URL, kept in alerts.delivered_to
+  chatId?: string; // Telegram: the chat to post in
+}
+
+function detected(u: URL): Format | null {
+  if (/(^|\.)(discord|discordapp)\.com$/.test(u.hostname) && u.pathname.startsWith("/api/webhooks/")) return "discord";
+  if (u.hostname === "hooks.slack.com") return "slack";
+  if (u.hostname === "api.telegram.org" && u.pathname.startsWith("/bot")) return "telegram";
+  return null;
+}
+
+// FNV-1a: only tells the configured URLs apart; nothing secret depends on it.
+function hookId(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, "0");
+}
+
+export function webhooks(env: Env): Hook[] {
+  const forced = (env.ALERT_WEBHOOK_FORMAT ?? "").toLowerCase();
+  const out: Hook[] = [];
+  for (const raw of (env.ALERT_WEBHOOK_URL ?? "").split(/[\s,]+/)) {
+    let u: URL;
+    try {
+      u = new URL(raw);
+    } catch {
+      continue;
+    }
+    if (u.protocol !== "https:" && u.protocol !== "http:") continue;
+    // ALERT_WEBHOOK_FORMAT names the format of addresses it can't tell by itself.
+    const format: Format =
+      detected(u) ?? (forced === "discord" || forced === "slack" || forced === "telegram" || forced === "json" ? forced : "json");
+    const hook: Hook = { url: u.toString(), format, id: hookId(u.toString()) };
+    if (format === "telegram") {
+      hook.chatId = u.searchParams.get("chat_id") || (env.ALERT_TELEGRAM_CHAT_ID ?? "").trim() || undefined;
+      u.searchParams.delete("chat_id");
+      if (/^\/bot[^/]+\/?$/.test(u.pathname)) u.pathname = u.pathname.replace(/\/?$/, "/sendMessage");
+      hook.url = u.toString();
+    }
+    if (!out.some((h) => h.id === hook.id)) out.push(hook);
   }
-  return "json";
+  return out;
+}
+
+// webhookFormat is the first webhook's format (json when there is none).
+export function webhookFormat(env: Env): Format {
+  return webhooks(env)[0]?.format ?? "json";
+}
+
+// Bold for the message's first line, as each platform writes it; Telegram and
+// JSON get plain text.
+function bold(format: Format, s: string): string {
+  return format === "discord" ? `**${s}**` : format === "slack" ? `*${s}*` : s;
 }
 
 // Report fields are attacker-controlled. In chat they go inside inline code,
@@ -45,6 +92,7 @@ export interface AlertRow {
   check_id: string;
   detail: string;
   created_at: string;
+  delivered_to?: string;
 }
 
 function detail(a: AlertRow): Record<string, string> {
@@ -92,7 +140,7 @@ export function alertLine(env: Env, a: AlertRow): string {
   return url ? `${line} ${url}` : line;
 }
 
-const LIMIT: Record<Format, number> = { discord: 1900, slack: 3500, json: 3500 };
+const LIMIT: Record<Format, number> = { discord: 1900, slack: 3500, telegram: 3500, json: 3500 };
 
 // chunk packs lines into messages under the platform's size limit.
 export function chunk(lines: string[], limit: number): string[][] {
@@ -113,12 +161,15 @@ export function chunk(lines: string[], limit: number): string[][] {
   return out;
 }
 
-export function payload(format: Format, text: string, extra: Record<string, unknown> = {}): unknown {
+export function payload(format: Format, text: string, extra: Record<string, unknown> = {}, chatId?: string): unknown {
   switch (format) {
     case "discord":
       return { username: "BorderCheck", content: text, allowed_mentions: { parse: [] } };
     case "slack":
       return { text: slackEscape(text) };
+    case "telegram":
+      // No parse_mode: Telegram shows the text as it is, so nothing from a report can format or link.
+      return { chat_id: chatId, text, disable_web_page_preview: true };
     default:
       return { text, ...extra };
   }
@@ -126,6 +177,7 @@ export function payload(format: Format, text: string, extra: Record<string, unkn
 
 export type Send = (url: string, body: unknown) => Promise<void>;
 
+// The error never carries the URL: a Telegram one holds the bot's token.
 export const postWebhook: Send = async (url, body) => {
   const res = await fetch(url, {
     method: "POST",
@@ -190,41 +242,64 @@ export async function sendPending(
   const ts = now.toISOString();
   const pending = await (only
     ? env.DB.prepare(
-        `SELECT id, kind, install_id, check_id, detail, created_at FROM alerts
+        `SELECT id, kind, install_id, check_id, detail, created_at, delivered_to FROM alerts
          WHERE sent_at IS NULL AND install_id = ? AND kind IN (${only.kinds.map(() => "?").join(",")}) ORDER BY id LIMIT 500`,
       ).bind(only.installId, ...only.kinds)
-    : env.DB.prepare("SELECT id, kind, install_id, check_id, detail, created_at FROM alerts WHERE sent_at IS NULL ORDER BY id LIMIT 500")
+    : env.DB.prepare("SELECT id, kind, install_id, check_id, detail, created_at, delivered_to FROM alerts WHERE sent_at IS NULL ORDER BY id LIMIT 500")
   ).all<AlertRow>();
   const rows = pending.results;
   if (!rows.length) return { sent: 0, failed: null };
-  if (!env.ALERT_WEBHOOK_URL) {
+  const hooks = webhooks(env);
+  if (!hooks.length) {
     await markDelivered(env, rows.map((r) => r.id), ts, "no webhook");
     return { sent: 0, failed: null };
   }
   const stale = rows.filter((r) => now.getTime() - Date.parse(r.created_at) > GIVE_UP_AFTER);
   await markDelivered(env, stale.map((r) => r.id), ts, "dropped: webhook failed for 7 days");
   const live = rows.filter((r) => !stale.includes(r));
+  const took = new Map(live.map((a) => [a.id, new Set((a.delivered_to ?? "").split(",").filter(Boolean))]));
 
-  const format = webhookFormat(env);
-  const lines = live.map((a) => ({ id: a.id, text: alertLine(env, a) }));
-  const groups = chunk(lines.map((l) => l.text), LIMIT[format]);
-  let sent = 0;
-  let offset = 0;
-  for (const [i, g] of groups.entries()) {
-    if (i >= MAX_MESSAGES_PER_RUN) break; // the rest go next hour
-    const ids = lines.slice(offset, offset + g.length).map((l) => l.id);
-    const head = i === 0 ? `**BorderCheck**: ${live.length} new alert${live.length === 1 ? "" : "s"}\n` : "";
-    const text = (format === "slack" ? head.replace(/\*\*/g, "*") : format === "json" ? head.replace(/\*\*/g, "") : head) + g.join("\n");
-    try {
-      await send(env.ALERT_WEBHOOK_URL, payload(format, text, { alerts: live.filter((a) => ids.includes(a.id)).map(publicAlert) }));
-    } catch (e) {
-      return { sent, failed: (e as Error).message };
+  // Each webhook gets the alerts it has not taken yet; one that fails does not
+  // hold up the others, and they do not get those alerts again.
+  const failures: string[] = [];
+  for (const [n, h] of hooks.entries()) {
+    const todo = live.filter((a) => !took.get(a.id)!.has(h.id));
+    if (!todo.length) continue;
+    const where = hooks.length > 1 ? `${h.format} webhook ${n + 1}` : `${h.format} webhook`;
+    if (h.format === "telegram" && !h.chatId) {
+      failures.push(`${where}: no chat_id (add ?chat_id= to its URL or set ALERT_TELEGRAM_CHAT_ID)`);
+      continue;
     }
-    await markDelivered(env, ids, ts, "sent");
-    sent += ids.length;
-    offset += g.length;
+    const lines = todo.map((a) => ({ id: a.id, text: alertLine(env, a) }));
+    const groups = chunk(lines.map((l) => l.text), LIMIT[h.format]);
+    let offset = 0;
+    for (const [i, g] of groups.entries()) {
+      if (i >= MAX_MESSAGES_PER_RUN) break; // the rest go next hour
+      const ids = lines.slice(offset, offset + g.length).map((l) => l.id);
+      const head = i === 0 ? bold(h.format, "BorderCheck") + `: ${todo.length} new alert${todo.length === 1 ? "" : "s"}\n` : "";
+      try {
+        await send(h.url, payload(h.format, head + g.join("\n"), { alerts: todo.filter((a) => ids.includes(a.id)).map(publicAlert) }, h.chatId));
+      } catch (e) {
+        failures.push(`${where}: ${(e as Error).message}`);
+        break;
+      }
+      await addDelivered(env, ids, h.id);
+      for (const id of ids) took.get(id)!.add(h.id);
+      offset += g.length;
+    }
   }
-  return { sent, failed: null };
+  const done = live.filter((a) => hooks.every((h) => took.get(a.id)!.has(h.id))).map((a) => a.id);
+  await markDelivered(env, done, ts, "sent");
+  return { sent: done.length, failed: failures.length ? failures.join("; ") : null };
+}
+
+async function addDelivered(env: Env, ids: number[], hook: string) {
+  for (let i = 0; i < ids.length; i += 90) {
+    const part = ids.slice(i, i + 90);
+    await env.DB.prepare(`UPDATE alerts SET delivered_to = delivered_to || ? WHERE id IN (${part.map(() => "?").join(",")})`)
+      .bind(hook + ",", ...part)
+      .run();
+  }
 }
 
 function publicAlert(a: AlertRow) {
@@ -242,9 +317,8 @@ export async function digestText(env: Env, now: Date, format: Format): Promise<s
   const top = await env.DB.prepare(
     "SELECT check_id, COUNT(*) AS n FROM checks WHERE status = 'fail' GROUP BY check_id ORDER BY n DESC, check_id LIMIT 5",
   ).all<{ check_id: string; n: number }>();
-  const bold = format === "discord" ? "**" : format === "slack" ? "*" : "";
   const lines = [
-    `${bold}BorderCheck digest${bold}: ${t?.n ?? 0} machines, ${t?.failing ?? 0} non-compliant (${t?.high ?? 0} with a high-severity fail), ${t?.silent ?? 0} silent for more than ${config(env).silentDays} days`,
+    `${bold(format, "BorderCheck digest")}: ${t?.n ?? 0} machines, ${t?.failing ?? 0} non-compliant (${t?.high ?? 0} with a high-severity fail), ${t?.silent ?? 0} silent for more than ${config(env).silentDays} days`,
   ];
   if (t?.compromised) lines.push(`🚨 ${t.compromised} reporting signs of compromise`);
   if (top.results.length) lines.push("Most failing: " + top.results.map((r) => `${lit(r.check_id, 40)} ${r.n}`).join(", "));
@@ -255,12 +329,24 @@ export async function digestText(env: Env, now: Date, format: Format): Promise<s
 
 async function maybeDigest(env: Env, now: Date, send: Send): Promise<boolean> {
   const hours = config(env).digestHours;
-  if (!hours || !env.ALERT_WEBHOOK_URL) return false;
+  const hooks = webhooks(env);
+  if (!hours || !hooks.length) return false;
   const last = await env.DB.prepare("SELECT value FROM meta WHERE key = 'last_digest'").first<string>("value");
   // Allow 5 minutes of slack so an hourly cron does not drift a whole run.
   if (last && now.getTime() - Date.parse(last) < hours * 3600_000 - 5 * 60_000) return false;
-  const format = webhookFormat(env);
-  await send(env.ALERT_WEBHOOK_URL, payload(format, await digestText(env, now, format)));
+  // Sent to every webhook; counted as done when at least one took it, so a
+  // broken webhook does not make the others get the digest every hour.
+  const errors: string[] = [];
+  for (const h of hooks) {
+    if (h.format === "telegram" && !h.chatId) continue;
+    try {
+      await send(h.url, payload(h.format, await digestText(env, now, h.format), {}, h.chatId));
+    } catch (e) {
+      errors.push(`${h.format}: ${(e as Error).message}`);
+    }
+  }
+  if (errors.length === hooks.length) throw new Error(errors.join("; "));
+  if (errors.length) console.error("digest:", errors.join("; "));
   await env.DB.prepare(
     "INSERT INTO meta (key, value) VALUES ('last_digest', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
   )

@@ -694,9 +694,24 @@ responses of `POST /invites` and `POST /invites/{invite_id}/reissue`.
 
 ## Alerts
 
-`ALERT_WEBHOOK_URL` takes a Discord webhook (`https://discord.com/api/webhooks/…`), a Slack incoming webhook
-(`https://hooks.slack.com/…`), or any URL that accepts JSON (`{"text": …, "alerts": [...]}`). The format is
-picked from the URL; `ALERT_WEBHOOK_FORMAT` overrides it.
+`ALERT_WEBHOOK_URL` takes one webhook or several, separated by commas, spaces or new lines; each gets every
+alert. Each one's format comes from its address:
+
+| Address | Format |
+|---|---|
+| `https://discord.com/api/webhooks/…` | Discord |
+| `https://hooks.slack.com/…` | Slack incoming webhook |
+| `https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat>` | Telegram: a bot's token (from @BotFather), and the chat, group or channel it posts in. Without `?chat_id=`, `ALERT_TELEGRAM_CHAT_ID` (a var) gives the chat; `/sendMessage` may be left out. The bot must be a member of that chat (an admin of a channel). |
+| anything else | JSON: `{"text": …, "alerts": [...]}`; `ALERT_WEBHOOK_FORMAT` (`discord`, `slack`, `telegram` or `json`) names another format for such addresses |
+
+```sh
+printf '%s' 'https://hooks.slack.com/services/T/B/X,https://api.telegram.org/bot123:abc/sendMessage?chat_id=-100123' \
+  | npx wrangler secret put ALERT_WEBHOOK_URL
+```
+
+The whole list is one secret: a Telegram URL holds the bot's token. Errors in the log and on the cron's result
+name a webhook by its format and place in the list, never by its URL. Telegram messages are plain text (no
+`parse_mode`) without link previews.
 
 | Alert | Raised | Once per |
 |---|---|---|
@@ -706,8 +721,10 @@ picked from the URL; `ALERT_WEBHOOK_FORMAT` overrides it.
 | Silent | by the cron, when a machine's last report is older than `SILENT_DAYS` | silence; the next report clears it and posts "reporting again" |
 | Digest | by the cron every `DIGEST_HOURS` (`0` = off) | interval |
 
-Alerts wait in D1 until the webhook accepts them, so an outage delays them instead of losing or repeating
-them; after 7 days of failures they are dropped. Values from reports appear inside `code` spans, and Discord
+Alerts wait in D1 until every webhook has accepted them, so an outage delays them instead of losing or
+repeating them: a webhook that is down gets them when it is back, and the others don't get them again
+(`alerts.delivered_to`, migration `0010`). After 7 days of failures they are dropped. The digest goes to every
+webhook and counts as sent when at least one took it. Values from reports appear inside `code` spans, and Discord
 messages are sent with mentions disabled, so a hostname like `@everyone` or a markdown link can't ping or
 phish your channel. The **Alerts** page lists recent alerts and their delivery, webhook or not.
 

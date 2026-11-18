@@ -3,7 +3,7 @@ export interface Env {
 
   // Secrets (wrangler secret put NAME).
   ADMIN_TOKEN?: string; // dashboard login for people without Cloudflare Access
-  ALERT_WEBHOOK_URL?: string; // Discord or Slack incoming webhook, or any URL taking JSON
+  ALERT_WEBHOOK_URL?: string; // one or more (comma or space separated): Discord or Slack incoming webhooks, Telegram sendMessage, or any URL taking JSON
   MCP_TOKEN?: string; // bearer token for the MCP server at /mcp: read and write tools
   MCP_READ_TOKEN?: string; // bearer token for the MCP server: read-only tools
   // Neither set (or both shorter than 16 characters): /mcp answers 404.
@@ -27,7 +27,8 @@ export interface Env {
   HISTORY_PER_MACHINE?: string; // and at most this many reports per machine (default 500)
   MAX_REPORT_BYTES?: string; // default 262144
   MAX_MACHINES?: string; // refuse new install_ids beyond this (default 10000)
-  ALERT_WEBHOOK_FORMAT?: string; // discord | slack | json; default: from the URL
+  ALERT_WEBHOOK_FORMAT?: string; // discord | slack | telegram | json, for webhook URLs whose format their address does not tell (default json)
+  ALERT_TELEGRAM_CHAT_ID?: string; // the chat a Telegram webhook posts in, when its URL has no ?chat_id=
 
   // Enrollment portal.
   INVITE_DAYS?: string; // default lifetime of an invite (7)
