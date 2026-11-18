@@ -160,6 +160,8 @@ type Checks struct {
 	PackageManagers  PackageManagers  `json:"package-managers"`
 	StartupItems     StartupItems     `json:"startup-items"`
 	Backup           Backup           `json:"backup"`
+	// Warp is off unless a policy turns it on; see Warp.
+	Warp Warp `json:"warp"`
 }
 
 // Common is what every check accepts.
@@ -450,6 +452,20 @@ type Backup struct {
 	MaxBackupAgeDays int  `json:"max_backup_age_days"` // warn (low) when the last backup is older; 0 = don't check
 }
 
+// Warp looks at the Cloudflare One client (WARP) that Cloudflare Zero Trust
+// needs on a device to know it: installed, registered to Team, connected and,
+// with PostureOnly, in Posture only mode. Off by default (Enabled false): only
+// organisations that gate access with Zero Trust want it. What it finds is a
+// warning, never a fail.
+type Warp struct {
+	Common
+	Team        string `json:"team"`         // the Zero Trust team name (<team>.cloudflareaccess.com); required when enabled
+	PostureOnly bool   `json:"posture_only"` // also expect the "Posture only" service mode
+}
+
+// WarpTeamPattern is what a Zero Trust team name may look like.
+var WarpTeamPattern = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$`)
+
 func ptr[T any](v T) *T { return &v }
 
 // Default is the built-in policy.
@@ -512,6 +528,7 @@ func Default() Policy {
 			PackageManagers: PackageManagers{Tools: slices.Clone(PackageManagerTools), RequireIgnoreScripts: true, AllowHosts: []string{}},
 			StartupItems:    StartupItems{Allow: []string{}, ExtraSuspiciousPaths: []string{}},
 			Backup:          Backup{RequireEncrypted: true, RequireFindMy: true},
+			Warp:            Warp{Common: Common{Enabled: ptr(false)}},
 		},
 	}
 }
@@ -642,6 +659,7 @@ func (p Policy) validate() error {
 		"admin-rights":     c.AdminRights.OnProblem, "os-protections": c.OSProtections.OnProblem, "sharing": c.Sharing.OnProblem,
 		"extensions": c.Extensions.OnProblem, "browser-passwords": c.BrowserPasswords.OnProblem, "trust-store": c.TrustStore.OnProblem,
 		"package-managers": c.PackageManagers.OnProblem, "startup-items": c.StartupItems.OnProblem, "backup": c.Backup.OnProblem,
+		"warp": c.Warp.OnProblem,
 	} {
 		if on != "" && on != check.Fail && on != check.Warn {
 			return fmt.Errorf("checks.%s.on_problem must be \"fail\" or \"warn\", not %q", id, on)
@@ -759,7 +777,7 @@ func (c Checks) validateNew() error {
 	return c.validateMore()
 }
 
-// validateMore checks the options of package-managers, startup-items and backup.
+// validateMore checks the options of package-managers, startup-items, backup and warp.
 func (c Checks) validateMore() error {
 	for _, t := range c.PackageManagers.Tools {
 		if !slices.Contains(PackageManagerTools, t) {
@@ -785,6 +803,12 @@ func (c Checks) validateMore() error {
 	}
 	if d := c.Backup.MaxBackupAgeDays; d < 0 || d > 3650 {
 		return errors.New("checks.backup.max_backup_age_days must be between 0 and 3650")
+	}
+	if w := c.Warp; w.IsEnabled() && !WarpTeamPattern.MatchString(w.Team) {
+		return fmt.Errorf("checks.warp.team must be your Zero Trust team name (the <team> in <team>.cloudflareaccess.com) when the check is on, not %q", w.Team)
+	}
+	if w := c.Warp; w.Team != "" && !WarpTeamPattern.MatchString(w.Team) {
+		return fmt.Errorf("checks.warp.team %q is not a Zero Trust team name (the <team> in <team>.cloudflareaccess.com)", w.Team)
 	}
 	return nil
 }

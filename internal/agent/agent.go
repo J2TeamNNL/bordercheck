@@ -289,7 +289,7 @@ func Install(ctx context.Context, env Env, o InstallOptions) error {
 			return fmt.Errorf("no %s beside this binary; get it from your IT team or pass -policy", policy.FileName)
 		}
 	}
-	data, pol, err := readPolicy(ctx, env.Client, source, nil)
+	data, pol, err := readPolicy(ctx, env.Client, source, nil, env.Version)
 	if err != nil {
 		return err
 	}
@@ -826,7 +826,7 @@ func currentPolicy(ctx context.Context, env Env, cfg Config, tok *bearer) (polic
 		u = cfg.Enrollment.PolicyURL
 	}
 	if u != "" {
-		data, fresh, err := readPolicy(ctx, env.Client, u, tok)
+		data, fresh, err := readPolicy(ctx, env.Client, u, tok, env.Version)
 		if errors.Is(err, ErrRevoked) {
 			return pol, err
 		}
@@ -854,7 +854,7 @@ func isURL(s string) bool { return strings.HasPrefix(s, "https://") || strings.H
 
 // readPolicy reads a policy from a file or an https URL; with tok, from the
 // portal that issued the token only, sending it and following no redirects.
-func readPolicy(ctx context.Context, client *http.Client, source string, tok *bearer) ([]byte, policy.Policy, error) {
+func readPolicy(ctx context.Context, client *http.Client, source string, tok *bearer, version string) ([]byte, policy.Policy, error) {
 	var data []byte
 	if !isURL(source) {
 		var err error
@@ -871,6 +871,8 @@ func readPolicy(ctx context.Context, client *http.Client, source string, tok *be
 		if err != nil {
 			return nil, policy.Policy{}, err
 		}
+		// The portal leaves out of the policy what this version would refuse.
+		req.Header.Set("User-Agent", "bordercheck/"+version)
 		if tok != nil {
 			if err := tok.allows(source); err != nil {
 				return nil, policy.Policy{}, err

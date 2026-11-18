@@ -384,6 +384,7 @@ export const zh: Catalog = {
   "v.at": "{where}：{problem}",
   "v.unknownCheck": "checks：未知检查项“{id}”",
   "v.onProblem": "{where} 必须是“fail”或“warn”",
+  "v.warpTeam": "启用此检查时，checks.warp.team 必须是你的 Zero Trust 团队名称（.cloudflareaccess.com 前面的名称）",
   "v.untilFormat": "until 必须是日期，例如“2026-12-01”",
   "v.untilPast": "until 已是过去的日期",
   "v.untilFar": "until 超过 {n} 天之后；豁免只能是临时的",
@@ -581,6 +582,7 @@ export const zh: Catalog = {
   "checkTitle.package-managers": "包管理器能防范恶意软件包",
   "checkTitle.startup-items": "登录时没有可疑程序自动启动",
   "checkTitle.backup": "丢失的笔记本电脑可以找回并恢复数据",
+  "checkTitle.warp": "已安装并启用 Cloudflare One 客户端",
   "rep.prodSecrets": "{n} 个生产环境明文密钥",
   "rep.prodSecretsNote": "仅显示名称和文件；密钥的值从不发送。",
 

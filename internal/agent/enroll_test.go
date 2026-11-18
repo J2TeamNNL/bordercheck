@@ -410,7 +410,7 @@ func TestTokenNotFollowedThroughRedirects(t *testing.T) {
 	}))
 	defer redirect.Close()
 	tok := &bearer{token: testToken, portal: redirect.URL}
-	if _, _, err := readPolicy(t.Context(), redirect.Client(), redirect.URL+"/policy", tok); err == nil {
+	if _, _, err := readPolicy(t.Context(), redirect.Client(), redirect.URL+"/policy", tok, "test"); err == nil {
 		t.Error("a redirected policy fetch should fail")
 	}
 	if len(strayAuth) != 0 {

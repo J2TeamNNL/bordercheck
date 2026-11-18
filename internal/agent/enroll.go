@@ -436,7 +436,7 @@ func installEnrolled(ctx context.Context, env Env, o InstallOptions, cfg Config,
 	}
 
 	tok := &bearer{token: token, portal: portal}
-	data, pol, err := readPolicy(ctx, env.Client, cfg.Enrollment.PolicyURL, tok)
+	data, pol, err := readPolicy(ctx, env.Client, cfg.Enrollment.PolicyURL, tok, env.Version)
 	if errors.Is(err, ErrRevoked) {
 		return err
 	}

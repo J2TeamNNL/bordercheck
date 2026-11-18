@@ -53,6 +53,7 @@ Companies can install it on every laptop, and each one then reports to the IT te
 | `package-managers` | npm, pnpm, Yarn, Bun, pip, uv, Go and Cargo settings: registries over plain http, certificate or checksum checks off, every package's install scripts allowed to run |
 | `startup-items` | What starts at login or on a schedule (LaunchAgents, autostart, systemd user units, crontab, Run keys, scheduled tasks): download-and-run commands, programs in temporary, download or hidden folders, programs anyone can change |
 | `backup` | Time Machine encrypted (and, if the policy asks, set up and recent); Find My Mac or Find my device on |
+| `warp` | Off unless the policy turns it on: the Cloudflare One client (WARP) installed, signed in to your Zero Trust team, connected, and if asked in Posture only mode ([Zero Trust guide](docs/zero-trust.md)) |
 
 `os-updates`, `screen-lock` and `remote-access` never go online: they judge what the machine already knows.
 Details and options for each: [Policies](docs/policies.md#checks).

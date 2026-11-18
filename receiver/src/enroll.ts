@@ -10,7 +10,7 @@ import { forRequest, type I18n, type Key } from "./i18n";
 import { json } from "./ingest";
 import { hit } from "./ratelimit";
 import { str } from "./report";
-import { composePolicy, type WaiverRow } from "./roles";
+import { clientVersion, composePolicy, type WaiverRow } from "./roles";
 import { CODE_RE, newInstallId, newToken, sha256hex, TOKEN_RE } from "./tokens";
 
 export interface Enrollment {
@@ -142,7 +142,8 @@ export async function serveMachinePolicy(req: Request, env: Env, now = new Date(
   } catch {
     return json({ error: "role_policy_unreadable" }, 500);
   }
-  const p = composePolicy(rolePolicy, role.name, m, waivers.results, new URL(req.url).origin, now);
+  const p = composePolicy(rolePolicy, role.name, m, waivers.results, new URL(req.url).origin, now,
+    clientVersion(req.headers.get("user-agent")));
   if (!m.last_policy_at || Date.parse(m.last_policy_at) < now.getTime() - 60 * 60 * 1000) {
     await env.DB.prepare("UPDATE enrollments SET last_policy_at = ? WHERE install_id = ?").bind(now.toISOString(), m.install_id).run();
   }

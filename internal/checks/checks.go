@@ -88,12 +88,13 @@ func allWith(p policy.Policy, local Local, includeDisabled bool) []check.Check {
 		{check.Check{ID: "package-managers", Title: "Package managers guard against bad packages", Run: packageManagers(c.PackageManagers)}, c.PackageManagers.Common},
 		{check.Check{ID: "startup-items", Title: "Nothing unexpected starts at login", Run: startupItems(c.StartupItems)}, c.StartupItems.Common},
 		{check.Check{ID: "backup", Title: "A lost laptop can be found and restored", Run: backup(c.Backup)}, c.Backup.Common},
+		{check.Check{ID: "warp", Title: "Cloudflare One client is set up", Run: warp(c.Warp)}, c.Warp.Common},
 	}
 	var out []check.Check
 	for _, a := range all {
 		if a.IsEnabled() {
 			out = append(out, withOnProblem(a.Check, a.OnProblem))
-		} else if includeDisabled {
+		} else if includeDisabled && !offByDefault(a.ID, a.Common) {
 			a.Run = func(context.Context) check.Result {
 				return check.SkippedMsg(msg.Of("check.disabledByPolicy"))
 			}
@@ -101,6 +102,13 @@ func allWith(p policy.Policy, local Local, includeDisabled bool) []check.Check {
 		}
 	}
 	return out
+}
+
+// offByDefault is a check that is off unless a policy turns it on, and that
+// this policy leaves off: it is left out of reports rather than listed as
+// "disabled by the organisation" on every machine.
+func offByDefault(id string, c policy.Common) bool {
+	return id == "warp" && c.Enabled != nil && !*c.Enabled
 }
 
 // withOnProblem makes every problem the check finds report as status on.

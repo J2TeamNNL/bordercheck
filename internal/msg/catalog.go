@@ -690,6 +690,49 @@ var Catalog = map[string]Entry{
 	"backup.fix.win.findMy": s("Settings → Privacy & security → Find my device → turn it on (it needs a Microsoft " +
 		"account and location services)."),
 
+	// ---- warp: the Cloudflare One client (WARP), for Cloudflare Zero Trust ----
+	"warp.missing": s("The Cloudflare One client (WARP) is not installed: Cloudflare Zero Trust cannot see this " +
+		"computer, so company apps it protects will not let it in once access is enforced."),
+	"warp.notRunning": s("The Cloudflare One client (WARP) is installed, but its service did not answer."),
+	"warp.notEnrolled": s("The Cloudflare One client (WARP) is not signed in to your organisation's Zero Trust " +
+		"team ({team})."),
+	"warp.consumer": s("The Cloudflare One client (WARP) is signed in as the free consumer WARP, not to your " +
+		"organisation's Zero Trust team ({team})."),
+	"warp.otherTeam": s("The Cloudflare One client (WARP) is signed in to the Zero Trust team {org}, not {team}."),
+	"warp.disconnected": s("The Cloudflare One client (WARP) is disconnected: Zero Trust cannot check this computer " +
+		"until it is on."),
+	"warp.notPostureOnly": s("The Cloudflare One client (WARP) runs in {mode} mode, not Posture only."),
+	"warp.ok":             s("The Cloudflare One client (WARP) is signed in to {team} and connected."),
+	"warp.teamUnknown":    s("The client did not say which team it is signed in to."),
+	"warp.modeUnknown":    s("The client did not say which mode it runs in."),
+	"warp.fix.mac.install": s("Install the Cloudflare One client: [code]brew install --cask cloudflare-warp[/code], " +
+		"or download it from https://one.one.one.one/ and open it from Applications."),
+	"warp.fix.win.install": s("Install the Cloudflare One client: [code]winget install Cloudflare.Warp[/code], or " +
+		"download it from https://one.one.one.one/ and run the installer."),
+	"warp.fix.linux.install": s("Install the cloudflare-warp package: https://pkg.cloudflareclient.com/ has the steps for each distribution."),
+	"warp.fix.mac.enroll": s("Click the Cloudflare WARP cloud in the menu bar → the gear → Preferences → Account → " +
+		"Login to Cloudflare Zero Trust, enter the team name {team} and sign in with the email your " +
+		"BorderCheck invite was sent to. Or: [code]warp-cli registration new {team}[/code]."),
+	"warp.fix.win.enroll": s("Click the Cloudflare WARP cloud by the clock → the gear → Preferences → Account → " +
+		"Login to Cloudflare Zero Trust, enter the team name {team} and sign in with the email your " +
+		"BorderCheck invite was sent to. Or: [code]warp-cli registration new {team}[/code]."),
+	"warp.fix.linux.enroll": s("Run [code]warp-cli registration new {team}[/code] and sign in, in the browser it " +
+		"opens, with the email your BorderCheck invite was sent to."),
+	"warp.fix.mac.start": s("Open Cloudflare WARP from Applications so its service starts; if it still does not " +
+		"answer, restart the Mac."),
+	"warp.fix.win.start": s("Open Cloudflare WARP from the Start menu so its service starts; if it still does not " +
+		"answer, restart the PC."),
+	"warp.fix.linux.start": s("Start the client's service: [code]sudo systemctl enable --now warp-svc[/code]."),
+	"warp.fix.mac.connect": s("Click the Cloudflare WARP cloud in the menu bar and turn the switch on. Or: " +
+		"[code]warp-cli connect[/code]."),
+	"warp.fix.win.connect": s("Click the Cloudflare WARP cloud by the clock and turn the switch on. Or: " +
+		"[code]warp-cli connect[/code]."),
+	"warp.fix.linux.connect": s("Run [code]warp-cli connect[/code]."),
+	"warp.fix.logout": s("Sign out of the other team first: the gear → Preferences → Account → Logout from " +
+		"Cloudflare Zero Trust (or [code]warp-cli registration delete[/code])."),
+	"warp.fix.mode": s("The mode comes from your organisation's device profile in Zero Trust, not from this " +
+		"computer: tell IT."),
+
 	// ---- secrets: likely sample keys (checks.secrets.sample_rules) ----
 	"samples.more": pl("1 more looks like a sample key.", "{n} more look like sample keys."),
 	"samples.all": pl("The only finding looks like a sample key, not a real one.",

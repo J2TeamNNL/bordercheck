@@ -25,7 +25,30 @@ export const POLICY_CHECKS = [
   "extensions", "browser-passwords", "trust-store",
   "package-managers", "startup-items", "backup",
   "mesh-vpn", // took over "tailscale" (kept: policies for older clients still set it)
+  "warp", // from v0.5.21 (WARP_SINCE): left out of the policy older clients get
 ];
+
+// WARP_SINCE is the first client that knows checks.warp; composePolicy leaves
+// the check, and waivers of it, out of the policy an older client gets.
+export const WARP_SINCE = [0, 5, 21];
+const WARP_TEAM_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
+
+// clientVersion reads "bordercheck/v0.5.21" from a User-Agent: the numbers, or
+// "new" for a build without a release number (a developer's), or null when the
+// request is not from a client that says its version (before v0.5.21).
+export function clientVersion(ua: string | null): number[] | "new" | null {
+  const m = /^bordercheck\/(\S+)/.exec(ua ?? "");
+  if (!m) return null;
+  const v = /^v?(\d+)\.(\d+)\.(\d+)/.exec(m[1]);
+  return v ? [Number(v[1]), Number(v[2]), Number(v[3])] : "new";
+}
+
+export function atLeast(v: number[] | "new" | null, min: number[]): boolean {
+  if (v === "new") return true;
+  if (!v) return false;
+  for (let i = 0; i < min.length; i++) if (v[i] !== min[i]) return v[i] > min[i];
+  return true;
+}
 
 // The checks whose findings the person at the machine may mark as not
 // sensitive (bordercheck ignore), each with its own user_ignore switch.
@@ -272,6 +295,13 @@ export function validateRolePolicy(p: unknown, now: Date): Msg[] {
         if (USER_IGNORE_CHECKS.includes(id) && c.user_ignore !== undefined && typeof c.user_ignore !== "boolean") must("v.mustBool", `checks.${id}.user_ignore`);
         // Which rules set a secret aside as a likely sample key; needs a client that knows the field.
         if (id === "secrets" && c.sample_rules !== undefined) strList(c.sample_rules, "checks.secrets.sample_rules", errs, SAMPLE_RULES);
+        if (id === "warp") {
+          if (c.posture_only !== undefined && typeof c.posture_only !== "boolean") must("v.mustBool", "checks.warp.posture_only");
+          const team = c.team;
+          if ((c.enabled === true || (team !== undefined && team !== "")) && (typeof team !== "string" || !WARP_TEAM_RE.test(team))) {
+            errs.push(msg("v.warpTeam"));
+          }
+        }
       }
   }
   return errs;
@@ -301,8 +331,12 @@ export function composePolicy(
   waivers: WaiverRow[],
   origin: string,
   now: Date,
+  client: number[] | "new" | null = "new",
 ): Obj {
   const p = structuredClone(rolePolicy);
+  // A client older than WARP_SINCE refuses a policy that names the check.
+  const noWarp = !atLeast(client, WARP_SINCE);
+  if (noWarp && isObj(p.checks)) delete p.checks.warp;
   if (typeof p.name !== "string" || !p.name) p.name = roleName;
   // For the portal only (posture.ts): a machine older than v0.5.19 would refuse a policy with it.
   delete p.access;
@@ -331,11 +365,12 @@ export function composePolicy(
       if (!email && !id) continue;
       if (email && email.toLowerCase() !== m.email.toLowerCase()) continue;
       if (id && id !== m.install_id) continue;
+      if (noWarp && w.check === "warp") continue;
       out.push(w);
     }
   }
   for (const w of waivers) {
-    if (!fits(w.until, w.check_id)) continue;
+    if (!fits(w.until, w.check_id) || (noWarp && w.check_id === "warp")) continue;
     out.push({ check: w.check_id, install_id: m.install_id, until: w.until, reason: w.reason });
   }
   p.waivers = out;

@@ -405,6 +405,7 @@ export const en = {
   "v.at": "{where}: {problem}",
   "v.unknownCheck": "checks: unknown check \"{id}\"",
   "v.onProblem": "{where} must be \"fail\" or \"warn\"",
+  "v.warpTeam": "checks.warp.team must be your Zero Trust team name (the name before .cloudflareaccess.com) when the check is on",
   "v.untilFormat": "until must be a date like \"2026-12-01\"",
   "v.untilPast": "until is in the past",
   "v.untilFar": "until is more than {n} days ahead; waivers are temporary",
@@ -608,6 +609,7 @@ export const en = {
   "checkTitle.package-managers": "Package managers guard against bad packages",
   "checkTitle.startup-items": "Nothing unexpected starts at login",
   "checkTitle.backup": "A lost laptop can be found and restored",
+  "checkTitle.warp": "Cloudflare One client is set up",
   "rep.prodSecrets": { one: "{n} production secret in plain text", other: "{n} production secrets in plain text" },
   "rep.prodSecretsNote": "Names and files only; the values are never sent.",
 

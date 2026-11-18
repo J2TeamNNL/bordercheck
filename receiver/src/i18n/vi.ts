@@ -385,6 +385,7 @@ export const vi: Catalog = {
   "v.at": "{where}: {problem}",
   "v.unknownCheck": "checks: mục kiểm tra không xác định \"{id}\"",
   "v.onProblem": "{where} phải là \"fail\" hoặc \"warn\"",
+  "v.warpTeam": "checks.warp.team phải là tên team Zero Trust của bạn (phần tên đứng trước .cloudflareaccess.com) khi bật check này",
   "v.untilFormat": "until phải là ngày, ví dụ \"2026-12-01\"",
   "v.untilPast": "until là ngày trong quá khứ",
   "v.untilFar": "until xa hơn {n} ngày; miễn trừ chỉ là tạm thời",
@@ -582,6 +583,7 @@ export const vi: Catalog = {
   "checkTitle.package-managers": "Trình quản lý gói chặn được gói độc hại",
   "checkTitle.startup-items": "Không có gì lạ tự chạy khi đăng nhập",
   "checkTitle.backup": "Laptop bị mất vẫn tìm được và khôi phục được",
+  "checkTitle.warp": "Đã cài và bật Cloudflare One client",
   "rep.prodSecrets": "{n} secret production dạng văn bản thuần",
   "rep.prodSecretsNote": "Chỉ có tên và file; giá trị không bao giờ được gửi đi.",
 

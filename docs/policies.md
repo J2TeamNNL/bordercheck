@@ -726,6 +726,39 @@ rights or prompts; what cannot be read is said in a note.
 | `require_find_my` | `true` | Warn (low) when Find My Mac / Find my device is off. Not asked of a desktop computer (one with no battery): there it is a note. |
 | `max_backup_age_days` | `0` | Warn (low) when the last backup to a destination is older than this, 0–3650; `0` = don't check. |
 
+### warp
+
+Is the Cloudflare One client (WARP) ready for Cloudflare Zero Trust to judge this device? **Off by default**
+(`"enabled": false`), and then left out of reports altogether rather than listed as disabled: only an
+organisation that gates access with Zero Trust wants it ([Zero Trust guide](zero-trust.md)). From v0.5.21; the
+portal leaves the check, and waivers of it, out of the policy an older client gets.
+
+It runs `warp-cli status`, `warp-cli registration show` and `warp-cli settings` as the person, and changes
+nothing. It never accepts the client's terms of service: a client never set up for this user counts as not
+signed in. In order, the first of these that holds is reported:
+
+| Finding | Severity |
+|---|---|
+| The client is not installed (`warp-cli` not in `PATH` nor where the client installs it) | medium |
+| Its service did not answer | medium |
+| Not signed in to any account, or signed in as the free consumer WARP rather than a team | medium |
+| Signed in to another Zero Trust team than `team` | medium |
+| Disconnected | low |
+| With `posture_only`: in another service mode than Posture only | low |
+
+Every finding is a **warning**, never a fail, with a fix for the person's OS (install, sign in to `team`, start,
+connect). The mode comes from the device profile in the Zero Trust dashboard, so that fix says to tell IT. The
+email the client signed in with is not read: Cloudflare and the portal match it to the invite.
+
+| Field | Default | |
+|---|---|---|
+| `team` | `""` | Your Zero Trust team name, the part before `.cloudflareaccess.com`. Required when the check is on. |
+| `posture_only` | `false` | Also expect the "Posture only" service mode. Set your device profile's **Service mode** first. |
+
+```json
+{ "checks": { "warp": { "enabled": true, "team": "<your team name>", "posture_only": true } } }
+```
+
 ## A fuller example
 
 ```json
