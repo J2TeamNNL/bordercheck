@@ -556,7 +556,7 @@ export const checksZh: CheckCatalog = {
   "warp.fix.linux.connect": "运行 [code]warp-cli connect[/code]。",
   "warp.fix.logout": "先退出另一个团队：[code]warp-cli registration delete[/code]。",
   "warp.fix.guide": "分步说明（附图）：https://github.com/ptrinh/BorderCheck/blob/main/docs/warp.md （供你或你的 AI 助手参考）。",
-  "warp.fix.mode": "该模式由你所在组织在 Zero Trust 中的设备配置文件设定，而不是由这台电脑设定：请告知 IT。",
+  "warp.fix.mode": "这台电脑上没有可设置的选项：客户端登录到团队后，该模式由组织下发，通常一分钟内生效。如果一直不变，请告知 IT。",
   "samples.more": "另有 {n} 项看起来是示例密钥。",
   "samples.all": "发现的只有 {n} 项看起来是示例密钥，而非真实密钥。",
 };

@@ -578,7 +578,7 @@ export const checksVi: CheckCatalog = {
   "warp.fix.linux.connect": "Chạy [code]warp-cli connect[/code].",
   "warp.fix.logout": "Rời team kia trước: [code]warp-cli registration delete[/code].",
   "warp.fix.guide": "Hướng dẫn từng bước, có ảnh: https://github.com/ptrinh/BorderCheck/blob/main/docs/warp.md (cho bạn hoặc trợ lý AI của bạn).",
-  "warp.fix.mode": "Chế độ này do device profile của tổ chức trong Zero Trust đặt, không phải do máy này: hãy báo IT.",
+  "warp.fix.mode": "Không có gì để chỉnh trên máy này: chế độ do tổ chức đặt, tự áp dụng khi client đã đăng nhập vào team, thường trong vòng một phút. Nếu vẫn vậy, hãy báo IT.",
   "samples.more": "Ngoài ra còn {n} mục có vẻ là khoá mẫu.",
   "samples.all": "Các mục tìm thấy đều là {n} mục có vẻ là khoá mẫu, không phải khoá thật.",
 };

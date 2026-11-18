@@ -7,6 +7,10 @@ BorderCheck's `warp` check tells you what is missing and the team name to use.
 In the mode your organisation uses (**Posture only**, shown as *Device Information Only*), the client only tells
 Cloudflare which computer this is: it does not route your traffic, change your DNS or see what you browse.
 
+**You do not choose that mode, and the client has no setting for it.** It comes from your organisation as soon
+as the client is signed in to its team (step 3): before that, the client only offers Private browsing or Cloudflare
+One Client, and its settings show nothing about Posture only. Just sign in to the team; the mode follows.
+
 An AI coding assistant (Claude Code, Codex…) can do most of this with you: see [For an AI assistant](#for-an-ai-assistant).
 
 ## 1. Install the client
@@ -35,7 +39,9 @@ BorderCheck report.
 
 ## 4. Check that it is connected
 
-The window shows **Connected · Device Information Only**:
+A minute or so after signing in, the window shows **Connected · Device Information Only**: that is Posture only
+mode, set by your organisation. Right after signing in it may first run in another mode for a minute while it
+fetches your organisation's settings; wait. Do not change the mode yourself.
 
 <p align="center"><img src="img/warp-connected.png" width="520" alt="The client's window after enrolling: Connected, Device Information Only, with a Disconnect button."></p>
 
@@ -52,7 +58,7 @@ it is off. Then run BorderCheck again (or wait for its next check): the `warp` c
 | Signed in to another team | `warp-cli registration delete`, then `warp-cli registration new <team>` |
 | Disconnected | Step 4, or `warp-cli connect` |
 | On but not connected, *Failed to set mTLS Identity* or another certificate error | A setting of your organisation, not of your computer: tell IT what it says. |
-| Runs in another mode, not Posture only | Set by your organisation's device profile: tell IT. |
+| Runs in another mode, not Posture only | Nothing to set on the computer. Wait a minute after signing in; if it stays, tell IT (the organisation's device profile sets it). |
 
 ## For an AI assistant
 
@@ -67,4 +73,7 @@ Run the commands one at a time, and ask the person before each one that changes 
    team as `Organization`. Do not paste the device or account IDs it prints anywhere.
 5. Run `bordercheck fix` again: the `warp` finding is gone.
 
-Do not change the client's mode or settings: the organisation sets them.
+Do not change the client's mode or settings, and do not run `warp-cli mode`: Posture only comes from the
+organisation once the client is registered to the team (`warp-cli settings` then shows `Mode: PostureOnly`,
+usually within a minute). Before registration there is nothing that sets it. If the mode stays different, tell
+the person to ask IT.

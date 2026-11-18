@@ -82,7 +82,9 @@ cf zero-trust devices profiles default update --service-mode-v2-mode posture_onl
 ```
 
 Clients pick the change up within a minute or two. Set it **before** people connect: the default mode,
-"Traffic and DNS", sends all of a device's traffic through Cloudflare Gateway.
+"Traffic and DNS", sends all of a device's traffic through Cloudflare Gateway. People cannot choose the mode:
+the client has no setting for it, and it applies only once the client is signed in to your team (right after
+signing in, the client may show another mode for a minute while it fetches the profile).
 
 ### C. Client certificates for one zone
 

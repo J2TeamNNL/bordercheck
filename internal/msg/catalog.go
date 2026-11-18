@@ -726,8 +726,7 @@ var Catalog = map[string]Entry{
 	"warp.fix.logout":        s("Leave the other team first: [code]warp-cli registration delete[/code]."),
 	"warp.fix.cannotConnect": s("Open Cloudflare WARP to see the error. If it stays, send IT what it says: an error about the mTLS identity or the certificate is a setting of the organisation, not of this computer."),
 	"warp.fix.guide":         s("Step by step, with pictures: https://github.com/ptrinh/BorderCheck/blob/main/docs/warp.md (for you or your AI assistant)."),
-	"warp.fix.mode": s("The mode comes from your organisation's device profile in Zero Trust, not from this " +
-		"computer: tell IT."),
+	"warp.fix.mode":          s("There is nothing to set on this computer: the mode comes from your organisation once the client is signed in to its team, usually within a minute. If it stays, tell IT."),
 
 	// ---- secrets: likely sample keys (checks.secrets.sample_rules) ----
 	"samples.more": pl("1 more looks like a sample key.", "{n} more look like sample keys."),

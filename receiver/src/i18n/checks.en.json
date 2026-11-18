@@ -565,7 +565,7 @@
   "warp.fix.mac.enroll": "Open Cloudflare WARP from Applications. On its first screen choose Cloudflare One Client → Continue, enter the team name {team} and sign in with the email your BorderCheck invite was sent to. If it was set up for Private browsing before, run [code]warp-cli registration new {team}[/code] instead.",
   "warp.fix.mac.install": "Install the Cloudflare One client: [code]brew install --cask cloudflare-warp[/code], or download it from https://one.one.one.one/ and open it from Applications.",
   "warp.fix.mac.start": "Open Cloudflare WARP from Applications so its service starts; if it still does not answer, restart the Mac.",
-  "warp.fix.mode": "The mode comes from your organisation's device profile in Zero Trust, not from this computer: tell IT.",
+  "warp.fix.mode": "There is nothing to set on this computer: the mode comes from your organisation once the client is signed in to its team, usually within a minute. If it stays, tell IT.",
   "warp.fix.win.connect": "Open Cloudflare WARP from the Start menu or the cloud by the clock, then Home → Connect. Or: [code]warp-cli connect[/code].",
   "warp.fix.win.enroll": "Open Cloudflare WARP from the Start menu. On its first screen choose Cloudflare One Client → Continue, enter the team name {team} and sign in with the email your BorderCheck invite was sent to. If it was set up for Private browsing before, run [code]warp-cli registration new {team}[/code] instead.",
   "warp.fix.win.install": "Install the Cloudflare One client: [code]winget install Cloudflare.Warp[/code], or download it from https://one.one.one.one/ and run the installer.",
