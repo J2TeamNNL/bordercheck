@@ -16,17 +16,31 @@ import (
 
 // The cracked-software check looks for the traces that cracks of paid software
 // leave behind. Cracked installers are a common way to spread malware
-// (information stealers above all), so any trace fails high. It only reads:
-// the hosts file, on Windows the activation settings in the registry, and
-// whether well-known crack tools are installed. It never lists installed
-// software or goes online.
+// (information stealers above all). It fails high only on what is likely to
+// carry malware: closed-source crack tools that are installed, almost always
+// from third-party downloads, often repackaged with something else. Other
+// traces (a hosts-file line, a firewall rule, an open-source activator's hook)
+// show cracked software without that risk, and only warn. It only reads: the
+// hosts file, and on Windows the activation settings in the registry, the
+// firewall's outbound block rules, scheduled tasks and a few folders. It never
+// lists installed software or goes online.
 
 // crackFacts is what the per-OS code gathers.
 type crackFacts struct {
 	HostsPath string            // the hosts file, as shown
 	Hosts     string            // its contents; "" if unreadable
 	KMS       map[string]string // "Windows" / "Microsoft Office" → KeyManagementServiceName
-	Tools     []string          // crack tools found: "KMSpico (C:\Program Files\KMSpico)"
+	Tools     []string          // crack tools likely to carry malware: "KMSpico (C:\Program Files\KMSpico)"
+	Hooks     []string          // open-source activators' traces, such as Ohook's sppc.dll in Office
+	Firewall  []crackFirewall   // outbound block rules on paid programs
+}
+
+// crackFirewall is a Windows Firewall rule that keeps a paid program off the
+// internet, as crack instructions tell people to do so it can't check its licence.
+type crackFirewall struct {
+	Vendor  string // as in crackPrograms
+	Program string // the program's path as the rule has it
+	Rule    string // the rule's display name
 }
 
 // crackHost marks a vendor's licensing or activation servers. A crack blocks
@@ -39,6 +53,16 @@ type crackHost struct {
 }
 
 var crackHosts = []crackHost{
+	{vendor: "Internet Download Manager", domain: "internetdownloadmanager.com"},
+	{vendor: "Internet Download Manager", domain: "registeridm.com"},
+	{vendor: "CorelDRAW", domain: "corel.com"},
+	{vendor: "CorelDRAW", domain: "coreldraw.com"},
+	{vendor: "TechSmith (Camtasia, Snagit)", domain: "techsmith.com"},
+	{vendor: "Bandicam", domain: "bandisoft.com"},
+	{vendor: "Bandicam", domain: "bandicam.com"},
+	{vendor: "Wondershare (Filmora)", domain: "wondershare.com"},
+	{vendor: "Wondershare (Filmora)", domain: "wondershare.net"},
+	{vendor: "Wondershare (Filmora)", domain: "wondershare.cc"},
 	{vendor: "Adobe", domain: "adobegenuine.com"},
 	{vendor: "Adobe", domain: "adobe.com", words: []string{"activat", "licens", "genuine", "3dns"},
 		exact: []string{"na1r.services.adobe.com", "hlrcv.stage.adobe.com"}},
@@ -108,6 +132,32 @@ func kmsEmulated(server string) bool {
 	return host == "localhost" || blockingAddr(host)
 }
 
+// crackPrograms are paid programs (lower-case file names) whose cracks tell
+// people to block them in the firewall, by vendor.
+var crackPrograms = map[string]string{
+	"photoshop.exe": "Adobe", "illustrator.exe": "Adobe", "afterfx.exe": "Adobe", "adobe premiere pro.exe": "Adobe",
+	"indesign.exe": "Adobe", "acrobat.exe": "Adobe", "lightroom.exe": "Adobe", "animate.exe": "Adobe",
+	"adobe desktop service.exe": "Adobe", "agsservice.exe": "Adobe", "adobegcclient.exe": "Adobe",
+	"creative cloud.exe": "Adobe",
+	"acad.exe":           "Autodesk", "revit.exe": "Autodesk", "3dsmax.exe": "Autodesk", "maya.exe": "Autodesk",
+	"adskaccessservicehost.exe": "Autodesk", "adsklicensingagent.exe": "Autodesk",
+	"coreldrw.exe": "CorelDRAW", "corelpp.exe": "CorelDRAW",
+	"idman.exe":          "Internet Download Manager",
+	"camtasiastudio.exe": "TechSmith (Camtasia, Snagit)", "camtasia.exe": "TechSmith (Camtasia, Snagit)",
+	"snagiteditor.exe": "TechSmith (Camtasia, Snagit)", "snagit32.exe": "TechSmith (Camtasia, Snagit)",
+	"bdcam.exe": "Bandicam", "filmora.exe": "Wondershare (Filmora)", "wondershare filmora.exe": "Wondershare (Filmora)",
+	"sketchup.exe": "SketchUp", "lumion.exe": "Lumion", "etabs.exe": "CSI (ETABS, SAP2000)", "sap2000.exe": "CSI (ETABS, SAP2000)",
+}
+
+// crackFirewallVendor returns the vendor of a program a firewall rule blocks, or "".
+func crackFirewallVendor(program string) string {
+	p := strings.ReplaceAll(program, `\`, "/")
+	if i := strings.LastIndex(p, "/"); i >= 0 {
+		p = p[i+1:]
+	}
+	return crackPrograms[strings.ToLower(strings.TrimSpace(p))]
+}
+
 // crackAlternatives are free, open-source replacements from ArtCraft
 // (getartcraft.com), by the vendor whose product was cracked.
 var crackAlternatives = map[string]string{
@@ -134,17 +184,27 @@ func evalCracked(f crackFacts, opts policy.CrackedSoftware) check.Result {
 		}
 		ev = append(ev, fmt.Sprintf("%s blocks %s licensing servers: %s", f.HostsPath, v, shown))
 	}
-	// Signs of compromise are only the strongest traces: a KMS emulator this
-	// machine activates against, and an installed crack tool. Both are
-	// programs from the crack scene running with the system's rights, and the
-	// usual carriers of bundled malware. A hosts-file line is not one: it
-	// blocks a licence check, but runs nothing.
+	for _, fw := range f.Firewall {
+		vendors[fw.Vendor] = true
+		ev = append(ev, fmt.Sprintf("Windows Firewall blocks %s from the internet (rule %q)", fw.Program, fw.Rule))
+	}
+	for _, h := range f.Hooks {
+		vendors["Microsoft Office"] = true
+		ev = append(ev, "activation hook: "+h)
+	}
+	// Signs of compromise, and a fail, only for an installed closed-source
+	// crack tool: from the crack scene, running with the system's rights, the
+	// usual carrier of bundled malware. A KMS emulator this machine activates
+	// against counts with such a tool; alone it may be an open-source script
+	// (KMS_VL_ALL…), and warns. A hosts line or firewall rule runs nothing.
 	var compromise []check.Indicator
 	for _, product := range []string{"Windows", "Microsoft Office"} {
 		if s := f.KMS[product]; s != "" && kmsEmulated(s) {
 			vendors[product] = true
 			ev = append(ev, fmt.Sprintf("%s activates against a KMS server on this machine (%s): a KMS emulator", product, s))
-			compromise = append(compromise, check.Indicator{What: msg.P("compromise.kmsEmulator", "product", product), Detail: s})
+			if len(f.Tools) > 0 {
+				compromise = append(compromise, check.Indicator{What: msg.P("compromise.kmsEmulator", "product", product), Detail: s})
+			}
 		}
 	}
 	for _, t := range f.Tools {
@@ -156,14 +216,30 @@ func evalCracked(f crackFacts, opts policy.CrackedSoftware) check.Result {
 		return check.Result{Status: check.Pass}.WithSummary(msg.Of("cracked.pass"))
 	}
 	var what []string
-	for _, v := range []string{"Adobe", "Autodesk", "Microsoft Office", "Windows"} {
+	order := []string{"Adobe", "Autodesk", "Microsoft Office", "Windows"}
+	for _, v := range order {
 		if vendors[v] {
 			what = append(what, v)
 		}
 	}
-	return check.Result{Status: check.Fail, Severity: check.High, Evidence: ev, Compromise: compromise}.
-		WithSummary(msg.Of("cracked.found", "products", strings.Join(what, ", "))).
-		WithFix(crackFix(vendors, opts.SuggestAlternatives))
+	var rest []string
+	for v := range vendors {
+		if !slices.Contains(order, v) {
+			rest = append(rest, v)
+		}
+	}
+	sort.Strings(rest)
+	what = append(what, rest...)
+	fix := crackFix(vendors, opts.SuggestAlternatives)
+	if len(f.Firewall) > 0 {
+		fix = append(fix, msg.P("cracked.fix.firewall"))
+	}
+	if len(f.Tools) > 0 {
+		return check.Result{Status: check.Fail, Severity: check.High, Evidence: ev, Compromise: compromise}.
+			WithSummary(msg.Of("cracked.found", "products", strings.Join(what, ", "))).WithFix(fix)
+	}
+	return check.Result{Status: check.Warn, Severity: check.Medium, Evidence: ev}.
+		WithSummary(msg.Of("cracked.traces", "products", strings.Join(what, ", "))).WithFix(fix)
 }
 
 func crackFix(vendors map[string]bool, alternatives bool) msg.Text {

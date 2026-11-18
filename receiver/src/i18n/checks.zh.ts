@@ -335,7 +335,9 @@ export const checksZh: CheckCatalog = {
   "ai.fix":
     "不要把令牌写在 MCP 配置中：改为引用环境变量（[code]\"env\": {\"API_KEY\": \"${env:API_KEY}\"}[/code] 或代理自带的输入/密钥机制），并从系统钥匙串加载（macOS 上用 [code]touchenv run[/code]）。重新开启审批和沙箱：否则，代理读取的任何文件、网页或 issue 中的提示词注入都能以你的身份执行命令。",
 
-  "cracked.pass": "没有发现破解版 Adobe、Autodesk、Windows 或 Microsoft Office 的痕迹。",
+  "cracked.pass": "未发现破解软件的痕迹。",
+  "cracked.traces": "发现破解软件的痕迹（{products}），但没有发现常携带恶意软件的破解工具。破解软件得不到更新，许可证也无效。",
+  "cracked.fix.firewall": "删除阻止这些程序联网的防火墙规则：Windows Defender Firewall with Advanced Security（wf.msc）→ Outbound Rules。",
   "cracked.found": "发现破解软件的迹象（{products}）。破解软件是植入窃取密码和令牌的恶意软件的常见途径。",
   "cracked.fix":
     "卸载破解软件及所有破解或激活工具，删除破解程序添加到 hosts 文件中的条目，并进行全盘恶意软件扫描：破解软件常常携带信息窃取木马。如果扫描发现木马，请更改在这台电脑上使用过的密码和令牌。请向 IT 申请正版授权。",

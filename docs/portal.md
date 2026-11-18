@@ -164,7 +164,7 @@ them. Details: [Alerts](../receiver/README.md#alerts).
 ### Signs of compromise
 
 A few findings are signs that hostile code is already on a machine rather than an open door: a startup item
-that downloads and runs code, an extension on the role's block list, an installed crack tool or KMS emulator
+that downloads and runs code, an extension on the role's block list, an installed closed-source crack tool, with the KMS emulator it runs
 ([the list](policies.md#signs-of-compromise)). A report with one says `"compromised": true`, and while a
 machine's latest report does:
 

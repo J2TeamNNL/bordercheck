@@ -729,7 +729,7 @@ messages are sent with mentions disabled, so a hostname like `@everyone` or a ma
 phish your channel. The **Alerts** page lists recent alerts and their delivery, webhook or not.
 
 A **compromised** report comes from a BorderCheck that found a sign that hostile code is already on the machine
-(a startup item that downloads and runs code, an extension on the block list, a crack tool or KMS emulator: see
+(a startup item that downloads and runs code, an extension on the block list, a closed-source crack tool and its KMS emulator: see
 [docs/policies.md](../docs/policies.md#signs-of-compromise)); it is a small set of strong signs, not malware
 detection. Only a literal `"compromised": true` counts, so a report from an older client never does. The
 webhook line names the machine and the check IDs, never the item (that is on the machine page); the JSON

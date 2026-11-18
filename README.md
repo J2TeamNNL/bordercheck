@@ -47,7 +47,7 @@ at once ([signs of compromise](docs/policies.md#signs-of-compromise)).
 | `ssh-keys` | Private keys without a passphrase or readable by others; who can log in through `authorized_keys` |
 | `tunnels` | ngrok, cloudflared, `tailscale funnel`/`serve`, VS Code tunnels, `ssh -R` and others |
 | `ai-agents` | Plain-text tokens in MCP and agent configs, and settings that skip approvals or the sandbox |
-| `cracked-software` | Traces of cracked Adobe, Autodesk, Windows or Office (blocked licensing servers, KMS emulators, KMSpico); suggests free alternatives |
+| `cracked-software` | Traces of cracked software: Windows and Office activators, licensing servers blocked in the hosts file or the firewall (Adobe, Autodesk, CorelDRAW, IDM, Camtasia, Bandicam, Filmora…). Fails only on crack tools that commonly carry malware (KMSpico, KMSAuto, AAct…); suggests free alternatives |
 | `admin-rights` | No passwordless `sudo`; Windows UAC on and asking, built-in Administrator off; if the policy asks, that the daily account is not an administrator |
 | `os-protections` | SIP and Gatekeeper (macOS); Defender or another antivirus, tamper protection, SmartScreen, Secure Boot (Windows); Secure Boot, AppArmor or SELinux enforcing (Linux) |
 | `sharing` | AirDrop for Everyone, File, Printer, Internet, Media and Bluetooth Sharing, Content Caching (macOS); shared folders, network discovery on public networks, Nearby sharing (Windows); Samba, NFS, CUPS and GNOME file sharing (Linux) |

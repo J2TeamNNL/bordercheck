@@ -416,7 +416,11 @@ var Catalog = map[string]Entry{
 		"then run commands as you."),
 
 	// ---- cracked-software ----
-	"cracked.pass": s("No traces of cracked Adobe, Autodesk, Windows or Microsoft Office."),
+	"cracked.pass": s("No traces of cracked software."),
+	"cracked.traces": s("Traces of cracked software ({products}), but no crack tool that commonly carries malware. " +
+		"Cracked software gets no updates, and its licence is not valid."),
+	"cracked.fix.firewall": s("Remove the firewall rules that keep those programs off the internet: Windows Defender " +
+		"Firewall with Advanced Security (wf.msc) → Outbound Rules."),
 	"cracked.found": s("Signs of cracked software ({products}). Cracks are a common way to install malware that " +
 		"steals passwords and tokens."),
 	"cracked.fix": s("Uninstall the cracked software and any crack or activation tool, remove the lines the crack " +

@@ -86,7 +86,7 @@ already happened. Those findings carry a **sign of compromise**, and only these,
 |---|---|---|
 | `startup-items` | An item that starts at login or on a schedule runs a command that downloads code and runs it (`curl … \| sh`, `powershell -enc …`, `iex (… DownloadString …)`, `mshta http…`, `certutil -urlcache`) | That is how droppers keep themselves on a machine. An item the policy's `allow` list matches is not checked. A program in an odd place, one anyone can change or one that is missing is an ordinary finding. |
 | `extensions` | An installed extension (even disabled) matches the policy's `block` list | IT has declared it malicious or forbidden. An extension from outside a store, or one not on the `allow` list, is an ordinary finding. |
-| `cracked-software` | A crack tool is installed (KMSpico, AutoKMS), or Windows or Office activates against a KMS server on the machine itself (a KMS emulator) | A program from the crack scene that runs with the system's rights, and the usual carrier of bundled malware. A hosts-file line that blocks Adobe's or Autodesk's licence servers is an ordinary finding: it runs nothing. |
+| `cracked-software` | A closed-source crack tool is installed (KMSpico, AutoKMS, KMSAuto, AAct), and with one, Windows or Office activating against a KMS server on the machine itself (a KMS emulator) | A program from the crack scene that runs with the system's rights, and the usual carrier of bundled malware. A KMS emulator alone (possibly an open-source script), Ohook, a hosts-file line or a firewall rule that keeps a paid program from its licence server is an ordinary finding: it runs nothing from the crack scene, or nothing at all. |
 
 This is a small set of strong signs that BorderCheck already sees, not malware detection: BorderCheck is not an
 antivirus, and a machine without these signs is not proven clean. A sign counts only on a result that fails: a
@@ -482,21 +482,25 @@ Continue and Zed, at the paths each vendor documents (on Linux and Windows only 
 ### cracked-software
 
 Traces that cracks of paid software leave behind. Cracked installers are a common way to spread malware,
-information stealers above all, so any trace fails with high severity. The check never lists installed software
-and never goes online.
+information stealers above all. The check **fails (high) only on what is likely to carry malware**: an installed
+closed-source crack tool, almost always downloaded from a third-party site and often repackaged with something
+else. Every other trace shows cracked software without that risk and **warns (medium)**. The check never lists
+installed software and never goes online.
 
-| Looks for | Where |
-|---|---|
-| Adobe licensing and activation servers (`*.adobegenuine.com`; names under `adobe.com` and `adobe.io` that hold `activat`, `licens` or `genuine`, `3dns-…` and a few known ones such as `ic.adobe.io`) or Autodesk's (`activat`, `licens`, `genuine` under `autodesk.com`) sent to `0.0.0.0`, `::` or a loopback address in the hosts file | every OS (`/etc/hosts`; `%SystemRoot%\System32\drivers\etc\hosts`) |
-| Windows or Microsoft Office set to activate against a KMS server on the machine itself (loopback or `localhost`), which only a KMS emulator such as KMSpico or KMS_VL_ALL answers. A company KMS server on the network passes. | Windows |
-| KMSpico installed (`Program Files\KMSpico`) or its AutoKMS scheduler (`%SystemRoot%\AutoKMS`) | Windows |
+| Looks for | Where | Result |
+|---|---|---|
+| A closed-source activator installed: KMSpico (`Program Files\KMSpico`), Microsoft Toolkit's or KMSpico's AutoKMS (`%SystemRoot%\AutoKMS`), KMSAuto (`%ProgramData%\KMSAutoS`, `Program Files\KMSAuto Net`), AAct (`Program Files\AAct`), or a scheduled task of one of them (a name holding `KMSpico`, `AutoKMS`, `KMSAuto` or `AAct`) | Windows | **fail**, sign of compromise |
+| Windows or Microsoft Office set to activate against a KMS server on the machine itself (loopback or `localhost`), which only a KMS emulator answers. A company KMS server on the network passes. | Windows | with a tool above: fail, sign of compromise; alone (it may be an open-source script such as KMS_VL_ALL): warn |
+| Ohook, the Office activator of Microsoft Activation Scripts (open source): its `sppc.dll` in `Microsoft Office\root\vfs\System` or `SystemX86`, where genuine Office has none | Windows | warn |
+| Licensing and activation servers sent to `0.0.0.0`, `::` or a loopback address in the hosts file: Adobe (`*.adobegenuine.com`; names under `adobe.com` and `adobe.io` that hold `activat`, `licens` or `genuine`, `3dns-…` and a few known ones such as `ic.adobe.io`), Autodesk (`activat`, `licens`, `genuine` under `autodesk.com`), and any name under the domains of Internet Download Manager (`internetdownloadmanager.com`, `registeridm.com`), CorelDRAW (`corel.com`, `coreldraw.com`), TechSmith (`techsmith.com`), Bandicam (`bandisoft.com`, `bandicam.com`) and Wondershare (`wondershare.com`, `.net`, `.cc`) | every OS (`/etc/hosts`; `%SystemRoot%\System32\drivers\etc\hosts`) | warn |
+| An enabled Windows Firewall outbound block rule on a paid program, as crack instructions tell people to add so it can't check its licence: Adobe (Photoshop, Illustrator, Premiere Pro, After Effects, InDesign, Acrobat, Lightroom, Animate, and its licensing services), Autodesk (AutoCAD, Revit, 3ds Max, Maya, its licensing services), CorelDRAW, Internet Download Manager, Camtasia, Snagit, Bandicam, Filmora, SketchUp, Lumion, ETABS and SAP2000 | Windows | warn |
 
 | Field | Default | |
 |---|---|---|
 | `suggest_alternatives` | `true` | The fix names free, open-source replacements from [ArtCraft](https://getartcraft.com) for the products found: PhotoCraft, VectorCraft, FilmCraft, LightCraft, EffectCraft, DesignCraft and PdfCraft for Adobe; WordCraft, GridCraft and DeckCraft for Office; CADCraft for Autodesk. Set it to `false` if your organisation provides licences instead. |
 
 The fix always says to remove the crack and its hosts entries, run a full malware scan, change the passwords and
-tokens used on the machine, and ask IT for a licensed copy.
+tokens used on the machine, and ask IT for a licensed copy; with firewall rules, to remove them too.
 
 ### admin-rights
 

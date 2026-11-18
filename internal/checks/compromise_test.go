@@ -54,7 +54,7 @@ func TestCompromiseIndicators(t *testing.T) {
 	}
 
 	opts := policy.Default().Checks.CrackedSoftware
-	if r := evalCracked(crackFacts{HostsPath: "/etc/hosts", Hosts: "0.0.0.0 lmlicensing.adobe.com\n"}, opts); r.Status != check.Fail || r.Compromise != nil {
+	if r := evalCracked(crackFacts{HostsPath: "/etc/hosts", Hosts: "0.0.0.0 lmlicensing.adobe.com\n"}, opts); r.Status != check.Warn || r.Compromise != nil {
 		t.Errorf("a hosts-file line alone is not a sign of compromise: %s %+v", r.Status, r.Compromise)
 	}
 	r = evalCracked(crackFacts{KMS: map[string]string{"Windows": "127.0.0.2:1688"}, Tools: []string{`KMSpico (C:\Program Files\KMSpico)`}}, opts)
@@ -62,6 +62,9 @@ func TestCompromiseIndicators(t *testing.T) {
 		r.Compromise[0].What.English() != "Windows is activated by a fake activation server running on this computer." ||
 		r.Compromise[1].Detail != `KMSpico (C:\Program Files\KMSpico)` {
 		t.Errorf("crack tools: %+v", r.Compromise)
+	}
+	if r := evalCracked(crackFacts{KMS: map[string]string{"Windows": "127.0.0.2:1688"}}, opts); r.Status != check.Warn || r.Compromise != nil {
+		t.Errorf("a KMS emulator without a closed-source tool (KMS_VL_ALL…) only warns: %s %+v", r.Status, r.Compromise)
 	}
 	if r := evalCracked(crackFacts{KMS: map[string]string{"Windows": "kms.corp.domain.com"}}, opts); r.Compromise != nil {
 		t.Errorf("a company KMS server: %+v", r.Compromise)

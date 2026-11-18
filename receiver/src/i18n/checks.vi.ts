@@ -339,7 +339,9 @@ export const checksVi: CheckCatalog = {
   "ai.fix":
     "Không để token trong cấu hình MCP: hãy tham chiếu biến môi trường ([code]\"env\": {\"API_KEY\": \"${env:API_KEY}\"}[/code] hoặc cơ chế input/secret riêng của agent) và nạp giá trị từ keychain của hệ điều hành ([code]touchenv run[/code] trên macOS). Bật lại bước xác nhận và sandbox: nếu không, một đoạn prompt injection trong bất kỳ file, trang web hay issue nào agent đọc đều có thể chạy lệnh dưới danh nghĩa của bạn.",
 
-  "cracked.pass": "Không có dấu vết của Adobe, Autodesk, Windows hay Microsoft Office bẻ khoá.",
+  "cracked.pass": "Không có dấu vết phần mềm crack.",
+  "cracked.traces": "Có dấu vết phần mềm crack ({products}), nhưng không thấy công cụ crack nào hay mang malware. Phần mềm crack không được cập nhật, và giấy phép không hợp lệ.",
+  "cracked.fix.firewall": "Xoá các luật firewall chặn những chương trình đó kết nối internet: Windows Defender Firewall with Advanced Security (wf.msc) → Outbound Rules.",
   "cracked.found":
     "Có dấu hiệu phần mềm bẻ khoá ({products}). Bản crack là con đường phổ biến để cài mã độc đánh cắp mật khẩu và token.",
   "cracked.fix":
