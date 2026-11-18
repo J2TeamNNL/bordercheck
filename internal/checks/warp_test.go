@@ -36,6 +36,12 @@ const (
 )
 
 func TestParseWarpReal(t *testing.T) {
+	// Posture only, connected.
+	posture := strings.Replace(warpRealSettings, "Mode: WarpWithDnsOverHttps", "Mode: PostureOnly", 1)
+	if f := parseWarp("Status update: Connected\nNetwork: healthy\n", warpRealReg, posture); !f.Connected || f.Mode != "PostureOnly" ||
+		evalWarp(f, policy.Warp{Team: "senprints", PostureOnly: true}, "darwin").Status != check.Pass {
+		t.Errorf("posture only, connected: %+v", f)
+	}
 	// Posture only before the zone's client certificates were turned on.
 	if f := parseWarp("Status update: Unable\nReason: Failed to set mTLS Identity\n", warpRealReg, warpRealSettings); f.Status != "Unable" ||
 		f.Reason != "Failed to set mTLS Identity" || f.Connected {
