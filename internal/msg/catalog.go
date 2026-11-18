@@ -163,9 +163,12 @@ var Catalog = map[string]Entry{
 	"docker.notInstalled": s("Docker is not installed."),
 	"docker.noPermission": s("Docker is installed, but this user may not use it (not in the docker group), so its " +
 		"containers were not checked."),
-	"docker.notRunning":   s("Docker is not running."),
-	"docker.noContainers": s("No running containers."),
-	"docker.pass":         pl("1 running container, isolated.", "{n} running containers, all isolated."),
+	"docker.notRunning":        s("Docker is not running."),
+	"docker.noContainers":      s("No running containers."),
+	"docker.notRunningEngines": s("Not running: {engines}."),
+	"docker.checked":           s("Checked: {engines}."),
+	"docker.alsoStopped":       s("Not running, so not checked: {engines}."),
+	"docker.pass":              pl("1 running container, isolated.", "{n} running containers, all isolated."),
 	"docker.problems": pl("1 problem in {containers} running container(s).",
 		"{n} problems in {containers} running container(s)."),
 	"docker.fix": s("Publish ports on localhost only ([code]-p 127.0.0.1:5432:5432[/code]). Don't use " +

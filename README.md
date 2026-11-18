@@ -39,7 +39,7 @@ at once ([signs of compromise](docs/policies.md#signs-of-compromise)).
 | `disk-encryption` | FileVault, BitLocker, LUKS/dm-crypt or ZFS encryption |
 | `listeners` | Ports reachable beyond localhost |
 | `mesh-vpn` | Private networks (Tailscale, ZeroTier, NetBird, WireGuard, Nebula, Hamachi) do not let their other members in: Tailscale shields up, NetBird "Block inbound connections", no inbound rules in Nebula; ZeroTier, WireGuard and Hamachi have no such switch, so a connected one is a warning |
-| `docker` | Containers with ports on 0.0.0.0, host network, privileged, or mounts of `/`, home, credential folders or the Docker socket |
+| `docker` | Containers with ports on 0.0.0.0, host network, privileged, or mounts of `/`, home, credential folders or the Docker socket, in every local engine (Docker Desktop, OrbStack, Colima, Rancher Desktop, Podman…) |
 | `secrets` | Keys in shell files and history, `.env` files, private key files, a dozen credential stores (`~/.aws`, Docker, kubeconfig, `.netrc`, gcloud…) and, for information, the last 48 hours of AI assistants' chat history (Claude Code, Codex, Gemini CLI, Copilot, Cursor's agent, Cline, Aider; `bordercheck full-scan` reads all of it, and git history and logs) |
 | `os-updates` | OS version against your minimum, automatic updates on, nothing left waiting; Chrome, Edge, Firefox, Brave not stale |
 | `screen-lock` | A password after sleep, and the screen locks soon enough (Linux: GNOME and KDE only) |

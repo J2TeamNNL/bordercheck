@@ -295,6 +295,14 @@ Running containers with ports published on `0.0.0.0`, host networking, `privileg
 home folder, credential folders (`~/.ssh`, `~/.aws`, `~/.kube`, `~/.gnupg`, `~/.docker`, `~/.config`) or the
 Docker socket.
 
+Every local engine is checked: each local context of the `docker` CLI (Docker Desktop, OrbStack, Colima,
+Rancher Desktop, Lima…, named by the socket it talks to; one engine per socket; remote `tcp://` and `ssh://`
+contexts are left alone), and Podman through `podman` unless a context already reaches it. A context whose
+socket is missing is skipped, except the current one, which is reported as not running ("Not running:
+OrbStack"). With several engines, the evidence names each container's engine. The CLIs are also looked for where
+those tools install them (`/opt/homebrew/bin`, `~/.orbstack/bin`, `~/.rd/bin`…), since the hourly service's
+`PATH` has only the system folders.
+
 | Field | Default | |
 |---|---|---|
 | `allow_containers` | `[]` | Container names exempt from every Docker rule. |

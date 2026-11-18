@@ -93,11 +93,14 @@
   "disk.win.on": "BitLocker is on for the system drive.",
   "disk.win.partial": "BitLocker is not fully on for the system drive (status {code}).",
   "disk.win.unknown": "Windows did not report BitLocker status for the system drive.",
+  "docker.alsoStopped": "Not running, so not checked: {engines}.",
+  "docker.checked": "Checked: {engines}.",
   "docker.fix": "Publish ports on localhost only ([code]-p 127.0.0.1:5432:5432[/code]). Don't use [code]--network host[/code] or [code]--privileged[/code]. Mount only the project folder, never the Docker socket, your home folder or credential folders.",
   "docker.noContainers": "No running containers.",
   "docker.noPermission": "Docker is installed, but this user may not use it (not in the docker group), so its containers were not checked.",
   "docker.notInstalled": "Docker is not installed.",
   "docker.notRunning": "Docker is not running.",
+  "docker.notRunningEngines": "Not running: {engines}.",
   "docker.pass": {
     "one": "1 running container, isolated.",
     "other": "{n} running containers, all isolated."
