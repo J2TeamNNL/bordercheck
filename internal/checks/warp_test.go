@@ -123,6 +123,9 @@ func TestEvalWarp(t *testing.T) {
 			if r.Status != c.st || r.Severity != c.sev || !strings.Contains(r.Summary, c.has) {
 				t.Errorf("%s on %s: %s %s %q", c.name, goos, r.Status, r.Severity, r.Summary)
 			}
+			if r.Status == check.Warn && !strings.Contains(r.Fix, "docs/warp.md") {
+				t.Errorf("%s on %s: the fix does not point to the guide: %q", c.name, goos, r.Fix)
+			}
 			if r.Status == check.Warn && r.Fix == "" {
 				t.Errorf("%s on %s: no fix", c.name, goos)
 			}

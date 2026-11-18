@@ -748,7 +748,7 @@ signed in. In order, the first of these that holds is reported:
 | With `posture_only`: in another service mode than Posture only | low |
 
 Every finding is a **warning**, never a fail, with a fix for the person's OS (install, sign in to `team`, start,
-connect). The mode comes from the device profile in the Zero Trust dashboard, so that fix says to tell IT. The
+connect), and ends with a link to [the step-by-step page](warp.md). The mode comes from the device profile in the Zero Trust dashboard, so that fix says to tell IT. The
 email the client signed in with is not read: Cloudflare and the portal match it to the invite.
 
 | Field | Default | |

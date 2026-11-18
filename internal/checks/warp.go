@@ -147,7 +147,9 @@ func warpOS(goos string) string {
 func evalWarp(f warpFacts, p policy.Warp, goos string) check.Result {
 	osKey := warpOS(goos)
 	team := p.Team
+	// Every fix ends with the step-by-step page (docs/warp.md), for the person or their AI assistant.
 	warn := func(sev check.Severity, summary msg.Part, fix msg.Text, ev ...string) check.Result {
+		fix = append(fix, msg.P("warp.fix.guide"))
 		return check.Result{Status: check.Warn, Severity: sev, Evidence: ev}.WithSummary(msg.Text{summary}).WithFix(fix)
 	}
 	enroll := msg.P(warpFixes[osKey]["enroll"], "team", team)

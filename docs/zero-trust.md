@@ -104,7 +104,8 @@ remove (**SSL/TLS → Client Certificates**, named by the device ID).
 
 ### D. Try it on one computer
 
-What each person will do, so try it on your own computer first:
+What each person will do, so try it on your own computer first. The same steps for people (and their AI
+assistants) are in [Setting up the Cloudflare One client](warp.md), which every `warp` finding links to.
 
 1. **Install** the client: macOS `brew install --cask cloudflare-warp`, Windows `winget install Cloudflare.Warp`,
    or the installer from <https://one.one.one.one/>; Linux, the `cloudflare-warp` package from
