@@ -6,7 +6,8 @@ device stands. A machine that is not enrolled,
 has failed a check for too long, shows signs of compromise or has gone silent loses access.
 
 - [How the score works](#how-the-score-works)
-- [What you need](#what-you-need), and [the `warp` check](#turn-on-the-warp-check) that tells people to install the client
+- [What you need](#what-you-need)
+- [Set up the client in Posture only mode](#set-up-the-client-in-posture-only-mode), and [the `warp` check](#turn-on-the-warp-check) that tells people to install it
 - [Set up the integration](#set-up-the-integration) (once)
 - [Enforce it](#enforce-it): Access applications, and phones
 - [Roll it out](#roll-it-out) without locking everyone out
@@ -55,8 +56,74 @@ So people must sign in to WARP with the **same email** their BorderCheck invite 
 - The portal at a version with `/posture/cloudflare` and migration `0009` applied.
 
 Without the client, a device is unknown to Cloudflare and fails every posture check. Most people do not have it
-yet when you start, so **turn on the `warp` check** below first: BorderCheck then tells each of them what is
-missing, long before you enforce anything.
+yet when you start, so set the client up once ([next section](#set-up-the-client-in-posture-only-mode)) and
+**turn on the `warp` check**: BorderCheck then tells each person what is missing, long before you enforce
+anything.
+
+## Set up the client in Posture only mode
+
+Once, before anyone installs the client. In Posture only mode the Cloudflare One client (WARP) only proves which
+device it is and reports its posture: it routes no traffic and changes no DNS. The client's window calls it
+**Device Information Only**; `warp-cli settings` shows `Mode: PostureOnly`.
+
+### A. Who may enroll
+
+Zero Trust dashboard, the device settings' **Device enrollment permissions**: an Allow rule for your people,
+e.g. emails ending in `@example.com`. People sign in with your identity provider (or a one-time PIN by email)
+when they enroll.
+
+### B. Posture only for every device
+
+Dashboard: **Team & Resources → Devices → Device profiles → General profiles → Default → Edit → Service mode →
+Posture only → Save**. Or:
+
+```sh
+cf zero-trust devices profiles default update --service-mode-v2-mode posture_only --dry-run   # then without --dry-run
+```
+
+Clients pick the change up within a minute or two. Set it **before** people connect: the default mode,
+"Traffic and DNS", sends all of a device's traffic through Cloudflare Gateway.
+
+### C. Client certificates for one zone
+
+In Posture only mode the client proves the device with a certificate from your account, so certificate
+provisioning must be on for one zone of the account (any zone; the portal's is fine). Without it every client
+stays at **Unable** with the reason *Failed to set mTLS Identity*.
+
+There is no switch for it in the dashboard and no `cf` command: create an API token with **Zone → SSL and
+Certificates → Edit** for that zone (short expiry), then:
+
+```sh
+curl -X PATCH "https://api.cloudflare.com/client/v4/zones/<zone id>/devices/policy/certificates" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data '{"enabled": true}'
+```
+
+Delete the token afterwards. This only issues certificates; it requires mTLS nowhere. Each enrolled device holds
+one client certificate of that zone, and a zone has 100 active ones by default: revoke those of devices you
+remove (**SSL/TLS → Client Certificates**, named by the device ID).
+
+### D. Try it on one computer
+
+What each person will do, so try it on your own computer first:
+
+1. **Install** the client: macOS `brew install --cask cloudflare-warp`, Windows `winget install Cloudflare.Warp`,
+   or the installer from <https://one.one.one.one/>; Linux, the `cloudflare-warp` package from
+   <https://pkg.cloudflareclient.com/>. Installing asks for an administrator password.
+2. **Open Cloudflare WARP** and, on its first screen, choose **Cloudflare One Client → Continue**. *Private
+   browsing* is the free consumer WARP: it does not enroll the device and does not count.
+
+   <p align="center"><img src="img/warp-first-run.png" width="520" alt="The client's first screen, What would you like to use the client for: Private browsing (no set up or login required), or Cloudflare One Client (requires Cloudflare One login), each with a button."></p>
+
+3. **Enter the team name** (the part before `.cloudflareaccess.com`) and sign in with the **same email** the
+   BorderCheck invite was sent to.
+4. The window shows **Connected · Device Information Only**:
+
+   <p align="center"><img src="img/warp-connected.png" width="520" alt="The client's window after enrolling: Connected, Device Information Only, with a Disconnect button."></p>
+
+   From a terminal: `warp-cli status` says `Connected`, `warp-cli registration show` says `Account type: Team`
+   and your team as `Organization`.
+
+Someone who chose Private browsing earlier can enroll with `warp-cli registration new <team>`.
 
 ### Turn on the `warp` check
 
@@ -73,9 +140,9 @@ default**; turn it on in the policy of every role whose people must get through 
 - `posture_only`: also expect the "Posture only" service mode.
 
 What it finds is a **warning**, never a fail: the person sees what to do on their report page and in a
-notification, and the machine counts as "attention", within `access.warn_grace` once you enforce. The service
-mode comes from your device profile's **Service mode** setting in the Zero Trust dashboard, not from the person:
-set the default profile to **Posture only** before turning `posture_only` on. The portal leaves the check, and waivers of
+notification (install, choose Cloudflare One Client, enter the team name, connect), and the machine counts as
+"attention", within `access.warn_grace` once you enforce. The service mode comes from the device profile
+([B](#b-posture-only-for-every-device)), not from the person: set it before turning `posture_only` on. The portal leaves the check, and waivers of
 it, out of the policy it serves to machines older than v0.5.21 (they would refuse it), so you can turn it on at
 once: each machine starts checking when it updates. Every finding and its fix:
 [Policies → warp](policies.md#warp).
@@ -212,8 +279,9 @@ consoles): those then stay reachable only from computers that pass BorderCheck.
 
 ## Roll it out
 
-1. **Set up, don't enforce.** Steps 1–5 only, and [the `warp` check](#turn-on-the-warp-check) on in each
-   role, so people hear from BorderCheck that they need the client. Check device results in Zero Trust and the portal's filters
+1. **Set up, don't enforce.** [The client in Posture only mode](#set-up-the-client-in-posture-only-mode), steps
+   1–5, and [the `warp` check](#turn-on-the-warp-check) on in each role, so people hear from BorderCheck that
+   they need the client. Check device results in Zero Trust and the portal's filters
    (*Fail, error or warn*, *Silent*): who would lose access today, and why (not enrolled, WARP signed in with
    another email, an old warning past its grace…).
 2. **Announce a date.** Tell people what to do by when: install BorderCheck from their invite, sign in to WARP
@@ -228,8 +296,12 @@ consoles): those then stay reachable only from computers that pass BorderCheck.
 
 A device scores 0 though the person has BorderCheck:
 
-- **No client, or registered elsewhere.** The `warp` check on the machine says which: not installed, another
-  team, not connected.
+- **No client, or registered elsewhere.** The `warp` check on the machine says which: not installed, Private
+  browsing (the consumer WARP), another team, not connected.
+- **Client stuck at "Unable — Failed to set mTLS Identity".** Certificate provisioning is off for the zone
+  ([C](#c-client-certificates-for-one-zone)), or the zone has no free client-certificate slot.
+- **Client connected in another mode** ("Traffic and DNS"): the device profile's service mode
+  ([B](#b-posture-only-for-every-device)).
 - **Different email.** WARP's user and the BorderCheck invite must be the same address (case does not matter).
 - **No serial and a different hostname.** Before v0.5.19 there is no serial; the short hostname in WARP must
   match the one in the portal. Update BorderCheck (it updates itself daily when the policy allows).
