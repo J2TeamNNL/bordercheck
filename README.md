@@ -25,6 +25,10 @@ at once ([signs of compromise](docs/policies.md#signs-of-compromise)).
 Companies can install it on every laptop, and each one then reports to the IT team on a schedule. See
 [For organisations](#for-organisations).
 
+> **For organisations:** a management portal you host yourself (fleet, roles, invites, alerts), and access that
+> depends on each laptop's results through Cloudflare Zero Trust and the Cloudflare One client (WARP)
+> ([Zero Trust guide](docs/zero-trust.md)).
+
 <p align="center"><img src="docs/img/portal-machines.png" width="860" alt="The portal's Machines page: tiles for failing, attention, silent, pending invites and awaiting first report; the checks failing most; and a table of every machine with its state, person, role, platform, where it reports from and counts."></p>
 
 ## What it checks
