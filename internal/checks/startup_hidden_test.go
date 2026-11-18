@@ -50,9 +50,11 @@ func TestHostsHijacks(t *testing.T) {
 		"127.0.0.1 api.github.com\n" + // a developer pointing a name at their own machine
 		"# 1.2.3.4 binance.com\n" +
 		"10.0.0.5 intranet.example.com\n" +
-		"185.1.2.3 www.payoneer.com app.phantom.app\n"
+		"185.1.2.3 www.payoneer.com app.phantom.app\n" +
+		"185.1.2.3 secure.chase.com www.ubs.com\n" +
+		"185.1.2.3 notachase.com\n"
 	r, b := hostsHijacks(hosts)
-	if strings.Join(r, "|") != "accounts.google.com → 203.0.113.9|app.phantom.app → 185.1.2.3|online.vietcombank.com.vn → 203.0.113.9|www.payoneer.com → 185.1.2.3" {
+	if strings.Join(r, "|") != "accounts.google.com → 203.0.113.9|app.phantom.app → 185.1.2.3|online.vietcombank.com.vn → 203.0.113.9|secure.chase.com → 185.1.2.3|www.payoneer.com → 185.1.2.3|www.ubs.com → 185.1.2.3" {
 		t.Errorf("redirects: %q", r)
 	}
 	if strings.Join(b, "|") != "www.virustotal.com" {
@@ -95,5 +97,15 @@ func TestEvalStartupHidden(t *testing.T) {
 	}
 	if r := evalStartupWith(nil, nil, env, startupFix("windows"), hiddenFacts{Hosts: "0.0.0.0 doubleclick.net\n"}); r.Status != check.Pass {
 		t.Errorf("an ad blocker's hosts file: %s %s", r.Status, r.Summary)
+	}
+}
+
+func TestSensitiveDomainsAreDomains(t *testing.T) {
+	seen := map[string]bool{}
+	for _, d := range sensitiveDomains {
+		if seen[d] || d != strings.ToLower(d) || !strings.Contains(d, ".") || strings.ContainsAny(d, " /") {
+			t.Errorf("bad or repeated entry %q", d)
+		}
+		seen[d] = true
 	}
 }

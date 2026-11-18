@@ -98,28 +98,6 @@ func broadExclusion(e string, env startupEnv, getenv func(string) string) string
 	return ""
 }
 
-// sensitiveDomains are sites whose sign-in a hosts-file redirect would phish:
-// sign-in pages, mail, payments, crypto exchanges, and banks and wallets used
-// in Vietnam.
-var sensitiveDomains = []string{
-	"google.com", "gmail.com", "googleapis.com", "microsoftonline.com", "live.com", "outlook.com", "office.com",
-	"microsoft.com", "apple.com", "icloud.com", "facebook.com", "instagram.com", "github.com", "gitlab.com",
-	"cloudflare.com", "amazon.com", "aws.amazon.com", "paypal.com", "stripe.com", "shopify.com", "zalo.me",
-	// Crypto exchanges and wallets.
-	"binance.com", "coinbase.com", "okx.com", "bybit.com", "kraken.com", "metamask.io", "crypto.com", "kucoin.com",
-	"bitget.com", "gate.io", "htx.com", "mexc.com", "bitfinex.com", "gemini.com", "bitstamp.net", "upbit.com",
-	"trustwallet.com", "phantom.app", "exodus.com", "ledger.com", "trezor.io", "blockchain.com", "myetherwallet.com",
-	"rabby.io", "rainbow.me", "keplr.app", "solflare.com", "tonkeeper.com", "uniswap.org", "opensea.io",
-	// Payment wallets and money transfer, worldwide and for online sellers.
-	"wise.com", "revolut.com", "payoneer.com", "pingpongx.com", "airwallex.com", "worldfirst.com", "lianlianglobal.com",
-	"skrill.com", "neteller.com", "venmo.com", "cash.app", "alipay.com", "paytm.com", "gcash.com", "grab.com",
-	"klarna.com", "adyen.com", "squareup.com",
-	// Banks and wallets used in Vietnam.
-	"vietcombank.com.vn", "techcombank.com", "techcombank.com.vn", "vpbank.com.vn", "mbbank.com.vn", "bidv.com.vn",
-	"vietinbank.vn", "acb.com.vn", "tpb.vn", "sacombank.com", "sacombank.com.vn", "agribank.com.vn", "vib.com.vn",
-	"shb.com.vn", "hdbank.com.vn", "ocb.com.vn", "msb.com.vn", "momo.vn", "zalopay.vn", "vnpay.vn",
-}
-
 // securityDomains are security vendors' and scanners' sites; malware blocks
 // them so updates and second opinions fail.
 var securityDomains = []string{
