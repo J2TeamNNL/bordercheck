@@ -49,9 +49,10 @@ func TestHostsHijacks(t *testing.T) {
 		"0.0.0.0 ads.example.com google-analytics.com\n" +
 		"127.0.0.1 api.github.com\n" + // a developer pointing a name at their own machine
 		"# 1.2.3.4 binance.com\n" +
-		"10.0.0.5 intranet.example.com\n"
+		"10.0.0.5 intranet.example.com\n" +
+		"185.1.2.3 www.payoneer.com app.phantom.app\n"
 	r, b := hostsHijacks(hosts)
-	if strings.Join(r, "|") != "accounts.google.com → 203.0.113.9|online.vietcombank.com.vn → 203.0.113.9" {
+	if strings.Join(r, "|") != "accounts.google.com → 203.0.113.9|app.phantom.app → 185.1.2.3|online.vietcombank.com.vn → 203.0.113.9|www.payoneer.com → 185.1.2.3" {
 		t.Errorf("redirects: %q", r)
 	}
 	if strings.Join(b, "|") != "www.virustotal.com" {
