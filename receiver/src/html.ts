@@ -267,6 +267,7 @@ a.card:hover,a.card:focus-visible{transform:scale(1.04);background-color:var(--g
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{border-collapse:collapse;width:100%;font-size:14px}
 th{text-align:left;font-size:11.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding:14px 14px 10px;white-space:nowrap}
+th a.sort{color:inherit;text-decoration:none}th a.sort:hover,th a.sort:focus-visible,th a.sort.on{color:var(--text)}
 td{padding:11px 14px;border-top:1px solid var(--line);vertical-align:top}
 th:first-child,td:first-child{padding-left:22px}th:last-child,td:last-child{padding-right:22px}
 tbody tr{transition:background-color .2s}

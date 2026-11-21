@@ -100,6 +100,31 @@ describe("dashboard pages", () => {
     expect(body).toContain("a&amp;b");
   });
 
+  it("filters machines and the waiting list by role, and searches role names", async () => {
+    const dev = await enrolled("dev@domain.com", "Dev");
+    const ops = await enrolled("ops@domain.com", "Ops");
+    await enrolled("wait@domain.com", "Ops"); // never reports
+    await post(report(), { token: dev.token });
+    await post(report(), { token: ops.token });
+    const page = await (await adminGet(`/admin?role=${ops.roleId}`)).text();
+    expect(page).toContain("ops@domain.com");
+    expect(page).toContain("wait@domain.com");
+    expect(page).not.toContain("dev@domain.com");
+    expect(page).toContain(`<option value="${ops.roleId}" selected>Ops</option>`);
+    expect(page).toContain("in role Ops");
+    // Sort links keep the role.
+    expect(page).toContain(`role=${ops.roleId}&amp;sort=who`);
+    const byName = await (await adminGet("/admin?q=ops")).text();
+    expect(byName).toContain("ops@domain.com");
+    expect(byName).not.toContain("dev@domain.com");
+    // Place sorts and searches work with no geo stored (local dev, STORE_GEO off).
+    const placeSearch = await adminGet("/admin?q=region&sort=from");
+    expect(placeSearch.status).toBe(200);
+    expect(await placeSearch.text()).not.toContain("ops@domain.com");
+    // A role the admin cannot see, or nonsense, means every role.
+    expect(await (await adminGet("/admin?role=99999")).text()).toContain("dev@domain.com");
+  });
+
   it("lists machines, filters non-compliant, shows waivers and unknown statuses", async () => {
     const an = await enrolled("an@domain.com");
     const boM = await enrolled("bo@domain.com");
@@ -121,6 +146,31 @@ describe("dashboard pages", () => {
     const search = await (await adminGet("/admin?q=bo-b")).text();
     expect(search).toContain("bo@domain.com");
     expect(search).not.toContain("an@domain.com");
+
+    // Sorting: by person, either way; the header marks the column and links to the reverse.
+    const byWho = await (await adminGet("/admin?sort=who&dir=asc")).text();
+    expect(byWho.indexOf("an@domain.com")).toBeLessThan(byWho.indexOf("bo@domain.com"));
+    expect(byWho).toContain('aria-sort="ascending"');
+    expect(byWho).toContain('href="/admin?sort=who&amp;dir=desc"');
+    const byWhoDesc = await (await adminGet("/admin?sort=who&dir=desc")).text();
+    expect(byWhoDesc.indexOf("bo@domain.com")).toBeLessThan(byWhoDesc.indexOf("an@domain.com"));
+    // Fail starts with the most failing; unknown sort keys fall back to worst first.
+    const byFail = await (await adminGet("/admin?sort=fail")).text();
+    expect(byFail.indexOf("an@domain.com")).toBeLessThan(byFail.indexOf("bo@domain.com"));
+    expect((await adminGet("/admin?sort=1;DROP")).status).toBe(200);
+
+    // The search also matches platform, role and state words (English or the admin's language).
+    const linux = await (await adminGet("/admin?q=linux")).text();
+    expect(linux).toContain("bo@domain.com");
+    expect(linux).not.toContain("an@domain.com");
+    const nonCompliant = await (await adminGet("/admin?q=non-comp")).text();
+    expect(nonCompliant).toContain("an@domain.com");
+    expect(nonCompliant).not.toContain("bo@domain.com");
+    const vi = await (
+      await call(new Request(`${BASE}/admin?q=${encodeURIComponent("chưa tuân")}`, { headers: { authorization: `Bearer ${ADMIN_TOKEN}`, cookie: "bc_lang=vi" } }))
+    ).text();
+    expect(vi).toContain("an@domain.com");
+    expect(vi).not.toContain("bo@domain.com");
 
     const bo = await (await adminGet(`/admin/machine/${boM.install_id}`)).text();
     expect(bo).toContain("Waived until 2099-01-31");

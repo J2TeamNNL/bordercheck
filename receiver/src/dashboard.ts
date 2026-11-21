@@ -70,27 +70,111 @@ export interface MachineQuery {
   after?: string;
   // A named admin's scope (dashboard only); absent: every machine.
   scope?: Scope;
+  // Dashboard only: q also matches role, platform, version, place and public
+  // IP, and `states` (from stateTerms) matches a state word such as "silent".
+  wide?: boolean;
+  states?: StateKey[];
+  // Dashboard only: a column to sort by (ignored with byId), and its direction.
+  sort?: SortKey;
+  desc?: boolean;
 }
 
+// The states a machine can be in, as SQL over machines m / enrollments e.
+// ?2 is silentBefore. Fixed strings: only these go into the query.
+const STATE_SQL = {
+  compromised: "m.compromised_since IS NOT NULL",
+  noncompliant: "m.fail > 0",
+  attention: "(m.fail = 0 AND (m.error > 0 OR m.warn > 0))",
+  ok: "(m.fail = 0 AND m.error = 0 AND m.warn = 0)",
+  silent: "m.last_seen < ?2",
+  revoked: "e.revoked_at IS NOT NULL",
+  info: "m.info > 0",
+} as const;
+export type StateKey = keyof typeof STATE_SQL;
+const STATE_LABEL: Record<StateKey, Key> = {
+  compromised: "state.compromised",
+  noncompliant: "state.noncompliant",
+  attention: "state.attention",
+  ok: "state.ok",
+  silent: "state.silent",
+  revoked: "state.revoked",
+  info: "info.label",
+};
+
+// stateTerms: the states whose name (in English or the admin's language)
+// starts with the search text, or has a word that does: "sil", "mất liên",
+// "compromised". Two characters at least, so "o" does not mean "ok".
+export function stateTerms(q: string, L: I18n): StateKey[] {
+  const t = q.trim().toLocaleLowerCase();
+  if (t.length < 2) return [];
+  const fits = (label: string) => {
+    const s = label.replace(/^ℹ\s*/, "").toLocaleLowerCase();
+    return s.startsWith(t) || s.split(/[\s-]+/).some((w) => w.startsWith(t));
+  };
+  const english: Record<StateKey, string> = { compromised: "compromised", noncompliant: "non-compliant failing", attention: "attention", ok: "ok", silent: "silent", revoked: "revoked", info: "info" };
+  return (Object.keys(STATE_SQL) as StateKey[]).filter((k) => fits(english[k]) || fits(L.s(STATE_LABEL[k])));
+}
+
+// geoField: one field of machines.geo, '' when there is none (geo is '' without
+// request.cf, and json_extract fails on that).
+function geoField(k: "city" | "region" | "country" | "as_org"): string {
+  return `CASE WHEN json_valid(m.geo) THEN COALESCE(json_extract(m.geo, '$.${k}'), '') ELSE '' END`;
+}
+
+// Columns of the machine table that sort, as ORDER BY terms for ascending
+// order (descending flips each). Fixed strings: only these go into the query.
+const SORT_SQL = {
+  state: ["(m.compromised_since IS NOT NULL) * 4 + (m.fail > 0) * 2 + (m.error > 0 OR m.warn > 0)", "m.high_fail", "m.fail"],
+  who: ["lower(m.email)", "lower(m.hostname)"],
+  role: ["lower(COALESCE(r.name, ''))", "lower(m.email)"],
+  platform: ["m.os", "m.arch", "m.version"],
+  from: [geoField("country"), geoField("city"), "m.public_ip"],
+  seen: ["m.last_seen"],
+  fail: ["m.fail", "m.high_fail"],
+  error: ["m.error"],
+  warn: ["m.warn"],
+  waived: ["m.waived"],
+} as const;
+export type SortKey = keyof typeof SORT_SQL;
+export const isSortKey = (s: string): s is SortKey => Object.hasOwn(SORT_SQL, s);
+// Columns that start descending when first clicked (worst, newest, most first).
+const SORT_DESC_FIRST = new Set<SortKey>(["state", "seen", "fail", "error", "warn", "waived"]);
+
 const MACHINE_FROM = `FROM machines m LEFT JOIN enrollments e ON e.install_id = m.install_id LEFT JOIN roles r ON r.id = e.role_id`;
-const machineWhere = (filter: Filter, scope?: Scope) =>
-  `WHERE ${FILTERS[filter].where} AND ${roleIn("e.role_id", 9, scope)} AND (?1 = '' OR m.email LIKE ?3 ESCAPE '\\' OR m.hostname LIKE ?3 ESCAPE '\\')
+// Place: the geo fields themselves, not the JSON (whose key names would match "on", "city"…).
+const WIDE_COLUMNS = [
+  "COALESCE(r.name, '')", "m.os || '/' || m.arch", "m.version", "COALESCE(m.public_ip, '')",
+  ...(["city", "region", "country", "as_org"] as const).map(geoField),
+];
+const machineWhere = (o: MachineQuery) => {
+  const match = ["m.email LIKE ?3 ESCAPE '\\'", "m.hostname LIKE ?3 ESCAPE '\\'"];
+  if (o.wide) {
+    match.push(...WIDE_COLUMNS.map((c) => `${c} LIKE ?3 ESCAPE '\\'`));
+    for (const s of o.states ?? []) if (Object.hasOwn(STATE_SQL, s)) match.push(STATE_SQL[s]);
+  }
+  return `WHERE ${FILTERS[o.filter].where} AND ${roleIn("e.role_id", 9, o.scope)} AND (?1 = '' OR ${match.join(" OR ")})
        AND (?5 = '' OR EXISTS (SELECT 1 FROM checks c WHERE c.install_id = m.install_id AND c.check_id = ?5 AND (?6 = '' OR c.status = ?6)))
        AND (?7 = 0 OR e.role_id = ?7) AND (?8 = '' OR m.install_id > ?8)`;
+};
 const machineBinds = (o: MachineQuery, after: string) =>
   [o.q, o.silentBefore, `%${o.q.replace(/[\\%_]/g, (c) => "\\" + c)}%`, o.limit, o.check ?? "", o.checkStatus ?? "", o.roleId ?? 0, after, scopeBind(o.scope)];
 
+function machineOrder(o: MachineQuery): string {
+  if (o.byId) return "m.install_id";
+  if (!o.sort || !isSortKey(o.sort)) return "m.compromised_since IS NOT NULL DESC, m.fail > 0 DESC, m.high_fail DESC, m.fail DESC, m.last_seen DESC";
+  const dir = o.desc ? " DESC" : "";
+  return [...SORT_SQL[o.sort].map((t) => t + dir), "m.install_id"].join(", ");
+}
+
 export async function machineRows(env: Env, o: MachineQuery): Promise<MachineListRow[]> {
-  const order = o.byId
-    ? "m.install_id"
-    : "m.compromised_since IS NOT NULL DESC, m.fail > 0 DESC, m.high_fail DESC, m.fail DESC, m.last_seen DESC";
+  const order = machineOrder(o);
   const rows = await env.DB.prepare(
     `SELECT m.install_id, m.email, m.hostname, m.os, m.arch, m.version, m.policy, m.first_seen, m.last_seen, m.report_time,
             m.fail, m.high_fail, m.error, m.warn, m.waived, m.pass, m.skip, m.other, m.info, m.compromised_since, m.public_ip, m.geo,
             e.install_id IS NOT NULL AS enrolled, e.revoked_at, r.name AS role,
             (SELECT MIN(c.since) FROM checks c WHERE c.install_id = m.install_id AND c.status = 'fail') AS failing_since
      ${MACHINE_FROM}
-     ${machineWhere(o.filter, o.scope)}
+     ${machineWhere(o)}
      ORDER BY ${order} LIMIT ?4`,
   )
     .bind(...machineBinds(o, o.byId ? o.after ?? "" : ""))
@@ -100,7 +184,7 @@ export async function machineRows(env: Env, o: MachineQuery): Promise<MachineLis
 
 // machineCount: how many machines machineRows would list without a limit or cursor.
 export async function machineCount(env: Env, o: MachineQuery): Promise<number> {
-  const n = await env.DB.prepare(`SELECT COUNT(*) AS n ${MACHINE_FROM} ${machineWhere(o.filter, o.scope)} AND ?4 = ?4`)
+  const n = await env.DB.prepare(`SELECT COUNT(*) AS n ${MACHINE_FROM} ${machineWhere(o)} AND ?4 = ?4`)
     .bind(...machineBinds(o, ""))
     .first<number>("n");
   return n ?? 0;
@@ -109,13 +193,13 @@ export async function machineCount(env: Env, o: MachineQuery): Promise<number> {
 // waitingRows: enrolled machines that never reported, newest enrollment
 // first; with byId, by install_id after `after` (for a cursor), optionally
 // narrowed by a substring of email or hostname and by role.
-export async function waitingRows(env: Env, limit: number, o: { byId?: boolean; after?: string; q?: string; roleId?: number; scope?: Scope } = {}) {
+export async function waitingRows(env: Env, limit: number, o: { byId?: boolean; after?: string; q?: string; roleId?: number; scope?: Scope; wide?: boolean } = {}) {
   const q = o.q ?? "";
   const like = `%${q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
   const r = await env.DB.prepare(
     `SELECT e.install_id, e.email, e.hostname, e.enrolled_at, r.name AS role FROM enrollments e JOIN roles r ON r.id = e.role_id
      WHERE e.revoked_at IS NULL AND NOT EXISTS (SELECT 1 FROM machines m WHERE m.install_id = e.install_id)
-       AND (?2 = '' OR e.install_id > ?2) AND (?3 = '' OR e.email LIKE ?4 ESCAPE '\\' OR e.hostname LIKE ?4 ESCAPE '\\') AND (?5 = 0 OR e.role_id = ?5) AND ${roleIn("e.role_id", 6, o.scope)}
+       AND (?2 = '' OR e.install_id > ?2) AND (?3 = '' OR e.email LIKE ?4 ESCAPE '\\' OR e.hostname LIKE ?4 ESCAPE '\\'${o.wide ? " OR r.name LIKE ?4 ESCAPE '\\'" : ""}) AND (?5 = 0 OR e.role_id = ?5) AND ${roleIn("e.role_id", 6, o.scope)}
      ORDER BY ${o.byId ? "e.install_id" : "e.enrolled_at DESC"} LIMIT ?1`,
   ).bind(limit, o.byId ? o.after ?? "" : "", q, like, o.roleId ?? 0, scopeBind(o.scope)).all<{ install_id: string; email: string; hostname: string; enrolled_at: string; role: string }>();
   return r.results;
@@ -165,11 +249,21 @@ export async function machinesPage(env: Env, url: URL, who: string, now: number,
   const f = (url.searchParams.get("filter") ?? "all") as Filter;
   const filter: Filter = f in FILTERS ? f : "all";
   const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
+  const roleParam = Number(url.searchParams.get("role") ?? 0);
+  const sortParam = url.searchParams.get("sort") ?? "";
+  const sort: SortKey | undefined = isSortKey(sortParam) ? sortParam : undefined;
+  const desc = sort ? (url.searchParams.get("dir") ?? (SORT_DESC_FIRST.has(sort) ? "desc" : "asc")) === "desc" : false;
   const cfg = config(env);
   const silentBefore = new Date(now - cfg.silentDays * DAY).toISOString();
-  const [rows, waiting, totals, top, pending] = await Promise.all([
-    machineRows(env, { filter, q, silentBefore, limit: 2000, scope }),
+  const roles = (
+    await env.DB.prepare(`SELECT id, name FROM roles WHERE ${roleIn("id", 1, scope)} ORDER BY name`).bind(scopeBind(scope)).all<{ id: number; name: string }>()
+  ).results;
+  const roleId = roles.some((r) => r.id === roleParam) ? roleParam : 0;
+  const narrowed = q !== "" || roleId !== 0;
+  const [rows, waitingAll, waitingShown, totals, top, pending] = await Promise.all([
+    machineRows(env, { filter, q, silentBefore, limit: 2000, scope, roleId, wide: true, states: stateTerms(q, L), sort, desc }),
     waitingRows(env, 500, { scope }),
+    narrowed ? waitingRows(env, 500, { scope, q, roleId, wide: true }) : Promise.resolve(null),
     env.DB.prepare(
       `SELECT COUNT(*) AS n, SUM(m.fail > 0) AS failing, SUM(m.fail = 0 AND (m.error > 0 OR m.warn > 0)) AS attention,
               SUM(m.last_seen < ?1) AS silent, SUM(e.revoked_at IS NOT NULL) AS revoked, SUM(m.compromised_since IS NOT NULL) AS compromised
@@ -187,13 +281,31 @@ export async function machinesPage(env: Env, url: URL, who: string, now: number,
   const attention = totals?.attention ?? 0;
   const ok = Math.max(0, n - failing - attention);
   const topFailing = top.filter((c) => c.fail > 0);
+  const waiting = waitingShown ?? waitingAll;
 
-  const link = (k: Filter) => {
+  // A link to this list with some of filter / q / role / sort changed.
+  const listLink = (o: { filter?: Filter; sort?: SortKey; desc?: boolean }) => {
     const p = new URLSearchParams();
-    if (k !== "all") p.set("filter", k);
+    const fk = o.filter ?? filter;
+    if (fk !== "all") p.set("filter", fk);
     if (q) p.set("q", q);
+    if (roleId) p.set("role", String(roleId));
+    const sk = "sort" in o ? o.sort : sort;
+    if (sk) {
+      p.set("sort", sk);
+      p.set("dir", ("desc" in o ? o.desc : desc) ? "desc" : "asc");
+    }
     const s = p.toString();
     return `/admin${s ? "?" + s : ""}`;
+  };
+  const link = (k: Filter) => listLink({ filter: k });
+  // A column header that sorts: first click in the column's natural order,
+  // the next one reverses it; ▲/▼ marks the column in use.
+  const th = (k: SortKey, label: Html, cls = "") => {
+    const on = sort === k;
+    const nextDesc = on ? !desc : SORT_DESC_FIRST.has(k);
+    const aria = on ? (desc ? "descending" : "ascending") : "none";
+    return html`<th${cls ? html` class="${cls}"` : ""} aria-sort="${aria}"><a class="sort${on ? " on" : ""}" href="${listLink({ sort: k, desc: nextDesc })}">${label}${on ? (desc ? " ▼" : " ▲") : ""}</a></th>`;
   };
 
   const compromised = totals?.compromised ?? 0;
@@ -203,7 +315,7 @@ ${tile(L, "/admin?filter=failing", failing, L.t("tile.failing"), L.t("tile.faili
 ${tile(L, "/admin?filter=attention", attention, L.t("tile.attention"), L.t("tile.attentionSub"), "t-warn")}
 ${tile(L, "/admin?filter=silent", totals?.silent ?? 0, L.t("tile.silent"), L.t("tile.silentSub", { n: cfg.silentDays }), "t-skip")}
 ${tile(L, "/admin/invites?status=pending", pending ?? 0, L.t("tile.pending"), L.t("tile.pendingSub"), "t-accent")}
-${tile(L, "#waiting", waiting.length, L.t("tile.waiting"), L.t("tile.waitingSub"), "t-accent")}
+${tile(L, "#waiting", waitingAll.length, L.t("tile.waiting"), L.t("tile.waitingSub"), "t-accent")}
 </div>
 ${n
     ? html`<div class="health" aria-label="${L.s("health.aria")}"><div class="bar">${failing ? html`<i class="b-fail" style="width:${pct(failing, n)}"></i>` : ""}${
@@ -221,8 +333,8 @@ ${topFailing.length
       )}</div>`
     : ""}`;
 
-  const table = html`<div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("machines.thState")}</th><th>${L.t("common.personMachine")}</th><th>${L.t("common.role")}</th><th>${L.t("machines.thPlatform")}</th><th>${L.t("machines.thFrom")}</th><th>${L.t("machines.thLastSeen")}</th>
-<th class="n">${L.t("common.fail")}</th><th class="n">${L.t("common.error")}</th><th class="n">${L.t("common.warn")}</th><th class="n">${L.t("common.waived")}</th></tr></thead><tbody>
+  const table = html`<div class="panel flush"><div class="scroll"><table><thead><tr>${th("state", L.t("machines.thState"))}${th("who", L.t("common.personMachine"))}${th("role", L.t("common.role"))}${th("platform", L.t("machines.thPlatform"))}${th("from", L.t("machines.thFrom"))}${th("seen", L.t("machines.thLastSeen"))}
+${th("fail", L.t("common.fail"), "n")}${th("error", L.t("common.error"), "n")}${th("warn", L.t("common.warn"), "n")}${th("waived", L.t("common.waived"), "n")}</tr></thead><tbody>
 ${rows.map(
     (m) => html`<tr${m.revoked_at ? html` class="off"` : ""}><td class="nowrap">${state(L, m, silentBefore)}${
       m.failing_since ? html`<span class="sub">${L.t("machines.failingFor", { age: L.age(m.failing_since, now) })}</span>` : ""
@@ -242,11 +354,19 @@ ${rows.map(
 <p class="lead">${L.t("machines.lead", { n, failing, silent: totals?.silent ?? 0, days: cfg.silentDays })}</p></div>
 ${scopeNote(L, scope)}
 ${overview}
-<div class="shelf"><h2>${filter === "all" ? L.t("machines.every") : L.t(FILTERS[filter].key)}${q ? L.t("machines.matching", { q }) : ""}</h2><span class="muted small">${L.t("machines.shown", { n: rows.length })}</span></div>
+<div class="shelf"><h2>${filter === "all" ? L.t("machines.every") : L.t(FILTERS[filter].key)}${q ? L.t("machines.matching", { q }) : ""}${roleId ? L.t("machines.inRole", { role: roles.find((r) => r.id === roleId)?.name ?? "" }) : ""}</h2><span class="muted small">${L.t("machines.shown", { n: rows.length })}</span></div>
 <div class="toolbar"><nav class="seg" aria-label="${L.s("filter.aria")}">${(Object.keys(FILTERS) as Filter[]).map(
     (k) => html`<a href="${link(k)}" class="${k === filter ? "on" : ""}">${L.t(FILTERS[k].key)}</a>`,
   )}</nav>
-<form class="search" method="get" action="/admin">${filter !== "all" ? html`<input type="hidden" name="filter" value="${filter}">` : ""}<input name="q" value="${q}" placeholder="${L.s("machines.searchPlaceholder")}" aria-label="${L.s("machines.searchAria")}"><button>${L.t("machines.search")}</button></form></div>
+<form class="search" method="get" action="/admin">${filter !== "all" ? html`<input type="hidden" name="filter" value="${filter}">` : ""}${
+    sort ? html`<input type="hidden" name="sort" value="${sort}"><input type="hidden" name="dir" value="${desc ? "desc" : "asc"}">` : ""
+  }<input name="q" value="${q}" placeholder="${L.s("machines.searchPlaceholder")}" aria-label="${L.s("machines.searchAria")}">${
+    roles.length > 1 || roleId
+      ? html`<select name="role" aria-label="${L.s("machines.roleAria")}"><option value="">${L.t("machines.allRoles")}</option>${roles.map(
+          (r) => html`<option value="${r.id}"${r.id === roleId ? html` selected` : ""}>${r.name}</option>`,
+        )}</select>`
+      : ""
+  }<button>${L.t("machines.search")}</button>${narrowed || sort ? html`<a class="muted small" href="${filter === "all" ? "/admin" : `/admin?filter=${filter}`}">${L.t("machines.clear")}</a>` : ""}</form></div>
 ${table}
 ${waiting.length
     ? html`<h2 id="waiting">${L.t("machines.waiting", { n: waiting.length })}</h2>
