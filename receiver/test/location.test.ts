@@ -1,3 +1,4 @@
+import { FILTER_SCRIPT } from "../src/html";
 import { beforeEach, describe, expect, it } from "vitest";
 import { alertLine, prune } from "../src/alerts";
 import type { Env } from "../src/env";
@@ -147,7 +148,7 @@ describe("where reports come from", () => {
     for (const path of [`/admin/machine/${ID}`, "/admin"]) {
       const body = await (await adminGet(path)).text();
       expect(body).not.toContain("<img");
-      expect(body).not.toContain("<script>");
+      expect(body.replace(`<script>${FILTER_SCRIPT}</script>`, "")).not.toContain("<script>");
       expect(body).toContain("&lt;script&gt;");
       expect(body).not.toContain(", <b>");
       expect(body).toContain(", &lt;b&gt;");

@@ -83,11 +83,26 @@ describe("copy buttons", () => {
     }
   });
 
+  it("the machine list carries only the hashed search script, and works without it", async () => {
+    const m = await enrolled();
+    await post(report(), { token: m.token });
+    const evil = `</script><script>alert(1)</script>`;
+    const res = await call(new Request(`${BASE}/admin?q=${encodeURIComponent(evil)}`, { headers: { authorization: `Bearer ${ADMIN_TOKEN}` } }));
+    const body = await res.text();
+    const scripts = [...body.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)];
+    expect(scripts.length).toBe(1);
+    expect(scripts[0][0].startsWith("<script>")).toBe(true);
+    expect(res.headers.get("content-security-policy")).toBe(`${BASE_CSP}; script-src 'sha256-${await sha256b64(scripts[0][1])}'`);
+    // Without the script the form still searches: a Search button and a GET form.
+    expect(body).toMatch(/<form class="search" id="mf" method="get" action="\/admin">/);
+    expect(body).toContain("<button>Search</button>");
+  });
+
   it("leaves every other page script-free, with the same CSP", async () => {
     const m = await enrolled();
     const r = await post(report(), { token: m.token });
     const reportPath = (await r.json<{ report_url: string }>()).report_url.replace("https://bordercheck.example.com", "");
-    const admin = ["/admin", `/admin/machine/${m.install_id}`, "/admin/checks", "/admin/alerts", "/admin/roles", "/admin/invites", "/admin/audit"];
+    const admin = [`/admin/machine/${m.install_id}`, "/admin/checks", "/admin/alerts", "/admin/roles", "/admin/invites", "/admin/audit"];
     for (const path of admin) {
       const res = await call(new Request(BASE + path, { headers: { authorization: `Bearer ${ADMIN_TOKEN}` } }));
       expect(res.headers.get("content-security-policy"), path).toBe(BASE_CSP);

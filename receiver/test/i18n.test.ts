@@ -1,3 +1,4 @@
+import { FILTER_SCRIPT } from "../src/html";
 import { describe, expect, it } from "vitest";
 import { COPY_SCRIPT, html } from "../src/html";
 import { english, fromAcceptLanguage, fromCookie, i18n, type Lang, LANGS, msg, negotiate, safeNext } from "../src/i18n";
@@ -254,7 +255,7 @@ describe("pages in every language", () => {
     for (const lang of LANGS) {
       for (const path of ["/admin", `/admin/machine/${m.install_id}`, "/admin/checks", "/admin/checks/firewall", "/admin/alerts", `/admin/machine/${m.install_id}?q=${encodeURIComponent(evil)}`, `/admin?q=${encodeURIComponent(evil)}`]) {
         const body = await (await adminGet(path, COOKIE(lang))).text();
-        expect(body, `${lang} ${path}`).not.toContain("<script>");
+        expect(body.replace(`<script>${FILTER_SCRIPT}</script>`, ""), `${lang} ${path}`).not.toContain("<script>");
         expect(body, `${lang} ${path}`).not.toContain("<img");
         expect(body, `${lang} ${path}`).not.toContain("<b>id</b>");
       }

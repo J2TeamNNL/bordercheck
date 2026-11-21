@@ -1,7 +1,14 @@
+import { FILTER_SCRIPT } from "../src/html";
 import { describe, expect, it } from "vitest";
 import { ADMIN_TOKEN, adminGet, BASE, call, enrolled, env, post, report, result } from "./helpers";
 
 const ID = "4f1c0000aaaabbbbccccdddd";
+
+// The page as the admin sees it: rows the search hid are left out.
+const shown = async (path: string, headers: Record<string, string> = {}) => {
+  const res = await call(new Request(BASE + path, { headers: { authorization: `Bearer ${ADMIN_TOKEN}`, ...headers } }));
+  return (await res.text()).replace(/<tr [^>]*hidden>[\s\S]*?<\/tr>/g, "");
+};
 
 describe("dashboard auth", () => {
   it("is not public", async () => {
@@ -91,7 +98,7 @@ describe("dashboard pages", () => {
       expect(res.status, path).toBe(200);
       expect(res.headers.get("content-security-policy")).toContain("default-src 'none'");
       const body = await res.text();
-      expect(body, path).not.toContain("<script>");
+      expect(body.replace(`<script>${FILTER_SCRIPT}</script>`, ""), path).not.toContain("<script>"); // only the hashed search script
       expect(body, path).not.toContain("<img");
       expect(body, path).not.toContain("<b>id</b>");
     }
@@ -114,13 +121,11 @@ describe("dashboard pages", () => {
     expect(page).toContain("in role Ops");
     // Sort links keep the role.
     expect(page).toContain(`role=${ops.roleId}&amp;sort=who`);
-    const byName = await (await adminGet("/admin?q=ops")).text();
+    const byName = await shown("/admin?q=ops");
     expect(byName).toContain("ops@domain.com");
     expect(byName).not.toContain("dev@domain.com");
     // Place sorts and searches work with no geo stored (local dev, STORE_GEO off).
-    const placeSearch = await adminGet("/admin?q=region&sort=from");
-    expect(placeSearch.status).toBe(200);
-    expect(await placeSearch.text()).not.toContain("ops@domain.com");
+    expect(await shown("/admin?q=region&sort=from")).not.toContain("ops@domain.com");
     // A role the admin cannot see, or nonsense, means every role.
     expect(await (await adminGet("/admin?role=99999")).text()).toContain("dev@domain.com");
   });
@@ -143,7 +148,7 @@ describe("dashboard pages", () => {
     const failing = await (await adminGet("/admin?filter=failing")).text();
     expect(failing).toContain("an@domain.com");
     expect(failing).not.toContain("bo@domain.com");
-    const search = await (await adminGet("/admin?q=bo-b")).text();
+    const search = await shown("/admin?q=bo-b");
     expect(search).toContain("bo@domain.com");
     expect(search).not.toContain("an@domain.com");
 
@@ -160,17 +165,21 @@ describe("dashboard pages", () => {
     expect((await adminGet("/admin?sort=1;DROP")).status).toBe(200);
 
     // The search also matches platform, role and state words (English or the admin's language).
-    const linux = await (await adminGet("/admin?q=linux")).text();
+    const linux = await shown("/admin?q=linux");
     expect(linux).toContain("bo@domain.com");
     expect(linux).not.toContain("an@domain.com");
-    const nonCompliant = await (await adminGet("/admin?q=non-comp")).text();
+    const nonCompliant = await shown("/admin?q=non-comp");
     expect(nonCompliant).toContain("an@domain.com");
     expect(nonCompliant).not.toContain("bo@domain.com");
-    const vi = await (
-      await call(new Request(`${BASE}/admin?q=${encodeURIComponent("chưa tuân")}`, { headers: { authorization: `Bearer ${ADMIN_TOKEN}`, cookie: "bc_lang=vi" } }))
-    ).text();
-    expect(vi).toContain("an@domain.com");
-    expect(vi).not.toContain("bo@domain.com");
+    // Accents optional, several words each anywhere in the row.
+    const vi = await shown("/admin?q=" + encodeURIComponent("chua tuan linux"), { cookie: "bc_lang=vi" });
+    expect(vi).not.toContain("an@domain.com");
+    const vi2 = await shown("/admin?q=" + encodeURIComponent("chưa tuân thủ"), { cookie: "bc_lang=vi" });
+    expect(vi2).toContain("an@domain.com");
+    expect(vi2).not.toContain("bo@domain.com");
+    // What the table shows counts too: the role, and the count of shown rows.
+    expect(await shown("/admin?q=dev+linux")).toContain("bo@domain.com");
+    expect(await shown("/admin?q=bo-b")).toContain('<span data-n="machines">1</span>');
 
     const bo = await (await adminGet(`/admin/machine/${boM.install_id}`)).text();
     expect(bo).toContain("Waived until 2099-01-31");

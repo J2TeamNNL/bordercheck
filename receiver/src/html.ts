@@ -136,6 +136,36 @@ export const PASSKEY_SCRIPT_HASH = "sha256-NsBDE8QZPy89nXGq7G6LfM4rVV96VXRAn+nOO
 export const PASSKEY_CSP = `${CSP}; script-src '${PASSKEY_SCRIPT_HASH}'; connect-src 'self'`;
 export const PASSKEY_HEADERS = { "content-security-policy": PASSKEY_CSP };
 
+// The machine list's search script, on /admin only (FILTER_HEADERS). Same
+// rules as COPY_SCRIPT: allowed by its hash, a test recomputes it.
+//
+// What it does: as the admin types in #mf's search box, it hides the rows of
+// every tbody[data-list] whose data-q (the row's visible text, normalised by
+// searchText in dashboard.ts) lacks a word typed, normalised the same way;
+// updates the counts ([data-n]), the "no match" notes ([data-empty]), the
+// sections to hide when empty ([data-empty-hide]) and the heading
+// ([data-matching], from its data-a/data-b text); puts the search in the
+// address (history.replaceState) and in the links marked data-keep (filter
+// tabs, sort headers). Changing the role select submits the form. It hides the
+// Search button, which without the script submits the search. It writes only
+// textContent, hidden and same-origin hrefs; it loads and sends nothing.
+export const FILTER_SCRIPT =
+  `(function(){var f=document.getElementById("mf");if(!f)return;` +
+  `var q=f.querySelector("input[name=q]"),r=f.querySelector("select[name=role]"),b=f.querySelector("button");if(!q)return;if(b)b.hidden=true;` +
+  `function n(s){return s.normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/[\\u0111\\u0110]/g,"d").toLowerCase().replace(/\\s+/g," ").trim()}` +
+  `function each(sel,fn){var l=document.querySelectorAll(sel);for(var i=0;i<l.length;i++)fn(l[i])}` +
+  `function keep(h,v){var u=new URL(h,location.href);if(v)u.searchParams.set("q",v);else u.searchParams.delete("q");return u.pathname+u.search+u.hash}` +
+  `function run(){var v=q.value.trim(),t=n(v).split(" ").filter(Boolean);` +
+  `each("tbody[data-list]",function(tb){var k=tb.getAttribute("data-list"),c=0;for(var j=0;j<tb.rows.length;j++){var row=tb.rows[j],d=row.getAttribute("data-q")||"",ok=true;` +
+  `for(var x=0;x<t.length;x++)if(d.indexOf(t[x])<0){ok=false;break}row.hidden=!ok;if(ok)c++}` +
+  `each('[data-n="'+k+'"]',function(e){e.textContent=String(c)});each('[data-empty="'+k+'"]',function(e){e.hidden=c>0});each('[data-empty-hide="'+k+'"]',function(e){e.hidden=c===0})});` +
+  `each("[data-matching]",function(e){e.textContent=v?(e.getAttribute("data-a")||"")+v+(e.getAttribute("data-b")||""):""});` +
+  `history.replaceState(null,"",keep(location.href,v));each("a[data-keep]",function(a){a.setAttribute("href",keep(a.getAttribute("href")||"",v))})}` +
+  `q.addEventListener("input",run);if(r)r.addEventListener("change",function(){f.submit()})})();`;
+export const FILTER_SCRIPT_HASH = "sha256-KPNTsOYn8OSclhhCE/VUZoXm445y1N81uvNzkYI9nXg=";
+export const FILTER_CSP = `${CSP}; script-src '${FILTER_SCRIPT_HASH}'`;
+export const FILTER_HEADERS = { "content-security-policy": FILTER_CSP };
+
 export function page(body: Html, status = 200, headers: Record<string, string> = {}): Response {
   return new Response("<!doctype html>" + body.value, {
     status,
@@ -488,6 +518,8 @@ export interface LayoutOptions {
   copy?: boolean;
   // Include PASSKEY_SCRIPT. The response must then carry PASSKEY_HEADERS.
   passkey?: boolean;
+  // Include FILTER_SCRIPT. The response must then carry FILTER_HEADERS.
+  filter?: boolean;
 }
 
 // copyButton copies the text of the element with id `target`. Hidden until
@@ -520,7 +552,7 @@ export function layout(L: I18n, title: string, who: string | null, body: Html, a
   }</header>
 <main>${body}</main><footer class="credit">© Phil Trinh - SENPRINTS</footer>${
     opts.copy ? html`<span id="copy-status" class="sr-only" aria-live="polite"></span><script>${new Html(COPY_SCRIPT)}</script>` : ""
-  }${opts.passkey ? html`<script>${new Html(PASSKEY_SCRIPT)}</script>` : ""}</body></html>`;
+  }${opts.passkey ? html`<script>${new Html(PASSKEY_SCRIPT)}</script>` : ""}${opts.filter ? html`<script>${new Html(FILTER_SCRIPT)}</script>` : ""}</body></html>`;
 }
 
 export function statusClass(s: string): string {

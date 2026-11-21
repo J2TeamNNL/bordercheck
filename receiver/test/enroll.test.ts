@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COPY_SCRIPT } from "../src/html";
+import { COPY_SCRIPT, FILTER_SCRIPT } from "../src/html";
 import { composePolicy, goDuration, validateRolePolicy } from "../src/roles";
 import { ADMIN_TOKEN, adminGet, BASE, call, env, post, report } from "./helpers";
 import { adminPost, DEV_POLICY, enroll, enrolled, getPolicy, HOST, makeInvites, makeRole } from "./portal";
@@ -388,7 +388,7 @@ describe("admin portal", () => {
       const res = await adminGet(path);
       expect(res.status, path).toBe(200);
       const body = await res.text();
-      expect(body, path).not.toContain("<script>");
+      expect(body.replace(`<script>${FILTER_SCRIPT}</script>`, ""), path).not.toContain("<script>");
       expect(body, path).toContain("&lt;script&gt;");
     }
   });
