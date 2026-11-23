@@ -15,7 +15,8 @@
 // only policy is Service Auth with the service token given to the
 // integration. Cloudflare then calls through Access, and this checks the
 // Access JWT: signed by ACCESS_TEAM_DOMAIN's keys, for POSTURE_ACCESS_AUD, a
-// service token (not a person), and if POSTURE_CLIENT_ID is set, that token.
+// service token (not a person), and if POSTURE_CLIENT_ID is set, one of those
+// tokens (a list: several Zero Trust organisations can poll one portal).
 // Unset POSTURE_ACCESS_AUD: 404 like any unknown path.
 //
 // Matching: by hardware serial number (the client sends it from v0.5.19);
@@ -78,13 +79,22 @@ export function postureScore(c: Candidate, env: Env, now: Date): number {
   return SCORE.ok;
 }
 
+// postureClientAllowed: POSTURE_CLIENT_ID unset lets any service token through
+// (Access already let only the application's tokens in); set, it lists the
+// allowed client IDs, separated by commas or spaces: one per Zero Trust
+// organisation polling this portal (each with its own integration and token).
+export function postureClientAllowed(env: Env, client: string): boolean {
+  const ids = (env.POSTURE_CLIENT_ID ?? "").split(/[\s,]+/).filter(Boolean);
+  return ids.length === 0 || ids.includes(client);
+}
+
 export async function handlePosture(req: Request, env: Env, now = new Date()): Promise<Response> {
   if (!env.POSTURE_ACCESS_AUD || !env.ACCESS_TEAM_DOMAIN) return json({ error: "not found" }, 404);
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405, { allow: "POST" });
   const claims = await accessClaims(req, env, env.POSTURE_ACCESS_AUD, now.getTime());
   // Only a service token: a person's Access session must not read postures.
   const client = typeof claims?.common_name === "string" ? claims.common_name : "";
-  if (!claims || !client || claims.email || (env.POSTURE_CLIENT_ID && client !== env.POSTURE_CLIENT_ID)) {
+  if (!claims || !client || claims.email || !postureClientAllowed(env, client)) {
     return json({ error: "unauthorized" }, 401);
   }
   let body: unknown;

@@ -141,6 +141,11 @@ describe("device posture for Cloudflare Zero Trust", () => {
     expect((await ask([dev("d")], service({ aud: ["other"] }))).status).toBe(401);
     expect((await ask([dev("d")], service({ common_name: "other.access" }), { ...E, POSTURE_CLIENT_ID: CLIENT })).status).toBe(401);
     expect((await ask([dev("d")], service(), { ...E, POSTURE_CLIENT_ID: CLIENT })).status).toBe(200);
+    // Several organisations: a list of client IDs.
+    const two = { ...E, POSTURE_CLIENT_ID: `${CLIENT}, second.access` };
+    expect((await ask([dev("d")], service({ common_name: "second.access" }), two)).status).toBe(200);
+    expect((await ask([dev("d")], service(), two)).status).toBe(200);
+    expect((await ask([dev("d")], service({ common_name: "other.access" }), two)).status).toBe(401);
     const none = await call(new Request(`${BASE}/posture/cloudflare`, { method: "POST", body: "{}" }), E);
     expect(none.status).toBe(401);
     expect((await ask(Array.from({ length: 1001 }, (_, i) => dev(`d${i}`)))).status).toBe(400);

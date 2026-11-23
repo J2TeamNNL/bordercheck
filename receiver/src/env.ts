@@ -18,7 +18,7 @@ export interface Env {
   // Access application in front of /posture/cloudflare (with ACCESS_TEAM_DOMAIN).
   // Unset: that path answers 404.
   POSTURE_ACCESS_AUD?: string;
-  POSTURE_CLIENT_ID?: string; // optional: only this Access service token's client ID may call it
+  POSTURE_CLIENT_ID?: string; // optional: only these Access service tokens' client IDs (comma or space separated) may call it
   DASHBOARD_URL?: string; // e.g. https://bordercheck.domain.com, for links in alerts
   ALLOWED_EMAIL_DOMAINS?: string; // comma-separated; reports from other emails are refused
   SILENT_DAYS?: string; // alert when a machine has not reported for this many days (default 7)

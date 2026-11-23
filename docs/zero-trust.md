@@ -195,10 +195,16 @@ In the portal's Wrangler config, under `vars`, then deploy:
 |---|---|
 | `ACCESS_TEAM_DOMAIN` | `<team>.cloudflareaccess.com` |
 | `POSTURE_ACCESS_AUD` | the AUD tag from step 2 |
-| `POSTURE_CLIENT_ID` | optional: the service token's client ID; then only that token gets answers |
+| `POSTURE_CLIENT_ID` | optional: the service token's client ID; then only that token gets answers. Several, separated by commas, when more than one Zero Trust organisation polls this portal (below) |
 
 Setting `ACCESS_TEAM_DOMAIN` alone does not put the dashboard behind Access (that needs `ACCESS_AUD` too).
 Without `POSTURE_ACCESS_AUD`, `/posture/cloudflare` answers 404.
+
+**A second Zero Trust organisation** (another company on the same portal, with its own Cloudflare account):
+create one more service token in the portal's account, add it to the step 2 policy (Include → Service token,
+next to the first), and add its client ID to `POSTURE_CLIENT_ID`. Then, in the other account, do steps 4 and 5
+with that token and the same URL. The Access application stays in the portal's account; the other organisation
+only needs its token.
 
 ### 4. The custom service provider
 
