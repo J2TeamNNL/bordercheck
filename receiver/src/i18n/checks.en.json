@@ -484,6 +484,7 @@
   "tailscale.badPrefs": "unexpected output from `tailscale debug prefs`",
   "tailscale.denied": "Only root or the Tailscale operator may read Tailscale's settings here. Run [code]sudo tailscale set --operator=$USER[/code] once, or [code]sudo bordercheck -only mesh-vpn[/code]. ({err})",
   "tailscale.notInstalled": "Tailscale is not installed.",
+  "tailscale.notRunning": "Tailscale is installed but not running.",
   "tailscale.open": "Tailscale accepts incoming connections. Tailscale traffic may bypass the OS firewall, so any device on the tailnet, including a hacked one, can reach every port this machine listens on.",
   "tailscale.open.fix": "Tailscale → Settings → untick \"Allow incoming connections\". Or: [code]tailscale set --shields-up[/code]. Admins: also limit who can reach whom with tailnet ACLs.",
   "tailscale.shieldsUp": "Shields up: other devices on the tailnet cannot open connections to this machine.",

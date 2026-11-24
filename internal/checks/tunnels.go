@@ -3,6 +3,7 @@ package checks
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/url"
 	"path"
@@ -46,10 +47,12 @@ func tunnels(p policy.Tunnels) func(context.Context) check.Result {
 	return func(ctx context.Context) check.Result {
 		var found []exposure
 		var notes msg.Text
+		blind := false // the process table, where most tunnels show, could not be read
 		if p.Processes {
 			ps, err := listProcs(ctx)
 			if err != nil {
 				notes = append(notes, msg.P("tunnels.noProcs", "err", err.Error()))
+				blind = !errors.Is(err, errUnsupported)
 			}
 			for _, pr := range ps {
 				if e, ok := classifyProc(pr); ok {
@@ -70,7 +73,11 @@ func tunnels(p policy.Tunnels) func(context.Context) check.Result {
 				}
 			}
 		}
-		return evalTunnels(found, p, notes)
+		r := evalTunnels(found, p, notes)
+		if blind && r.Status == check.Pass {
+			r.Status = check.Error // nothing found, but it was not looked for
+		}
+		return r
 	}
 }
 

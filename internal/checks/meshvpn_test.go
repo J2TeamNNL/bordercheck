@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -139,10 +140,21 @@ func TestEvalMeshVPN(t *testing.T) {
 	if r.Status != check.Pass || !strings.Contains(r.Summary, "Allowed by policy to accept incoming connections: Tailscale") || found != nil {
 		t.Errorf("tailscale allowed: %+v", r)
 	}
-	// Tailscale's bad output is a note.
+	// Tailscale running but unread (bad output, no answer) is an error, not a pass,
+	// unless something else is found open.
 	bad := check.Errored(msg.Err("tailscale.badPrefs"))
-	if r, _ := evalMeshVPN(meshFacts{Tailscale: &bad}, nil); r.Status != check.Pass || !strings.Contains(r.Summary, "unexpected output") {
+	if r, _ := evalMeshVPN(meshFacts{Tailscale: &bad}, nil); r.Status != check.Error || !strings.Contains(r.Summary, "unexpected output") {
 		t.Errorf("tailscale bad prefs: %+v", r)
+	}
+	tsHung := check.Errored(errors.New("Tailscale: no answer within 20 seconds"))
+	ztOpen := meshTools(meshRaw{GOOS: "linux", Procs: []proc{{exe: "zerotier-one"}}, Ifaces: []string{"ztabcdef12"}, NebulaRules: -1})
+	if r, _ := evalMeshVPN(meshFacts{Tailscale: &tsHung, Tools: ztOpen}, nil); r.Status != check.Warn {
+		t.Errorf("tailscale hung, zerotier open: %+v", r)
+	}
+	// Installed but not running: nothing comes in through it.
+	tsOff := check.SkippedMsg(msg.Of("tailscale.notRunning"))
+	if r, _ := evalMeshVPN(meshFacts{Tailscale: &tsOff}, nil); r.Status != check.Pass || !strings.Contains(r.Summary, "not running") {
+		t.Errorf("tailscale not running: %+v", r)
 	}
 	// Nebula with inbound rules, and one whose config could not be read.
 	if r, _ := evalMeshVPN(meshFacts{Tools: meshTools(meshRaw{GOOS: "linux", Procs: []proc{{exe: "nebula"}}, NebulaRules: 3})}, nil); r.Status != check.Warn ||
@@ -265,5 +277,23 @@ func TestMeshParsers(t *testing.T) {
 	// Windows: a stopped tunnel service is not a tunnel.
 	if ts := meshTools(meshRaw{GOOS: "windows", Services: map[string]string{"WireGuardTunnel$x": "Stopped"}, NebulaRules: -1}); len(ts) != 0 {
 		t.Errorf("stopped tunnel: %v", toolIDs(ts))
+	}
+}
+
+func TestTailscaleRunningMac(t *testing.T) {
+	for _, c := range []struct {
+		exe  string
+		want bool
+	}{
+		{"/Applications/Tailscale.app/Contents/MacOS/Tailscale", true},
+		{"/Library/SystemExtensions/X/io.tailscale.ipn.macsys.network-extension.systemextension/Contents/MacOS/io.tailscale.ipn.macsys.network-extension", true},
+		{"/Applications/Tailscale.app/Contents/PlugIns/IPNExtension.appex/Contents/MacOS/IPNExtension", true},
+		{"/opt/homebrew/bin/tailscaled", true},
+		{"/usr/local/bin/tailscale", false}, // the CLI itself is not Tailscale running
+		{"/usr/bin/ssh", false},
+	} {
+		if got := tailscaleRunningMac([]proc{{exe: c.exe}}); got != c.want {
+			t.Errorf("%s: %v", c.exe, got)
+		}
 	}
 }

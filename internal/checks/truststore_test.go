@@ -276,9 +276,13 @@ func TestEvalTrustStore(t *testing.T) {
 	if r := evalTrustStore(trustFacts{OS: "darwin", CAErr: "security: boom", ProxyErr: "scutil: boom"}, def); r.Status != check.Error {
 		t.Errorf("both unreadable: %+v", r)
 	}
-	if r := evalTrustStore(trustFacts{OS: "darwin", CAErr: "security: boom"}, def); r.Status != check.Pass ||
+	if r := evalTrustStore(trustFacts{OS: "darwin", CAErr: "security: boom"}, def); r.Status != check.Error ||
 		r.Summary != "No proxy is set. The trust store could not be read: security: boom" {
 		t.Errorf("ca unreadable: %+v", r)
+	}
+	// Proxies unreadable, no root added: an error too, not a pass.
+	if r := evalTrustStore(trustFacts{OS: "darwin", ProxyErr: "scutil: no answer within 20 seconds"}, def); r.Status != check.Error {
+		t.Errorf("proxy unreadable: %+v", r)
 	}
 }
 

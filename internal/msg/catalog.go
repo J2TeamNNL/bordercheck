@@ -133,6 +133,7 @@ var Catalog = map[string]Entry{
 	"tailscale.notInstalled": s("Tailscale is not installed."),
 	"tailscale.denied": s("Only root or the Tailscale operator may read Tailscale's settings here. Run " +
 		"[code]sudo tailscale set --operator=$USER[/code] once, or [code]sudo bordercheck -only mesh-vpn[/code]. ({err})"),
+	"tailscale.notRunning": s("Tailscale is installed but not running."),
 	"tailscale.unreadable": s("Could not read Tailscale settings; is Tailscale running? ({err})"),
 	"tailscale.badPrefs":   s("unexpected output from `tailscale debug prefs`"),
 	"tailscale.shieldsUp":  s("Shields up: other devices on the tailnet cannot open connections to this machine."),

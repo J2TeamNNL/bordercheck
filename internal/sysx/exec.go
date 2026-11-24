@@ -4,6 +4,7 @@ package sysx
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"os"
@@ -17,22 +18,74 @@ import (
 
 const timeout = 20 * time.Second
 
+// retryPause is how long a command that gave no answer waits before its one
+// retry. A Mac waking from sleep can stall every directory lookup (id,
+// fdesetup, ps) for a while; a few seconds later they answer at once.
+var retryPause = 3 * time.Second
+
+// ErrNoAnswer is wrapped by the error of a command that ran out of time, so a
+// check can tell "it did not answer" (unknown) from "it said no".
+var ErrNoAnswer = errors.New("no answer")
+
+type noAnswer struct {
+	name  string
+	limit time.Duration
+}
+
+func (e noAnswer) Error() string {
+	return fmt.Sprintf("%s: no answer within %d seconds", e.name, int(e.limit.Seconds()))
+}
+func (e noAnswer) Unwrap() error { return ErrNoAnswer }
+
+// NoAnswer reports whether err is, or wraps, a command that ran out of time.
+func NoAnswer(err error) bool { return errors.Is(err, ErrNoAnswer) }
+
 // Run runs name with args and returns its stdout. On failure the error carries
 // the first line of stderr.
 func Run(ctx context.Context, name string, args ...string) (string, error) {
 	return RunFor(ctx, timeout, name, args...)
 }
 
-// RunFor is Run with its own time limit, for a command known to be slow.
+// RunFor is Run with its own time limit, for a command known to be slow. A
+// command that gives no answer in time is run once more after a short pause,
+// if the caller's own deadline leaves room for a full second try.
 func RunFor(ctx context.Context, limit time.Duration, name string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, limit)
+	out, err := runOnce(ctx, limit, name, args...)
+	if !NoAnswer(err) || !roomFor(ctx, retryPause+limit) {
+		return out, err
+	}
+	select {
+	case <-ctx.Done():
+		return out, err
+	case <-time.After(retryPause):
+	}
+	return runOnce(ctx, limit, name, args...)
+}
+
+// roomFor is whether ctx is alive and its deadline, if any, is at least d away.
+func roomFor(ctx context.Context, d time.Duration) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	dl, ok := ctx.Deadline()
+	return !ok || time.Until(dl) >= d
+}
+
+func runOnce(parent context.Context, limit time.Duration, name string, args ...string) (string, error) {
+	// ownLimit: the time limit that can stop it is this command's, not the caller's.
+	pdl, has := parent.Deadline()
+	ownLimit := !has || pdl.After(time.Now().Add(limit))
+	ctx, cancel := context.WithTimeout(parent, limit)
 	defer cancel()
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	// A child the command started can keep its output open after the command
+	// is killed; stop waiting for it soon after.
+	cmd.WaitDelay = time.Second
 	if err := cmd.Run(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return stdout.String(), fmt.Errorf("%s: no answer within %d seconds", filepath.Base(name), int(limit.Seconds()))
+		if ctx.Err() == context.DeadlineExceeded && ownLimit {
+			return stdout.String(), noAnswer{filepath.Base(name), limit}
 		}
 		if msg := firstLine(stderr.String()); msg != "" {
 			return stdout.String(), fmt.Errorf("%s: %s", filepath.Base(name), msg)

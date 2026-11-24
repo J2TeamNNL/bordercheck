@@ -88,7 +88,7 @@ func evalMeshVPN(f meshFacts, allow []string) (r check.Result, found []string) {
 	var p issueList
 	var pass, notes msg.Text
 	var evidence, allowed []string
-	any := false
+	any, unknown := false, false
 	if ts := f.Tailscale; ts != nil && !(ts.Status == check.Skip && partKey(ts.SummaryParts) == "tailscale.notInstalled") {
 		any = true
 		switch ts.Status {
@@ -106,6 +106,7 @@ func evalMeshVPN(f meshFacts, allow []string) (r check.Result, found []string) {
 			found = append(found, "tailscale")
 		default: // could not read Tailscale's settings: say why
 			notes = append(notes, ts.SummaryParts...)
+			unknown = ts.Status == check.Error // running, but gave no answer
 		}
 	}
 	for _, t := range f.Tools {
@@ -142,7 +143,11 @@ func evalMeshVPN(f meshFacts, allow []string) (r check.Result, found []string) {
 	if len(pass) == 0 && len(p.high)+len(p.medium) == 0 && len(notes) == 0 {
 		pass = msg.Of("mesh.none") // unreachable: a tool always says something
 	}
-	return p.result(pass, notes, evidence), found
+	r = p.result(pass, notes, evidence)
+	if unknown && r.Status == check.Pass {
+		r.Status = check.Error // nothing open was found, but Tailscale was not read
+	}
+	return r, found
 }
 
 func partKey(t msg.Text) string {

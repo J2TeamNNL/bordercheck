@@ -108,6 +108,7 @@ export const checksVi: CheckCatalog = {
   "tailscale.notInstalled": "Chưa cài Tailscale.",
   "tailscale.denied":
     "Trên máy này chỉ root hoặc operator của Tailscale mới đọc được thiết lập của Tailscale. Chạy [code]sudo tailscale set --operator=$USER[/code] một lần, hoặc [code]sudo bordercheck -only mesh-vpn[/code]. ({err})",
+  "tailscale.notRunning": "Đã cài Tailscale nhưng Tailscale không chạy.",
   "tailscale.unreadable": "Không đọc được thiết lập của Tailscale; Tailscale có đang chạy không? ({err})",
   "tailscale.badPrefs": "kết quả không như mong đợi từ `tailscale debug prefs`",
   "tailscale.shieldsUp": "Shields up: các thiết bị khác trong tailnet không mở được kết nối tới máy này.",

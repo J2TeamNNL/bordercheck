@@ -3,6 +3,7 @@ package checks
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -25,7 +26,17 @@ func tailscale(ctx context.Context) check.Result {
 	if !ok {
 		return check.SkippedMsg(msg.Of("tailscale.notInstalled"))
 	}
+	if runtime.GOOS == "darwin" {
+		// The app's CLI can sit without answering when Tailscale is not
+		// running; nothing comes in through a Tailscale that is not running.
+		if procs, err := listProcs(ctx); err == nil && !tailscaleRunningMac(procs) {
+			return check.SkippedMsg(msg.Of("tailscale.notRunning"))
+		}
+	}
 	out, err := sysx.Run(ctx, bin, "debug", "prefs")
+	if sysx.NoAnswer(err) {
+		return check.Errored(err) // running, but its settings could not be read
+	}
 	if err != nil && runtime.GOOS == "linux" && strings.Contains(strings.ToLower(err.Error()), "denied") {
 		return check.SkippedMsg(msg.Of("tailscale.denied", "err", err.Error()))
 	}
@@ -33,6 +44,19 @@ func tailscale(ctx context.Context) check.Result {
 		return check.SkippedMsg(msg.Of("tailscale.unreadable", "err", err.Error()))
 	}
 	return evalTailscalePrefs(out)
+}
+
+// tailscaleRunningMac is whether any part of Tailscale runs: the app, its
+// network extension (standalone or App Store) or the open-source tailscaled.
+func tailscaleRunningMac(procs []proc) bool {
+	for _, p := range procs {
+		switch filepath.Base(p.exe) {
+		case "Tailscale", "IPNExtension", "tailscaled",
+			"io.tailscale.ipn.macsys.network-extension", "io.tailscale.ipn.macos.network-extension":
+			return true
+		}
+	}
+	return false
 }
 
 // evalTailscalePrefs judges `tailscale debug prefs`. ShieldsUp is the inverse of

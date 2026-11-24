@@ -2,6 +2,8 @@ package sysx
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -26,8 +28,37 @@ func TestFirstLine(t *testing.T) {
 }
 
 func TestRunForSaysWhenItTimedOut(t *testing.T) {
+	defer func(p time.Duration) { retryPause = p }(retryPause)
+	retryPause = 10 * time.Millisecond
 	_, err := RunFor(context.Background(), time.Second, "sleep", "5")
-	if err == nil || !strings.Contains(err.Error(), "no answer within 1 seconds") {
+	if err == nil || !strings.Contains(err.Error(), "no answer within 1 seconds") || !NoAnswer(err) {
 		t.Fatalf("err = %v", err)
+	}
+	if _, err := RunFor(context.Background(), time.Second, "sh", "-c", "exit 3"); err == nil || NoAnswer(err) {
+		t.Fatalf("a command that fails is not a command that did not answer: %v", err)
+	}
+}
+
+func TestRunForTriesOnceMore(t *testing.T) {
+	defer func(p time.Duration) { retryPause = p }(retryPause)
+	retryPause = 10 * time.Millisecond
+	// Hangs the first time, answers the second.
+	mark := filepath.Join(t.TempDir(), "ran")
+	script := `if [ -e "$1" ]; then echo ok; else : > "$1"; sleep 5; fi`
+	out, err := RunFor(context.Background(), time.Second, "sh", "-c", script, "sh", mark)
+	if err != nil || strings.TrimSpace(out) != "ok" {
+		t.Fatalf("out = %q, err = %v", out, err)
+	}
+
+	// No retry when the caller's deadline leaves no room for one.
+	os.Remove(mark)
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	if _, err := RunFor(ctx, time.Second, "sh", "-c", script, "sh", mark); !NoAnswer(err) {
+		t.Fatalf("err = %v", err)
+	}
+	if d := time.Since(start); d > 2500*time.Millisecond { // one try is 1s, plus up to 1s for sleep's pipe
+		t.Fatalf("retried past the caller's deadline: %v", d)
 	}
 }

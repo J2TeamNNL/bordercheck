@@ -109,6 +109,7 @@ export const checksZh: CheckCatalog = {
   "tailscale.notInstalled": "未安装 Tailscale。",
   "tailscale.denied":
     "在这台电脑上只有 root 或 Tailscale operator 才能读取 Tailscale 的设置。运行一次 [code]sudo tailscale set --operator=$USER[/code]，或运行 [code]sudo bordercheck -only mesh-vpn[/code]。（{err}）",
+  "tailscale.notRunning": "已安装 Tailscale，但它没有在运行。",
   "tailscale.unreadable": "无法读取 Tailscale 设置；Tailscale 是否正在运行？（{err}）",
   "tailscale.badPrefs": "`tailscale debug prefs` 的输出不符合预期",
   "tailscale.shieldsUp": "Shields up：tailnet 中的其他设备无法主动连接到这台电脑。",

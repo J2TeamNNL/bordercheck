@@ -211,6 +211,11 @@ func evalTrustStore(f trustFacts, opts policy.TrustStore) check.Result {
 	} else {
 		fix = append(fix, msg.P("trust.fix.allow"))
 	}
+	if status == check.Pass && (caErr || proxyErr) {
+		// Half the check could not be read: what was read is clean, but that
+		// is not a pass.
+		status = check.Error
+	}
 	if len(local) > 0 {
 		var shown []string
 		for _, p := range local {
