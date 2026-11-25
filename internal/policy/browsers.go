@@ -27,6 +27,9 @@ type Extensions struct {
 	WarnAllSites bool `json:"warn_all_sites"`
 	// AllowUnpacked are extensions that may come from outside a store.
 	AllowUnpacked []string `json:"allow_unpacked"`
+	// AllowAllSites are extensions that may read and change every site
+	// without a warning under WarnAllSites; they are still listed.
+	AllowAllSites []string `json:"allow_all_sites"`
 }
 
 // BrowserPasswords judges the browsers' own password saving.
@@ -66,8 +69,8 @@ func (c Checks) validateBrowserChecks() error {
 	}
 	for field, list := range map[string][]string{
 		"extensions.block": c.Extensions.Block, "extensions.allow": c.Extensions.Allow,
-		"extensions.allow_unpacked": c.Extensions.AllowUnpacked,
-		"trust-store.allow_cas":     c.TrustStore.AllowCAs, "trust-store.allow_proxies": c.TrustStore.AllowProxies,
+		"extensions.allow_unpacked": c.Extensions.AllowUnpacked, "extensions.allow_all_sites": c.Extensions.AllowAllSites,
+		"trust-store.allow_cas": c.TrustStore.AllowCAs, "trust-store.allow_proxies": c.TrustStore.AllowProxies,
 	} {
 		for _, s := range list {
 			if strings.TrimSpace(s) == "" {

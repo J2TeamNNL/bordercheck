@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -220,6 +221,19 @@ func TestEvalExtensions(t *testing.T) {
 	r = evalExtensions(extFacts{Apps: apps, Items: sampleExtItems()}, p)
 	if r.Status != check.Warn || !strings.Contains(r.Summary, "2 extensions can read and change every website you visit") {
 		t.Errorf("warn_all_sites: %+v", r)
+	}
+	// An approved extension stops counting but stays in the evidence; the other still warns.
+	p.AllowAllSites = []string{extStoreID}
+	r = evalExtensions(extFacts{Apps: apps, Items: sampleExtItems()}, p)
+	if r.Status != check.Warn || !strings.Contains(r.Summary, "1 extension can read and change every website you visit: Blocker") ||
+		!slices.ContainsFunc(r.Evidence, func(e string) bool {
+			return strings.Contains(e, "allowed by policy") && strings.Contains(e, "Store Helper")
+		}) {
+		t.Errorf("allow_all_sites, one left: %+v", r)
+	}
+	p.AllowAllSites = []string{extStoreID, "ublock@*"}
+	if r = evalExtensions(extFacts{Apps: apps, Items: sampleExtItems()}, p); strings.Contains(r.Summary, "every website you visit:") {
+		t.Errorf("allow_all_sites, all approved: %+v", r)
 	}
 
 	// A disabled extension on the block list still fails; a disabled unpacked one is fine.

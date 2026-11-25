@@ -521,7 +521,7 @@ func Default() Policy {
 				LSM: true},
 			Sharing: Sharing{Allow: []string{}},
 			Extensions: Extensions{Browsers: true, Editors: true, Block: []string{}, Allow: []string{},
-				AllowUnpacked: []string{}},
+				AllowUnpacked: []string{}, AllowAllSites: []string{}},
 			BrowserPasswords: BrowserPasswords{AllowBrowsers: []string{}, PassBelow: 10, MediumAbove: 20},
 			TrustStore: TrustStore{CAs: true, Proxies: true, AllowCAs: []string{}, AllowProxies: []string{},
 				CASeverity: check.Medium},

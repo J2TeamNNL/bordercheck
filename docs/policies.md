@@ -598,7 +598,7 @@ browser's enterprise policy and those built into the browser are not counted.
 | On `block` (even when disabled) | fail, high |
 | Not on `allow`, when `allow` is set | warn, medium |
 | From outside a store: loaded unpacked or with `--load-extension`, installed from a file, put in place by another program with a non-store update URL; in Firefox loaded temporarily, unsigned or sideloaded; in an editor installed from a VSIX file | warn, medium |
-| Can read and change every website (`<all_urls>`, `*://*/*`…) | counted in the summary; warn, medium with `warn_all_sites` |
+| Can read and change every website (`<all_urls>`, `*://*/*`…) | counted in the summary; warn, medium with `warn_all_sites` unless on `allow_all_sites` |
 
 | Field | Default | |
 |---|---|---|
@@ -608,6 +608,7 @@ browser's enterprise policy and those built into the browser are not counted.
 | `allow` | `[]` | When not empty, every enabled extension not on it warns (allowlist mode). Same syntax as `block`. |
 | `warn_all_sites` | `false` | Warn on extensions that can read and change every website. |
 | `allow_unpacked` | `[]` | Extensions that may come from outside a store, e.g. your own internal ones. |
+| `allow_all_sites` | `[]` | Extensions that may read and change every website without a warning when `warn_all_sites` is on, e.g. an AI assistant the organisation approved. They are still listed in the evidence. Same syntax as `block`. Needs a client that knows the field; older ones reject it. |
 
 ### browser-passwords
 

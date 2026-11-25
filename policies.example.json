@@ -192,7 +192,8 @@
       "block": [],
       "allow": [],
       "warn_all_sites": false,
-      "allow_unpacked": []
+      "allow_unpacked": [],
+      "allow_all_sites": []
     },
     "browser-passwords": {
       "allow_browsers": [],

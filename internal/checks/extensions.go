@@ -101,6 +101,7 @@ func evalExtensions(f extFacts, opts policy.Extensions) check.Result {
 		return check.SkippedMsg(msg.Of("extensions.notFound"))
 	}
 	block, allow, unpacked := globList(opts.Block), globList(opts.Allow), globList(opts.AllowUnpacked)
+	allowAllSites := globList(opts.AllowAllSites)
 	count := map[string]int{}
 	var blocked, outside, notAllowed, allSites []extItem
 	for _, e := range f.Items {
@@ -173,9 +174,15 @@ func evalExtensions(f extFacts, opts policy.Extensions) check.Result {
 		}
 	}
 	if len(allSites) > 0 {
-		if opts.WarnAllSites {
+		var warned []extItem
+		for _, e := range allSites {
+			if !matchAny(allowAllSites, e.ID) {
+				warned = append(warned, e)
+			}
+		}
+		if opts.WarnAllSites && len(warned) > 0 {
 			raise(check.Warn, check.Medium)
-			summary = append(summary, msg.P("extensions.allSitesWarn", "n", len(allSites), "names", names(allSites)))
+			summary = append(summary, msg.P("extensions.allSitesWarn", "n", len(warned), "names", names(warned)))
 			fix = append(fix, msg.P("extensions.fix.allSites"))
 		} else {
 			summary = append(summary, msg.P("extensions.allSites", "n", len(allSites)))
@@ -185,7 +192,11 @@ func evalExtensions(f extFacts, opts policy.Extensions) check.Result {
 				ev = append(ev, fmt.Sprintf("can read and change every website: %d more", len(allSites)-20))
 				break
 			}
-			ev = append(ev, "can read and change every website: "+e.String())
+			what := "can read and change every website: "
+			if matchAny(allowAllSites, e.ID) {
+				what = "can read and change every website, allowed by policy: "
+			}
+			ev = append(ev, what+e.String())
 		}
 	}
 	if status == check.Pass {
