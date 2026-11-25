@@ -23,6 +23,12 @@ func TestListenersInfoOnly(t *testing.T) {
 	if r.Severity != check.Medium || strings.Contains(r.Summary, "well-known") || !strings.Contains(r.Fix, "127.0.0.1") {
 		t.Errorf("with a dev server: %s %q %q", r.Severity, r.Summary, r.Fix)
 	}
+	// Logitech Options+ holds a Logi Flow port on every interface (captured on macOS 15).
+	logi := []listener{{Proc: "logioptionsplus_agent", Addr: "*", Port: "59869"}}
+	if r := evalListenersWith(logi, nil, nil, lower); r.Status != check.Pass || len(r.Evidence) != 1 ||
+		!strings.Contains(r.Evidence[0], "Logi Flow") {
+		t.Errorf("Logi Options+ only: %s %v", r.Status, r.Evidence)
+	}
 	// An empty list makes them findings again.
 	if r := evalListenersWith(airplay, nil, nil, nil); r.Status != check.Warn || r.Severity != check.Medium {
 		t.Errorf("no info_only list: %s", r.Severity)

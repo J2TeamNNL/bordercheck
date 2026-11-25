@@ -68,7 +68,8 @@
         "Dropbox",
         "Spotify",
         "tailscaled",
-        "IPNExtension"
+        "IPNExtension",
+        "logioptionsplus_agent"
       ]
     },
     "mesh-vpn": {

@@ -30,21 +30,22 @@ type listener struct{ Proc, Addr, Port string }
 
 // What common listeners are and where to turn them off, so people know what they're looking at.
 var listenerHints = map[string]string{
-	"ControlCenter":       "AirPlay Receiver; turn off in System Settings → General → AirDrop & Handoff if unused",
-	"rapportd":            "Apple Handoff/Continuity",
-	"DropboxFileProvider": "Dropbox LAN sync; turn off in Dropbox → Preferences → Network",
-	"spotify":             "Spotify Connect discovery",
-	"Spotify":             "Spotify Connect discovery",
-	"System":              "Windows file sharing (SMB) and other system services",
-	"svchost":             "Windows system service",
-	"lsass":               "Windows sign-in service (RPC)",
-	"wininit":             "Windows start-up service (RPC)",
-	"services":            "Windows service manager (RPC)",
-	"spoolsv":             "Windows print spooler (RPC)",
-	"tailscaled":          "Tailscale; reachable from your tailnet only",
-	"IPNExtension":        "Tailscale (the Mac app's network extension); reachable from your tailnet only",
-	"sshd":                "SSH server; turn it off if unused (Linux: sudo systemctl disable --now ssh; Mac: Remote Login)",
-	"kdeconnectd":         "KDE Connect",
+	"ControlCenter":         "AirPlay Receiver; turn off in System Settings → General → AirDrop & Handoff if unused",
+	"rapportd":              "Apple Handoff/Continuity",
+	"DropboxFileProvider":   "Dropbox LAN sync; turn off in Dropbox → Preferences → Network",
+	"spotify":               "Spotify Connect discovery",
+	"Spotify":               "Spotify Connect discovery",
+	"System":                "Windows file sharing (SMB) and other system services",
+	"svchost":               "Windows system service",
+	"lsass":                 "Windows sign-in service (RPC)",
+	"wininit":               "Windows start-up service (RPC)",
+	"services":              "Windows service manager (RPC)",
+	"spoolsv":               "Windows print spooler (RPC)",
+	"tailscaled":            "Tailscale; reachable from your tailnet only",
+	"IPNExtension":          "Tailscale (the Mac app's network extension); reachable from your tailnet only",
+	"logioptionsplus_agent": "Logitech Options+, for Logi Flow: one mouse and keyboard across computers on the same network",
+	"sshd":                  "SSH server; turn it off if unused (Linux: sudo systemctl disable --now ssh; Mac: Remote Login)",
+	"kdeconnectd":           "KDE Connect",
 }
 
 func listeners(ctx context.Context, opts policy.Listeners) check.Result {
