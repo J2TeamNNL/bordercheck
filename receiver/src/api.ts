@@ -50,6 +50,7 @@ import {
   machineWaivers,
   machineWrite,
   type Out,
+  waiverRequestWrite,
   reissueInvite,
   revokeInvite,
   roleDetail,
@@ -531,6 +532,21 @@ export const ROUTES: Route[] = [
       return ok({ install_id: c.params.install_id, waiver_id: c.params.waiver_id, removed: true });
     },
   },
+  ...(["approve", "reject"] as const).map((decision): Route => ({
+    method: "POST", path: `/machines/{install_id}/waiver-requests/{request_id}/${decision}`,
+    id: decision === "approve" ? "approveWaiverRequest" : "rejectWaiverRequest", tag: "machines",
+    summary: decision === "approve"
+      ? "Approve a pending waiver request from the person at the machine: adds the waiver as asked (same checks as addMachineWaiver), delivered at the next hourly policy refresh."
+      : "Reject a pending waiver request from the person at the machine, with an optional note they see in bordercheck waiver list.",
+    params: { install_id: installIdP, request_id: idP("waiver request (from getMachine's waiver_requests)") },
+    body: { type: "object", properties: { note: { type: "string", maxLength: 300, description: "Optional, shown to the person." } }, additionalProperties: false },
+    ok: 200, okText: decision === "approve" ? "Approved; waiver_id is the waiver it added." : "Rejected.",
+    response: obj({ install_id: { type: "string" }, request_id: { type: "integer" }, status: { type: "string" }, check: { type: "string" }, until: { type: "string" }, waiver_id: { type: ["integer", "null"] } }),
+    errors: [400, 401, 403, 404],
+    async run(c) {
+      return ok(must(await waiverRequestWrite(writer(c), c.params.install_id as string, c.params.request_id as number, decision, (c.body.note as string | undefined) ?? "")));
+    },
+  })),
   {
     method: "POST", path: "/machines/{install_id}/report-links/reset", id: "resetReportLinks", tag: "machines",
     summary: "End every login-free report link issued so far for one machine; the next report gets a new one.",
@@ -846,7 +862,7 @@ const ERROR_TEXT: Record<number, string> = {
   400: "Invalid request: validation_failed (details lists every problem), invalid_json.",
   401: "Missing or wrong token: unauthorized.",
   403: "read_only_token (a write with API_READ_TOKEN) or origin_not_allowed.",
-  404: "not_found (no such machine, role, invite or waiver) or unknown_endpoint.",
+  404: "not_found (no such machine, role, invite, waiver or pending waiver request) or unknown_endpoint.",
   405: "method_not_allowed; the Allow header lists the methods.",
   409: "A conflict: name_taken, invite_not_pending, invite_not_reissuable, not_enrolled, already_created, request_in_progress.",
   413: "payload_too_large.",

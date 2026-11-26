@@ -38,7 +38,7 @@ import {
 } from "./portal";
 import { type DeviceLocation, parseReport, statusRank } from "./report";
 import { POLICY_CHECKS, sameGrace } from "./roles";
-import { waiverRequestsDetail } from "./waiverrequests";
+import { type Decision, decideWaiverRequest, waiverRequestsDetail } from "./waiverrequests";
 import { inviteVisible, machineIn, machineVisible, roleAllowed, roleIn, type Scope, scopeBind } from "./scope";
 import { countLikelySamples, SAMPLE_RULES } from "./samples";
 
@@ -717,6 +717,19 @@ export async function machineWrite(w: Writer, id: string, action: MachineAction,
   // Moving a machine: the target role must be in scope too.
   if (action === "role" && !roleAllowed(w.scope, Number(params.role_id))) return failMsg(msg("err.noSuchRole"), 400);
   const r = await machineAction(w.env, w.who, id, action, params, w.extra);
+  if (r.error) {
+    if (r.status === 400) await w.refuse([english(r.error)]);
+    return failMsg(r.error, r.status);
+  }
+  return okData({ install_id: id, ...(r.detail ?? {}) });
+}
+
+// waiverRequestWrite approves or rejects one waiver request of machine `id`,
+// as the dashboard's buttons do.
+export async function waiverRequestWrite(w: Writer, id: string, requestId: number, decision: Decision, note = ""): Promise<Out> {
+  if (!INSTALL_ID_RE.test(id)) return fail("install_id has the wrong format.", undefined, 400);
+  if (!(await machineExists(w.env, id)) || !(await machineVisible(w.env, id, w.scope))) return fail("No such machine.", undefined, 404, "err.noSuchMachine");
+  const r = await decideWaiverRequest(w.env, w.who, id, requestId, decision, note, w.extra);
   if (r.error) {
     if (r.status === 400) await w.refuse([english(r.error)]);
     return failMsg(r.error, r.status);

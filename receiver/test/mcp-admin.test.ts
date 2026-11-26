@@ -92,6 +92,10 @@ describe("admin MCP tokens", () => {
     const opsInvite = await env.DB.prepare("SELECT i.id FROM invites i WHERE i.role_id = ?").bind(ops.roleId).first<number>("id");
     expect((await tool(token, "revoke_invite", { invite_id: opsInvite })).isError).toBe(true);
     expect(await env.DB.prepare("SELECT revoked_at FROM enrollments WHERE install_id = ?").bind(ops.install_id).first("revoked_at")).toBeNull();
+    await env.DB.prepare("INSERT INTO waiver_requests (install_id, check_id, until, reason, accept_risk, created_at) VALUES (?, 'firewall', '2099-01-01', 'r', 1, '2026-01-01')").bind(ops.install_id).run();
+    const opsRequest = await env.DB.prepare("SELECT id FROM waiver_requests").first<number>("id");
+    expect((await tool(token, "reject_waiver_request", { install_id: ops.install_id, request_id: opsRequest })).data.error).toBe("No such machine.");
+    expect(await env.DB.prepare("SELECT status FROM waiver_requests").first("status")).toBe("pending");
 
     const ok = await tool(token, "revoke_machine", { install_id: dev.install_id });
     expect(ok.isError).toBe(false);

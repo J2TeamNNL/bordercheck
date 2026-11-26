@@ -158,7 +158,9 @@ check, end date, reason and whether the person accepted the risk. **Approve** ad
 with the same checks as one you add yourself (a request whose end date has passed in the meantime stays waiting;
 reject it and add your own if you want other terms). **Reject** takes an optional note, which the person sees
 with `bordercheck waiver list`. Either way the decision, who made it and when are kept and audited. While a
-request waits, the machine's report page says so under that check. The reason is the person's own text: the
+request waits, the machine's report page says so under that check. Scripts and models decide them the same way,
+with the same checks and audit, through `POST /api/v1/machines/{install_id}/waiver-requests/{request_id}/approve`
+or `/reject` and the MCP tools `approve_waiver_request` and `reject_waiver_request`. The reason is the person's own text: the
 portal escapes it, and MCP and the API return it under `untrusted`.
 
 Each accepted report gets a login-free link to that machine's own results, which BorderCheck opens for the

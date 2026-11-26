@@ -658,3 +658,38 @@ describe("API OpenAPI document", () => {
     for (const x of ROUTES) expect(readme, `${x.method} ${x.path}`).toContain(`\`${x.method} ${x.path}\``);
   });
 });
+
+describe("API waiver requests", () => {
+  const askWaiver = (token: string, check = "listeners") =>
+    call(new Request(`${BASE}/waiver-requests`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ check, until: until(30), reason: "Postgres for billing", accept_risk: true }),
+    }));
+
+  it("approve adds the waiver, reject records the note, both audited; decided once only", async () => {
+    const m = await enrolled();
+    const a = (await (await askWaiver(m.token)).json<{ request_id: number }>()).request_id;
+    const b = (await (await askWaiver(m.token, "firewall")).json<{ request_id: number }>()).request_id;
+    const detail = await api("GET", `/machines/${m.install_id}`);
+    expect(detail.body.waiver_requests.map((r: any) => r.request_id).sort()).toEqual([a, b].sort());
+
+    const ok = await api("POST", `/machines/${m.install_id}/waiver-requests/${a}/approve`);
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ install_id: m.install_id, request_id: a, status: "approved", check: "listeners", until: until(30) });
+    expect(ok.body.waiver_id).toBeGreaterThan(0);
+    expect((await (await getPolicy(m.token)).json<any>()).waivers).toEqual([{ check: "listeners", install_id: m.install_id, until: until(30), reason: "Postgres for billing" }]);
+    expect((await api("POST", `/machines/${m.install_id}/waiver-requests/${a}/reject`)).status).toBe(404);
+
+    const no = await api("POST", `/machines/${m.install_id}/waiver-requests/${b}/reject`, { body: { note: "use the VM" } });
+    expect(no.body).toMatchObject({ request_id: b, status: "rejected" });
+    expect(await env.DB.prepare("SELECT decision_note, decided_by FROM waiver_requests WHERE id = ?").bind(b).first()).toEqual({ decision_note: "use the VM", decided_by: "api" });
+    const rows = await auditRows();
+    expect(JSON.parse(rows.find((r) => r.action === "waiver.add")!.detail)).toMatchObject({ request: a, via: "api" });
+    expect(JSON.parse(rows.find((r) => r.action === "waiver_request.reject")!.detail)).toMatchObject({ request: b, via: "api" });
+
+    expect((await api("POST", `/machines/${m.install_id}/waiver-requests/${b}/reject`, { body: { note: "x".repeat(301) } })).status).toBe(400);
+    expect((await api("POST", `/machines/${m.install_id}/waiver-requests/${b}/approve`, { token: API_READ })).status).toBe(403);
+    expect((await api("POST", `/machines/no-such-machine-01/waiver-requests/${b}/approve`)).status).toBe(404);
+  });
+});

@@ -12,7 +12,7 @@ import type { Env } from "./env";
 import { Html, html, note, pill } from "./html";
 import { checkTitle, english, type I18n, type Msg, msg } from "./i18n";
 import { json } from "./ingest";
-import { cleanLine, machineAction, machineLink } from "./portal";
+import { type AuditExtra, cleanLine, machineAction, machineLink } from "./portal";
 import { CHECK_ID_RE, POLICY_CHECKS, waiverDateError } from "./roles";
 import { machineIn, type Scope, scopeBind } from "./scope";
 
@@ -113,8 +113,9 @@ export async function decideWaiverRequest(
   requestId: number,
   decision: Decision,
   decisionNote: string,
+  extra: AuditExtra = {},
   now = new Date(),
-): Promise<{ status: number; error?: Msg }> {
+): Promise<{ status: number; error?: Msg; detail?: Record<string, unknown> }> {
   const db = env.DB;
   const ts = now.toISOString();
   const noteText = cleanLine(decisionNote, 300);
@@ -125,16 +126,17 @@ export async function decideWaiverRequest(
     .first<{ check_id: string; until: string; reason: string }>();
   if (!claimed) return { status: 404, error: msg("err.noSuchWaiverRequest") };
   if (decision === "reject") {
-    await audit(env, who, "waiver_request.reject", id, { request: requestId, check: claimed.check_id, until: claimed.until, note: noteText });
-    return { status: 200 };
+    await audit(env, who, "waiver_request.reject", id, { request: requestId, check: claimed.check_id, until: claimed.until, note: noteText, ...extra });
+    return { status: 200, detail: { request_id: requestId, status: "rejected", check: claimed.check_id, until: claimed.until } };
   }
-  const r = await machineAction(env, who, id, "waivers", { check: claimed.check_id, until: claimed.until, reason: claimed.reason }, { request: requestId });
+  const r = await machineAction(env, who, id, "waivers", { check: claimed.check_id, until: claimed.until, reason: claimed.reason }, { request: requestId, ...extra });
   if (r.error) {
     await db.prepare("UPDATE waiver_requests SET status = 'pending', decided_at = NULL, decided_by = NULL, decision_note = '' WHERE id = ?").bind(requestId).run();
     return r;
   }
-  await db.prepare("UPDATE waiver_requests SET waiver_id = ? WHERE id = ?").bind(Number(r.detail?.waiver_id ?? 0) || null, requestId).run();
-  return { status: 200 };
+  const waiverId = Number(r.detail?.waiver_id ?? 0) || null;
+  await db.prepare("UPDATE waiver_requests SET waiver_id = ? WHERE id = ?").bind(waiverId, requestId).run();
+  return { status: 200, detail: { request_id: requestId, status: "approved", check: claimed.check_id, until: claimed.until, waiver_id: waiverId } };
 }
 
 export async function machineWaiverRequests(env: Env, id: string): Promise<WaiverRequestRow[]> {
