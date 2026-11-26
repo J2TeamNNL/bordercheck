@@ -172,13 +172,13 @@ func TestScanSecrets(t *testing.T) {
 	s := testScanner(t, policy.Default().Checks.Secrets)
 	got := s.scan(strings.NewReader(sample), "~/.env", s.rules)
 	want := []secretFinding{
-		{"~/.env", 3, "OpenAI API key", "OPENAI_API_KEY", false, "1234", false, false, false, false, "", "", chatContext{}},
-		{"~/.env", 5, "Stripe live key", "STRIPE_KEY", true, "uvwx", true, false, false, false, "", "", chatContext{}},
-		{"~/.env", 6, "GitHub token", "PROD_GITHUB_TOKEN", true, "6789", false, false, false, false, "", "", chatContext{}},
-		{"~/.env", 8, "Password in URL", "DATABASE_URL", false, "", false, false, false, false, "", "", chatContext{}},
-		{"~/.env", 11, "Anthropic API key", "ANTHROPIC_API_KEY", false, "wxyz", false, false, false, false, "", "", chatContext{}},
-		{"~/.env", 12, "Private key", "", false, "", true, false, false, false, "", "", chatContext{}},
-		{"~/.env", 13, "Secret-looking variable", "client_secret", false, "", false, false, false, false, "", "", chatContext{}},
+		{"~/.env", 3, "OpenAI API key", "OPENAI_API_KEY", false, "1234", false, false, false, false, "", "", chatContext{}, false},
+		{"~/.env", 5, "Stripe live key", "STRIPE_KEY", true, "uvwx", true, false, false, false, "", "", chatContext{}, true},
+		{"~/.env", 6, "GitHub token", "PROD_GITHUB_TOKEN", true, "6789", false, false, false, false, "", "", chatContext{}, true},
+		{"~/.env", 8, "Password in URL", "DATABASE_URL", false, "", false, false, false, false, "", "", chatContext{}, false},
+		{"~/.env", 11, "Anthropic API key", "ANTHROPIC_API_KEY", false, "wxyz", false, false, false, false, "", "", chatContext{}, false},
+		{"~/.env", 12, "Private key", "", false, "", true, false, false, false, "", "", chatContext{}, false},
+		{"~/.env", 13, "Secret-looking variable", "client_secret", false, "", false, false, false, false, "", "", chatContext{}, false},
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("scanSecrets:\n got %+v\nwant %+v", got, want)
@@ -199,11 +199,11 @@ func TestEvalSecrets(t *testing.T) {
 	if r := evalSecrets(nil, nil, false, nil); r.Status != check.Pass {
 		t.Errorf("none: got %s", r.Status)
 	}
-	medium := []secretFinding{{"~/.zshrc", 1, "OpenAI API key", "OPENAI_API_KEY", false, "", false, false, false, false, "", "", chatContext{}}}
+	medium := []secretFinding{{"~/.zshrc", 1, "OpenAI API key", "OPENAI_API_KEY", false, "", false, false, false, false, "", "", chatContext{}, false}}
 	if r := evalSecrets(medium, nil, false, nil); r.Status != check.Warn {
 		t.Errorf("medium: got %s", r.Status)
 	}
-	high := append(medium, secretFinding{"~/k.pem", 1, "Private key", "", false, "", true, false, false, false, "", "", chatContext{}})
+	high := append(medium, secretFinding{"~/k.pem", 1, "Private key", "", false, "", true, false, false, false, "", "", chatContext{}, false})
 	r := evalSecrets(high, []string{"~/c.p12"}, true, nil)
 	if r.Status != check.Fail || !strings.HasPrefix(r.Evidence[0], "~/k.pem") || !strings.Contains(r.Summary, "time limit") {
 		t.Errorf("high: got %s %q %q", r.Status, r.Summary, r.Evidence)
@@ -276,9 +276,9 @@ func TestSecretPolicy(t *testing.T) {
 	s := testScanner(t, p)
 	got := s.scan(strings.NewReader("X=sample_abcdefghijklmnopqrstuvwx\nPRD_KEY=sk-abcdefghijklmnopqrstuvwxyz\nPROD_TOKEN=abcdefgh1234"), "~/.env", s.rules)
 	want := []secretFinding{
-		{"~/.env", 1, "Sample token", "X", false, "", true, false, false, false, "", "", chatContext{}},
-		{"~/.env", 2, "OpenAI API key", "PRD_KEY", true, "", false, false, false, false, "", "", chatContext{}},
-		{"~/.env", 3, "Secret-looking variable", "PROD_TOKEN", false, "", false, false, false, false, "", "", chatContext{}},
+		{"~/.env", 1, "Sample token", "X", false, "", true, false, false, false, "", "", chatContext{}, false},
+		{"~/.env", 2, "OpenAI API key", "PRD_KEY", true, "", false, false, false, false, "", "", chatContext{}, true},
+		{"~/.env", 3, "Secret-looking variable", "PROD_TOKEN", false, "", false, false, false, false, "", "", chatContext{}, false},
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %+v\nwant %+v", got, want)

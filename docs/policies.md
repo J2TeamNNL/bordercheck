@@ -319,7 +319,7 @@ private key, matches a `high` extra pattern, or is marked production. Values are
 |---|---|---|
 | `extra_files` | `[]` | More files to scan. |
 | `ignore_paths` | `[]` | Globs of findings to leave out, e.g. `"~/**/test-fixtures/**"`. |
-| `production_keywords` | `["prod", "production", "live"]` | A finding whose file path or line contains one of these as a word (any case) is marked `[production]` and fails. Must not be empty. |
+| `production_keywords` | `["prod", "production", "live"]` | A finding whose file path or line contains one of these as a word (any case) is marked `[production]` and fails. Must not be empty. A keyword only in the folders that hold a git repository or worktree does not stop an unchanged tracked file from being a likely sample (`sample_rules`). |
 | `show_tail` | `true` | Show the last 4 characters of long provider tokens (OpenAI, GitHub, AWS…), as their own dashboards do, so people can tell which key it is. Passwords never show anything. |
 | `walk_depth` | `5` | How many folders below home are searched for `.env` and key files, 0–20. Files and folders kept only in iCloud Drive or another cloud provider (placeholders, not on this disk) are not read, since reading one downloads it; apps, media libraries and disk-image bundles are skipped. |
 | `extra_patterns` | `[]` | Your own token formats: `{"kind": "Sample token", "regex": "\\bsample_[A-Za-z0-9]{32}\\b", "high": true, "show_tail": true}`. `kind` and a valid Go regular expression are required; `high` makes a match fail; `show_tail` is safe only for long random tokens. They are tried before the built-in rules. |

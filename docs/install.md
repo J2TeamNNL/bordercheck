@@ -551,7 +551,7 @@ policy's `checks.secrets.sample_rules` picks which; [policies](policies.md#secre
 | `sdk` | A file an SDK ships identically to every user: Tizen Studio's (or the older Tizen SDK's) `…/certificates/…` folders, which hold the public developer CA and the default distributor signer. Keys an SDK generates for you, such as Android's `debug.keystore` or your Tizen author certificate, do not count. |
 | `sample-dir` | A folder between your home folder and the file is named with one of the words `demo(s)`, `sample(s)`, `example(s)`, `fixture(s)`, `testdata`, `mock(s)` (split on `-`, `_` and `.`, any case), such as `demo-apps/` or `test_fixtures/`. `test` and `tests` do not count: real projects keep real keys for test servers there. The file's own name does not count. |
 
-Never set aside: a finding marked `[production]`, anything inside a `.git` folder, and, by `sample-dir` alone,
+Never set aside: a finding marked `[production]` (except by `git-tracked` when the keyword is only in the folders holding the repository, such as a worktree named after a `prod-…` branch), anything inside a `.git` folder, and, by `sample-dir` alone,
 a provider token that looks live (the kinds whose last 4 characters are shown: GitHub, OpenAI, AWS…). Something
 you ignored with `bordercheck ignore` stays in your list, with your reason.
 

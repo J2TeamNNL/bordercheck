@@ -118,19 +118,20 @@ var assignNameRe = regexp.MustCompile(`(?:^|[\s;:{,])(?:export\s+|set\s+|\$env:)
 // secretFinding locates a secret. It never holds the value, only the last 4
 // characters of a provider token so people can match it to their dashboard.
 type secretFinding struct {
-	path   string // as shown, ~ for the home folder
-	line   int
-	kind   string
-	name   string
-	prod   bool
-	tail   string
-	severe bool        // the rule itself is high severity, e.g. a private key
-	chat   bool        // in an AI assistant's conversation history (secrets_aichats.go)
-	signIn bool        // a cloud CLI's sign-in cache, reported for information (signInKinds)
-	store  bool        // a Java/Android keystore where it belongs, reported for information
-	synced string      // the cloud service the file is synced with (syncedBy), if any
-	token  string      // for full-scan -verify: the key of the token kept in Tokens, never the value
-	ctx    chatContext // where in that conversation; for bordercheck full-scan only
+	path     string // as shown, ~ for the home folder
+	line     int
+	kind     string
+	name     string
+	prod     bool
+	tail     string
+	severe   bool        // the rule itself is high severity, e.g. a private key
+	chat     bool        // in an AI assistant's conversation history (secrets_aichats.go)
+	signIn   bool        // a cloud CLI's sign-in cache, reported for information (signInKinds)
+	store    bool        // a Java/Android keystore where it belongs, reported for information
+	synced   string      // the cloud service the file is synced with (syncedBy), if any
+	token    string      // for full-scan -verify: the key of the token kept in Tokens, never the value
+	ctx      chatContext // where in that conversation; for bordercheck full-scan only
+	lineProd bool        // a production keyword on the line itself, not only in the path
 }
 
 func (f secretFinding) high() bool { return f.prod || f.severe }
@@ -172,6 +173,15 @@ type secretScanner struct {
 	postman  []string // exported Postman environments the walks passed
 }
 
+// productionRe matches one of the production keywords as a word, in any case.
+func productionRe(keywords []string) (*regexp.Regexp, error) {
+	kw := make([]string, len(keywords))
+	for i, k := range keywords {
+		kw[i] = regexp.QuoteMeta(k)
+	}
+	return regexp.Compile(`(?i)(?:^|[^a-z])(?:` + strings.Join(kw, "|") + `)(?:[^a-z]|$)`)
+}
+
 func newSecretScanner(p policy.Secrets, home string) (*secretScanner, error) {
 	s := &secretScanner{showTail: p.ShowTail == nil || *p.ShowTail, depth: p.WalkDepth, loc: p.Locations}
 	for _, sp := range p.ExtraPatterns { // the org's own formats are the most specific, so they go first
@@ -182,12 +192,8 @@ func newSecretScanner(p policy.Secrets, home string) (*secretScanner, error) {
 		s.rules = append(s.rules, secretRule{kind: sp.Kind, re: re, high: sp.High, showTail: sp.ShowTail})
 	}
 	s.rules = append(s.rules, secretRules...)
-	kw := make([]string, len(p.ProductionKeywords))
-	for i, k := range p.ProductionKeywords {
-		kw[i] = regexp.QuoteMeta(k)
-	}
 	var err error
-	if s.prodRe, err = regexp.Compile(`(?i)(?:^|[^a-z])(?:` + strings.Join(kw, "|") + `)(?:[^a-z]|$)`); err != nil {
+	if s.prodRe, err = productionRe(p.ProductionKeywords); err != nil {
 		return nil, err
 	}
 	for _, g := range p.IgnorePaths {
@@ -424,8 +430,9 @@ func (s *secretScanner) scan(r io.Reader, path string, rules []secretRule) []sec
 			if m == nil || (rule.valueGroup > 0 && isPlaceholder(m[rule.valueGroup])) {
 				continue
 			}
+			lineProd := s.prodRe.MatchString(line)
 			f := secretFinding{path: path, line: n, kind: rule.kind, severe: rule.high,
-				prod: pathProd || s.prodRe.MatchString(line)}
+				prod: pathProd || lineProd, lineProd: lineProd}
 			if rule.nameGroup > 0 {
 				f.name = safeName(m[rule.nameGroup])
 			} else if a := assignNameRe.FindStringSubmatch(line); a != nil {

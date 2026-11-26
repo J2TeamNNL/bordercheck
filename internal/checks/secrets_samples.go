@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -20,7 +21,10 @@ import (
 // key. A secrets finding that one of these rules matches is set aside: it does
 // not count toward the check's status, severity, counts or evidence, and is
 // listed in the result's LikelySamples, which is always sent, so IT still sees
-// it. Never set aside: a finding marked [production], anything inside a .git
+// it. Never set aside: a finding marked [production] by its line or by its
+// path inside the repository (a keyword only in the folders that hold a
+// repository or worktree, such as a branch-named worktree, does not count
+// for git-tracked), anything inside a .git
 // folder (a repository's own config holds real remote credentials), and, by
 // sample-dir alone, a live-looking provider token.
 //
@@ -69,6 +73,7 @@ type sampleClassifier struct {
 	home    string
 	ctx     context.Context
 	cancel  context.CancelFunc
+	prodRe  *regexp.Regexp          // production keywords; nil: never relax them
 	indexes map[string]*sampleIndex // by git dir
 	located map[string]gitFile      // by shown path, from prepare
 	found   []check.LikelySample
@@ -94,6 +99,7 @@ func newSampleClassifier(ctx context.Context, p policy.Secrets, home string) *sa
 	ctx, cancel := context.WithTimeout(ctx, sampleClassifyTimeout)
 	c := &sampleClassifier{rules: p.SampleRules, tokens: map[string]bool{}, home: home, ctx: ctx, cancel: cancel,
 		indexes: map[string]*sampleIndex{}, located: map[string]gitFile{}}
+	c.prodRe, _ = productionRe(p.ProductionKeywords)
 	// A live-looking provider token is a rule whose last characters may be
 	// shown; an org's own pattern counts when it says so.
 	for _, r := range secretRules {
@@ -152,19 +158,25 @@ func (c *sampleClassifier) prepare(paths []string) {
 }
 
 // setAside removes the findings and bundles that look like samples. Findings
-// marked [production] are never set aside.
+// marked [production] are never set aside, unless the keyword is only in the
+// folders above the repository of an unchanged git-tracked file.
 func (c *sampleClassifier) setAside(found []secretFinding, bundles []string) ([]secretFinding, []string) {
 	if c == nil {
 		return found, bundles
 	}
 	var paths []string
 	for _, f := range found {
-		if !f.prod {
+		if !f.prod || !f.lineProd {
 			paths = append(paths, f.path)
 		}
 	}
 	c.prepare(append(paths, bundles...))
-	found = slices.DeleteFunc(found, func(f secretFinding) bool { return !f.prod && c.take(f.path, f.name, f.kind, c.tokens[f.kind]) })
+	found = slices.DeleteFunc(found, func(f secretFinding) bool {
+		if !f.prod {
+			return c.take(f.path, f.name, f.kind, c.tokens[f.kind])
+		}
+		return !f.lineProd && c.prodAboveRepo(f.path) && c.takeGitTracked(f.path, f.name, f.kind)
+	})
 	bundles = slices.DeleteFunc(bundles, func(b string) bool { return c.take(b, "", bundleKind, false) })
 	return found, bundles
 }
@@ -203,6 +215,22 @@ func (c *sampleClassifier) take(shown, name, kind string, token bool) bool {
 		}
 	}
 	return false
+}
+
+// prodAboveRepo: the file is in a repository and its path there has no
+// production keyword, so the keyword came from the folders holding it.
+func (c *sampleClassifier) prodAboveRepo(shown string) bool {
+	loc, ok := c.located[shown]
+	return ok && c.prodRe != nil && !c.prodRe.MatchString(loc.rel)
+}
+
+// takeGitTracked is take with the git-tracked rule alone.
+func (c *sampleClassifier) takeGitTracked(shown, name, kind string) bool {
+	if !slices.Contains(c.rules, "git-tracked") || insideDotGit(shown) || !c.gitTracked(shown) {
+		return false
+	}
+	c.found = append(c.found, check.LikelySample{Path: shown, Name: name, Kind: kind, Rule: "git-tracked"})
+	return true
 }
 
 // gitTracked: prepare found the file in a repository whose index records it

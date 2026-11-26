@@ -224,3 +224,45 @@ func TestSecretsCheckSamplesEndToEnd(t *testing.T) {
 		t.Errorf("off: %v %v", r.LikelySamples, r.Evidence)
 	}
 }
+
+// A production keyword only in the folders holding a repository, such as a
+// worktree named after a prod-* branch, does not keep an unchanged tracked file
+// from being a likely sample; one in the line or inside the repository does.
+func TestSamplesProdKeywordAboveRepo(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	t.Setenv("CODEX_HOME", "")
+	dev := "DB_PASSWORD=Tr0ub4dor-x9\n"
+	prodLine := "PROD_DB_PASSWORD=Tr0ub4dor-x9\n"
+	writeRepo(t, filepath.Join(home, "worktrees", "backend-prod-bug-sweep"), "sha1", 2, []idxEntry{
+		{name: ".env.dev", content: dev},
+		{name: "deploy/prod/.env", content: dev},
+		{name: ".env.ci", content: prodLine},
+	}, map[string]string{
+		".env.dev":         dev,
+		"deploy/prod/.env": dev,
+		".env.ci":          prodLine,
+		".env.local":       dev, // untracked
+	})
+	p := policy.Default().Checks.Secrets
+	p.Locations = policy.SecretLocations{}
+	r := secrets(p, Local{})(t.Context())
+	var samples []string
+	for _, s := range r.LikelySamples {
+		samples = append(samples, filepath.ToSlash(s.Path)+" "+s.Rule)
+	}
+	if !slices.Equal(samples, []string{"~/worktrees/backend-prod-bug-sweep/.env.dev git-tracked"}) {
+		t.Errorf("likely samples: %v", samples)
+	}
+	left := strings.Join(r.Evidence, "\n")
+	for _, f := range []string{"deploy/prod/.env", ".env.ci", ".env.local"} {
+		if !strings.Contains(left, "backend-prod-bug-sweep/"+f) {
+			t.Errorf("%s should still be reported: %v", f, r.Evidence)
+		}
+	}
+	if r.Status != check.Fail {
+		t.Errorf("status %s", r.Status)
+	}
+}
