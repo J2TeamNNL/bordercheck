@@ -142,11 +142,24 @@ A machine's page shows its failing checks with summary, fix and since when, and 
 - **Change role**.
 - Add a **waiver**: a check, an end date (at most a year ahead) and a reason. It reaches the machine at its next
   hourly policy refresh. See [Waivers](policies.md#waivers).
+- **Approve** or **Reject** a [waiver request](#waiver-requests) from the person at the machine.
 - **Revoke** it: its token stops working at once and its history stays; **Restore** undoes it. Do this for a
   lost laptop or someone who left.
 - **Reset report links**, or **Forget** the machine (deletes its data).
 
 **Audit** lists every change and enrollment.
+
+### Waiver requests
+
+The person at an enrolled machine can ask for a waiver with `bordercheck waiver request -check <id> -until
+YYYY-MM-DD -reason "…" -accept-risk` (see [Asking IT for a waiver](policies.md#asking-it-for-a-waiver)). The
+**Machines** page says how many requests are waiting and lists them; the machine's page shows each one with its
+check, end date, reason and whether the person accepted the risk. **Approve** adds the waiver exactly as asked,
+with the same checks as one you add yourself (a request whose end date has passed in the meantime stays waiting;
+reject it and add your own if you want other terms). **Reject** takes an optional note, which the person sees
+with `bordercheck waiver list`. Either way the decision, who made it and when are kept and audited. While a
+request waits, the machine's report page says so under that check. The reason is the person's own text: the
+portal escapes it, and MCP and the API return it under `untrusted`.
 
 Each accepted report gets a login-free link to that machine's own results, which BorderCheck opens for the
 person when it announces a high-severity problem. Anyone with the link sees that machine's results, so it

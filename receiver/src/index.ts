@@ -14,7 +14,7 @@ import {
 import { alertsPage, checkPage, checksPage, forgetMachine, machinePage, machinesPage } from "./dashboard";
 import type { Env } from "./env";
 import { FAVICON, html, layout, MARK, note, page, PASSKEY_HEADERS } from "./html";
-import { forRequest, type I18n, isLang, type Key, langCookie, msg, safeNext } from "./i18n";
+import { forRequest, type I18n, isLang, type Key, langCookie, type Msg, msg, safeNext } from "./i18n";
 import { handleReport, json } from "./ingest";
 import { audit } from "./audit";
 import { handleEnroll, invitePage, serveMachinePolicy } from "./enroll";
@@ -37,6 +37,7 @@ import {
   updateRole,
 } from "./portal";
 import { selfReportPage } from "./selfreport";
+import { decideWaiverRequest, handleWaiverRequests } from "./waiverrequests";
 import { handleMcp } from "./mcp";
 import { handlePosture } from "./posture";
 import { API_BASE, handleApi } from "./api";
@@ -145,6 +146,11 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
   const scope = v.scope;
   const machineGone = () =>
     page(layout(L, L.s("common.notFound"), v.who, html`<p class="eyebrow">${L.t("nav.machines")}</p><h1>${L.t("machine.noSuch")}</h1><p><a href="/admin">${L.t("machine.back")}</a></p>`, "Machines"), 404);
+  const machineNotDone = (id: string, error: Msg, status: number) =>
+    page(
+      layout(L, L.s("notDone.title"), v.who, html`<p class="eyebrow">${L.t("nav.machines")}</p><h1>${L.t("notDone.title")}</h1>${note(L.m(error), "s-fail")}<div class="actions"><a class="btn" href="/admin/machine/${id}">${L.t("notDone.back")}</a></div>`),
+      status,
+    );
   // Cookie-borne credentials (Access, our session) need a same-origin check on writes.
   if (req.method !== "GET" && req.method !== "HEAD" && v.via !== "bearer" && !sameOrigin(req)) {
     return new Response("cross-site request refused", { status: 403 });
@@ -192,13 +198,16 @@ async function admin(req: Request, env: Env, url: URL, L: I18n): Promise<Respons
     const r = action === "role" && !roleAllowed(scope, Number(params.role_id))
       ? { status: 400, error: msg("err.noSuchRole") }
       : await machineAction(env, v.who, m[1], action, params);
-    if (r.error) {
-      return page(
-        layout(L, L.s("notDone.title"), v.who, html`<p class="eyebrow">${L.t("nav.machines")}</p><h1>${L.t("notDone.title")}</h1>${note(L.m(r.error), "s-fail")}<div class="actions"><a class="btn" href="/admin/machine/${m[1]}">${L.t("notDone.back")}</a></div>`),
-        r.status,
-      );
-    }
+    if (r.error) return machineNotDone(m[1], r.error, r.status);
     return redirect(`/admin/machine/${m[1]}`);
+  }
+
+  m = /^\/admin\/machine\/([A-Za-z0-9_-]+)\/waiver-requests\/(\d{1,12})\/(approve|reject)$/.exec(path);
+  if (m && req.method === "POST") {
+    const form = await formOf(req);
+    const r = await decideWaiverRequest(env, v.who, m[1], Number(m[2]), m[3] as "approve" | "reject", String(form.get("note") ?? ""));
+    if (r.error) return machineNotDone(m[1], r.error, r.status);
+    return redirect(`/admin/machine/${m[1]}#waiver-requests`);
   }
 
   if (path === "/admin/roles" && req.method === "GET") return rolesPage(env, v.who, L, "", undefined, 200, scope);
@@ -289,6 +298,7 @@ export default {
       if (req.method !== "GET") return json({ error: "bad_request", message: "GET your policy here" }, 405, { allow: "GET" });
       return serveMachinePolicy(req, env);
     }
+    if (path === "/waiver-requests") return handleWaiverRequests(req, env);
     if (path === "/lang") return switchLanguage(req, url);
     const L = forRequest(req, url);
     // Capability URLs. The code or id is never logged by this Worker.

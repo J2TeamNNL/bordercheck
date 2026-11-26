@@ -68,7 +68,8 @@ other standard users. On macOS and Linux root can read it too.
 
 ### How the token is used
 
-Every hourly run fetches the policy with `Authorization: Bearer <token>` and posts the report with it. The token
+Every hourly run fetches the policy with `Authorization: Bearer <token>` and posts the report with it, and
+`bordercheck waiver request` and `waiver list` send it the same way. The token
 is sent **only** to the portal that issued it: over https, never following a redirect, and only to the exact
 host of the invite link. A policy that points `report.url` or `update.policy_url` at another host is refused and
 the last good policy kept (with the reason in the log), rather than sending reports somewhere without the
@@ -159,6 +160,8 @@ bordercheck open                 # open this computer's report page in the brows
 bordercheck send -force          # send a report now
 bordercheck fix                  # what to fix and how, as instructions an AI coding assistant can follow with you
 bordercheck ignore <path> -reason "why"   # a secret, AI config token or SSH key that is not sensitive: stops counting, IT still sees it
+bordercheck waiver request -check <id> -until YYYY-MM-DD -reason "why" -accept-risk   # ask IT to exempt this machine from a check
+bordercheck waiver list          # those requests and IT's decisions
 bordercheck update               # refresh the policy and install a newer release now
 bordercheck uninstall
 ```

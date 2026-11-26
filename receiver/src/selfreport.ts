@@ -5,7 +5,8 @@
 // restored or its link is reset.
 //
 // The page shows what failed or warned with severity, summary and fix,
-// waived items with their end date, when the machine was checked, and which
+// waived items with their end date, a waiver the person asked for that IT has
+// not decided yet, when the machine was checked, and which
 // machine and email it is. It never shows other machines, admin controls,
 // audit data, IPs or locations, and of the evidence (file paths, ports,
 // container names: a map of the machine for whoever holds the link) only one
@@ -41,6 +42,7 @@ import { hit } from "./ratelimit";
 import { parseReport, type Result, statusRank } from "./report";
 import { countLikelySamples } from "./samples";
 import { LINK_RE, sha256hex } from "./tokens";
+import { pendingCheckIds } from "./waiverrequests";
 
 // fixCommand is how to run the installed bordercheck's `fix` on that OS: the
 // install folder is not on PATH (see Dir in internal/agent/agent.go).
@@ -88,7 +90,7 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
   // Same work for every id: hash, then one query.
   const h = await sha256hex(id);
   const row = await env.DB.prepare(
-    `SELECT m.email, m.hostname, m.last_seen, m.report, m.compromised_since, ro.policy AS role_policy
+    `SELECT l.install_id, m.email, m.hostname, m.last_seen, m.report, m.compromised_since, ro.policy AS role_policy
      FROM report_links l
      JOIN machines m ON m.install_id = l.install_id
      JOIN enrollments e ON e.install_id = l.install_id
@@ -96,8 +98,9 @@ export async function selfReportPage(req: Request, env: Env, id: string, now = n
      WHERE l.link_hash = ?1 AND ?2 = 1 AND l.expires_at > ?3 AND e.revoked_at IS NULL`,
   )
     .bind(h, LINK_RE.test(id) ? 1 : 0, now.toISOString())
-    .first<{ email: string; hostname: string; last_seen: string; report: string; compromised_since: string | null; role_policy: string }>();
+    .first<{ install_id: string; email: string; hostname: string; last_seen: string; report: string; compromised_since: string | null; role_policy: string }>();
   if (!row) return notFound(L);
+  const requested = await pendingCheckIds(env, row.install_id);
 
   let results: Result[] = [];
   let version = "";
@@ -155,6 +158,7 @@ ${problems.length === 0
 <h3>${checkTitle(L, r.id, r.title)}</h3>
 ${r.summary ? html`<div class="body">${summaryHtml(L, r)}</div>` : ""}
 ${prodSecrets(L, r)}
+${requested.has(r.id) ? html`<p class="waiver">${L.t("rep.waiverPending", { date: L.day(requested.get(r.id)!) })}</p>` : ""}
 ${r.user_ignored?.length ? html`<p class="dim">${L.t("rep.userIgnored", { n: r.user_ignored.length })}</p>` : ""}
 ${r.likely_samples?.length ? html`<p class="dim">${L.t("rep.likelySamples", { n: r.likely_samples.length })}</p>` : ""}
 ${r.fix ? html`<div class="fix"><b>${L.t("rep.howToFix")}</b><span>${fixHtml(L, r)}</span></div>` : ""}</div>`,

@@ -7,6 +7,7 @@ import { enrollmentOf, enrollmentSection } from "./portal";
 import { type DeviceLocation, parseReport, type Result, statusRank } from "./report";
 import { likelySamplesList } from "./samples";
 import { machineIn, roleIn, type Scope, scopeBind } from "./scope";
+import { machineWaiverRequests, pendingRequests, pendingRequestsNote, pendingRequestsSection, waiverRequestsSection } from "./waiverrequests";
 
 export interface MachineRow {
   install_id: string;
@@ -222,7 +223,7 @@ export async function machinesPage(env: Env, url: URL, who: string, now: number,
   const terms = searchText(q).split(" ").filter(Boolean);
   // Every machine of the filter and role comes back; the search marks rows
   // hidden, so FILTER_SCRIPT can show them again as the search changes.
-  const [rows, waitingAll, waitingRole, totals, top, pending] = await Promise.all([
+  const [rows, waitingAll, waitingRole, totals, top, pending, requests] = await Promise.all([
     machineRows(env, { filter, q: "", silentBefore, limit: 2000, scope, roleId, sort, desc }),
     waitingRows(env, 500, { scope }),
     roleId ? waitingRows(env, 500, { scope, roleId }) : Promise.resolve(null),
@@ -237,6 +238,7 @@ export async function machinesPage(env: Env, url: URL, who: string, now: number,
     env.DB.prepare(`SELECT COUNT(*) AS n FROM invites i WHERE i.used_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > ?1 AND ${roleIn("i.role_id", 2, scope)}`)
       .bind(new Date(now).toISOString(), scopeBind(scope))
       .first<number>("n"),
+    pendingRequests(env, 200, scope),
   ]);
   const n = totals?.n ?? 0;
   const failing = totals?.failing ?? 0;
@@ -335,6 +337,7 @@ ${machineTrs}
   const body = html`<div class="hero"><p class="eyebrow">${L.t("fleet.eyebrow")}</p><h1>${L.t("nav.machines")}</h1>
 <p class="lead">${L.t("machines.lead", { n, failing, silent: totals?.silent ?? 0, days: cfg.silentDays })}</p></div>
 ${scopeNote(L, scope)}
+${pendingRequestsNote(L, requests.length)}
 ${overview}
 <div class="shelf"><h2>${filter === "all" ? L.t("machines.every") : L.t(FILTERS[filter].key)}<span data-matching data-a="${matchA}" data-b="${matchB ?? ""}">${q ? L.s("machines.matching", { q }) : ""}</span>${roleId ? L.t("machines.inRole", { role: roles.find((r) => r.id === roleId)?.name ?? "" }) : ""}</h2><span class="muted small">${L.t("machines.shown", { n: nShown("machines", shown) })}</span></div>
 <div class="toolbar"><nav class="seg" aria-label="${L.s("filter.aria")}">${(Object.keys(FILTERS) as Filter[]).map(
@@ -353,7 +356,8 @@ ${table}
 ${waiting.length
     ? html`<section id="waiting" data-empty-hide="waiting"${waitingShown ? "" : html` hidden`}><h2>${L.t("machines.waiting", { n: nShown("waiting", waitingShown) })}</h2>
 <div class="panel flush"><div class="scroll"><table><thead><tr><th>${L.t("common.personMachine")}</th><th>${L.t("common.role")}</th><th>${L.t("machines.thEnrolled")}</th></tr></thead><tbody data-list="waiting">${waitingTrs}</tbody></table></div></div></section>`
-    : html`<span id="waiting"></span>`}`;
+    : html`<span id="waiting"></span>`}
+${pendingRequestsSection(L, requests, now)}`;
   return page(layout(L, L.s("nav.machines"), who, body, "Machines", { filter: true }), 200, FILTER_HEADERS);
 }
 
@@ -502,18 +506,19 @@ export async function machinePage(env: Env, id: string, who: string, now: number
   // One round of queries for everything keyed by the install ID alone: the
   // database can be far from where the request landed, so each extra round
   // is a long wait.
-  const [mRow, enrollment, checks, hist] = await Promise.all([
+  const [mRow, enrollment, checks, hist, requests] = await Promise.all([
     env.DB.prepare("SELECT * FROM machines WHERE install_id = ?").bind(id).first<MachineRow & { report: string; public_ip: string; geo: string; local_ips: string; device_location: string }>(),
     enrollmentOf(env, id),
     env.DB.prepare("SELECT check_id, since FROM checks WHERE install_id = ?").bind(id).all<{ check_id: string; since: string }>(),
     env.DB.prepare(
       "SELECT received_at, version, fail, warn, error, waived, statuses, ip, geo, device_location FROM reports WHERE install_id = ? ORDER BY id DESC LIMIT 61",
     ).bind(id).all<HistoryRow>(),
+    machineWaiverRequests(env, id),
   ]);
   if (!mRow && !enrollment) {
     return page(layout(L, L.s("common.notFound"), who, html`<p class="eyebrow">${L.t("nav.machines")}</p><h1>${L.t("machine.noSuch")}</h1><p><a href="/admin">${L.t("machine.back")}</a></p>`, "Machines"), 404);
   }
-  const enrollHtml = await enrollmentSection(L, env, id, enrollment, new Date(now), scope);
+  const enrollHtml = html`${waiverRequestsSection(L, id, requests)}${await enrollmentSection(L, env, id, enrollment, new Date(now), scope)}`;
   const crumb = html`<p class="eyebrow"><a href="/admin">${L.t("nav.machines")}</a> · ${enrollment?.role ?? L.s("common.machine")}</p>`;
   if (!mRow) {
     const e = enrollment!;

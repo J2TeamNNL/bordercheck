@@ -38,6 +38,7 @@ import {
 } from "./portal";
 import { type DeviceLocation, parseReport, statusRank } from "./report";
 import { POLICY_CHECKS, sameGrace } from "./roles";
+import { waiverRequestsDetail } from "./waiverrequests";
 import { inviteVisible, machineIn, machineVisible, roleAllowed, roleIn, type Scope, scopeBind } from "./scope";
 import { countLikelySamples, SAMPLE_RULES } from "./samples";
 
@@ -300,7 +301,7 @@ export async function machineDetail(env: Env, id: string, o: { evidence?: boolea
       last_policy_fetch: e.last_policy_at,
       untrusted: { hostname_at_enrollment: clean(e.hostname, 100), os: clean(e.os, 32), arch: clean(e.arch, 32), version: clean(e.version, 64) },
     };
-    out.waivers = await machineWaivers(env, id, now);
+    [out.waivers, out.waiver_requests] = await Promise.all([machineWaivers(env, id, now), waiverRequestsDetail(env, id)]);
   } else {
     out.enrollment = null;
   }

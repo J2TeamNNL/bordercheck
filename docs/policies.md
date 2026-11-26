@@ -195,6 +195,25 @@ no waiver applies.
 A waiver for `tailscale` (the check before it became part of `mesh-vpn`) is still accepted, and applies to a
 `mesh-vpn` result whose only finding is Tailscale's; a finding of another tool there needs a `mesh-vpn` waiver.
 
+### Asking IT for a waiver
+
+On a machine enrolled with an invite link, the person at it can ask for a waiver instead of waiting for IT to
+add one:
+
+```sh
+bordercheck waiver request -check listeners -until 2026-12-31 -reason "Postgres for the billing project" -accept-risk
+bordercheck waiver list     # this machine's requests: waiting for IT, approved or rejected, with IT's note
+```
+
+`-check`, `-until` (today to a year ahead), `-reason` (at most 300 characters) and `-accept-risk` (the person
+states they accept the risk of the check being exempted until then) are all required. The request goes to the
+portal the machine is enrolled with, with the machine's token, like a report; nothing changes on the machine.
+One request per check can be waiting at a time. The check counts as before until an admin approves the request
+in the portal, which adds an ordinary machine waiver (same rules as one IT adds) that reaches the machine at its
+next hourly policy refresh; a rejection only records the decision and IT's note. An install made from a
+`policies.json` has no portal to ask: there IT adds the waiver to the policy. See
+[Waiver requests](portal.md#waiver-requests).
+
 ## checks
 
 Every check takes two common fields:

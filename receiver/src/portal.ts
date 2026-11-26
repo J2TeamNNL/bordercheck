@@ -20,9 +20,9 @@ const MAX_ROLE_POLICY = 256 * 1024;
 export const MAX_BULK = 500;
 const EMAIL_RE = /^[^\s@<>"'(),;:\\]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
 
-const machineLink = (id: string) => `/admin/machine/${encodeURIComponent(id)}`;
+export const machineLink = (id: string) => `/admin/machine/${encodeURIComponent(id)}`;
 
-function cleanLine(s: string, max: number): string {
+export function cleanLine(s: string, max: number): string {
   return s.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
 }
 

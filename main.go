@@ -53,6 +53,10 @@ const usage = `Usage:
   bordercheck unignore [-check ID] <path> [-name NAME]
                                                      make it count again
   bordercheck fix                                    what to fix, with rules for an AI coding assistant
+  bordercheck waiver request -check ID -until YYYY-MM-DD -reason "why" -accept-risk
+                                                     enrolled installs: ask IT to exempt this machine from one
+                                                     check until that day (at most a year)
+  bordercheck waiver list                            those requests and IT's decisions
   bordercheck verify SHA256SUMS SHA256SUMS.sig [file...]
                                                      check downloaded release files against the signed checksums
   bordercheck -list | -print-policy | -version
@@ -93,6 +97,12 @@ Secrets that are not sensitive
   bordercheck ignore -list       what you ignored, and what no longer matches anything
   bordercheck unignore ~/proj/.env
                                  count it again
+
+Exceptions from IT
+  bordercheck waiver request -check listeners -until 2026-12-31 -reason "Postgres for the billing project" -accept-risk
+                                 ask IT to exempt this computer from one check until that day (at most a year);
+                                 it counts as before until IT approves it in the portal
+  bordercheck waiver list        your requests and IT's decisions
 
 Looking closer
   bordercheck -only firewall,secrets    run only these checks
@@ -139,6 +149,8 @@ func run(args []string) int {
 			return runIgnoreCommand(args[0], args[1:])
 		case "verify":
 			return runVerify(args[1:])
+		case "waiver":
+			return runWaiver(args[1:])
 		}
 	}
 	// A word that is not a command or an option: say so, rather than running the checks.

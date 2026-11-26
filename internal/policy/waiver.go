@@ -118,6 +118,9 @@ func checkIDs() map[string]bool {
 	return ids
 }
 
+// IsCheckID reports whether id is a check ID a waiver may name.
+func IsCheckID(id string) bool { return checkIDs()[id] }
+
 func validateWaivers(ws []Waiver, at time.Time) error {
 	ids := checkIDs()
 	today, _ := time.Parse(DateFormat, at.Format(DateFormat))

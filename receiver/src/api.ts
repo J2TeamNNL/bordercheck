@@ -454,7 +454,7 @@ export const ROUTES: Route[] = [
   },
   {
     method: "GET", path: "/machines/{install_id}", id: "getMachine", tag: "machines",
-    summary: "One machine: enrollment, waivers, signs of compromise if any, checks needing attention with since when, passing checks, history; evidence and location only when asked for.",
+    summary: "One machine: enrollment, waivers, waiver requests from its user (the reason under untrusted), signs of compromise if any, checks needing attention with since when, passing checks, history; evidence and location only when asked for.",
     description: "compromise (only while the latest report shows signs of compromise): since, checks, and signs, each a message key (compromise.startupDownloadRun, compromise.blockedExtension, compromise.crackTool, compromise.kmsEmulator) with its machine-supplied parameters and, with include=evidence, the item (untrusted.item).",
     params: { install_id: installIdP },
     query: {
