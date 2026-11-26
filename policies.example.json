@@ -165,6 +165,7 @@
     "ai-agents": {
       "tokens": true,
       "guardrails": true,
+      "instructions": true,
       "extra_paths": [],
       "ignore_paths": [],
       "user_ignore": true

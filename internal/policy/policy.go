@@ -300,10 +300,12 @@ type Tunnels struct {
 // AIAgents judges AI coding-agent and MCP config files.
 type AIAgents struct {
 	Common
-	Tokens      bool     `json:"tokens"`       // plain-text tokens and API keys in MCP / agent configs
-	Guardrails  bool     `json:"guardrails"`   // agents set to skip approvals or run unsandboxed
-	ExtraPaths  []string `json:"extra_paths"`  // more config files to scan for tokens, ~ allowed
-	IgnorePaths []string `json:"ignore_paths"` // globs on the shown path
+	Tokens     bool `json:"tokens"`     // plain-text tokens and API keys in MCP / agent configs
+	Guardrails bool `json:"guardrails"` // agents set to skip approvals or run unsandboxed
+	// Instructions: Claude Code / Codex global instructions name touchenv for secrets.
+	Instructions bool     `json:"instructions"`
+	ExtraPaths   []string `json:"extra_paths"`  // more config files to scan for tokens, ~ allowed
+	IgnorePaths  []string `json:"ignore_paths"` // globs on the shown path
 	// UserIgnore lets the person at the machine mark a plain-text token as not
 	// sensitive (bordercheck ignore); still listed in reports. Guardrails cannot be.
 	UserIgnore bool `json:"user_ignore"`
@@ -514,7 +516,7 @@ func Default() Policy {
 				UserIgnore: true},
 			Tunnels: Tunnels{Processes: true, TailscaleFunnel: true, TailscaleServe: true, Allow: []string{},
 				LowerSeverity: []string{"cloudflared"}},
-			AIAgents:        AIAgents{Tokens: true, Guardrails: true, ExtraPaths: []string{}, IgnorePaths: []string{}, UserIgnore: true},
+			AIAgents:        AIAgents{Tokens: true, Guardrails: true, Instructions: true, ExtraPaths: []string{}, IgnorePaths: []string{}, UserIgnore: true},
 			CrackedSoftware: CrackedSoftware{SuggestAlternatives: true},
 			AdminRights:     AdminRights{AllowAdmin: true},
 			OSProtections: OSProtections{SIP: true, Gatekeeper: true, Antivirus: true, SmartScreen: true, SecureBoot: true,

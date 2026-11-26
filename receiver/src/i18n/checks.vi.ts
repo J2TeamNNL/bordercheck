@@ -342,6 +342,9 @@ export const checksVi: CheckCatalog = {
   "ai.guards": "{n} thiết lập của agent bỏ qua bước xác nhận hoặc sandbox.",
   "ai.fix":
     "Không để token trong cấu hình MCP: hãy tham chiếu biến môi trường ([code]\"env\": {\"API_KEY\": \"${env:API_KEY}\"}[/code] hoặc cơ chế input/secret riêng của agent) và nạp giá trị từ keychain của hệ điều hành ([code]touchenv run[/code] trên macOS). Bật lại bước xác nhận và sandbox: nếu không, một đoạn prompt injection trong bất kỳ file, trang web hay issue nào agent đọc đều có thể chạy lệnh dưới danh nghĩa của bạn.",
+  "ai.instructions": "{n} AI agent chưa có luật về secret nhắc tới touchenv trong hướng dẫn chung của nó.",
+  "ai.instructions.fix":
+    "Thêm luật về secret vào hướng dẫn chung của agent ([code]~/.claude/CLAUDE.md[/code], [code]~/.codex/AGENTS.md[/code]): chạy [code]touchenv doctor --fix[/code], hoặc tự thêm các dòng sau: đọc secret bằng [code]touchenv run NAME -- cmd[/code]; lưu secret mới bằng [code]touchenv set NAME[/code]; không bao giờ chép file .env thật vào worktree mới.",
 
   "cracked.pass": "Không có dấu vết phần mềm crack.",
   "cracked.traces": "Có dấu vết phần mềm crack ({products}), nhưng không thấy công cụ crack nào hay mang malware. Phần mềm crack không được cập nhật, và giấy phép không hợp lệ.",

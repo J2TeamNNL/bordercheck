@@ -144,6 +144,7 @@ type aiFinding struct {
 	// A plain-text token, as opposed to a guardrail setting: only these can
 	// be ignored by the person at the machine (userignore.go).
 	token   bool
+	instr   bool   // the agent's global instructions have no secrets rule
 	prod    bool   // marked production
 	setting string // the config setting (JSON path) or variable name it sits in
 	name    string // the variable or header name the secret rules saw
@@ -175,6 +176,7 @@ func aiAgents(p policy.AIAgents, sp policy.Secrets, local Local) func(context.Co
 		if err != nil {
 			return check.Errored(err)
 		}
+		found = append(found, evalAIInstructions(p.Instructions, readAIInstructions(home, runtime.GOOS))...)
 		return evalAIAgentsWith(found, files, newUserIgnore("ai-agents", local, p.UserIgnore, home))
 	}
 }
@@ -553,13 +555,16 @@ func evalAIAgentsWith(found []aiFinding, files int, u *userIgnore) check.Result 
 	}
 	sort.SliceStable(found, func(i, j int) bool { return found[i].sev == check.High && found[j].sev != check.High })
 	var ev []string
-	high, tokens, guards := false, 0, 0
+	high, tokens, guards, instr := false, 0, 0, 0
 	for _, f := range found {
 		ev = append(ev, f.String())
 		high = high || f.sev == check.High
-		if f.token || strings.HasSuffix(f.what, " in plain text") {
+		switch {
+		case f.instr:
+			instr++
+		case f.token || strings.HasSuffix(f.what, " in plain text"):
 			tokens++
-		} else {
+		default:
 			guards++
 		}
 	}
@@ -574,10 +579,89 @@ func evalAIAgentsWith(found []aiFinding, files int, u *userIgnore) check.Result 
 	if guards > 0 {
 		parts = append(parts, msg.P("ai.guards", "n", guards))
 	}
-	r := check.Result{Status: check.Warn, Severity: check.Medium, Evidence: ev}.
-		WithSummary(parts).WithFix(msg.Of("ai.fix"))
+	if instr > 0 {
+		parts = append(parts, msg.P("ai.instructions", "n", instr))
+	}
+	r := check.Result{Status: check.Warn, Severity: check.Medium, Evidence: ev}
+	var fix msg.Text
+	if tokens+guards > 0 {
+		fix = append(fix, msg.P("ai.fix"))
+	} else {
+		r.Severity = check.Low
+	}
+	if instr > 0 {
+		fix = append(fix, msg.P("ai.instructions.fix"))
+	}
+	r = r.WithSummary(parts).WithFix(fix)
 	if high {
 		r.Status, r.Severity = check.Fail, check.High
 	}
 	return u.finish(r, nil)
+}
+
+// Global instruction files of the agents that read them on every session, from
+// each vendor's documentation (code.claude.com/docs/en/memory, Codex AGENTS.md guide).
+type aiInstr struct {
+	agent string
+	dir   func(home, goos string) []string
+	files []string // relative to dir; a pattern matches with filepath.Glob
+}
+
+var aiInstrs = []aiInstr{
+	{agent: "Claude Code", dir: envDirOr("CLAUDE_CONFIG_DIR", ".claude"), files: []string{"CLAUDE.md", "rules/*.md"}},
+	{agent: "Codex", dir: envDirOr("CODEX_HOME", ".codex"), files: []string{"AGENTS.md"}},
+}
+
+// aiInstrState is what one agent's global instructions say about secrets.
+type aiInstrState struct {
+	agent     string
+	installed bool     // its config folder exists
+	checked   []string // shown paths and patterns that were read
+	rule      bool     // one of them mentions touchenv
+}
+
+func readAIInstructions(home, goos string) []aiInstrState {
+	var out []aiInstrState
+	for _, a := range aiInstrs {
+		for _, dir := range a.dir(home, goos) {
+			st := aiInstrState{agent: a.agent}
+			if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
+				st.installed = true
+			}
+			for _, rel := range a.files {
+				pattern := filepath.Join(dir, filepath.FromSlash(rel))
+				st.checked = append(st.checked, tildePath(home, pattern))
+				paths, _ := filepath.Glob(pattern)
+				for _, path := range paths {
+					st.rule = st.rule || mentionsTouchenv(path)
+				}
+			}
+			out = append(out, st)
+		}
+	}
+	return out
+}
+
+// mentionsTouchenv reads a file, links followed, for the word touchenv in any case.
+func mentionsTouchenv(path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() > secretMaxFileSize {
+		return false
+	}
+	data, err := os.ReadFile(path)
+	return err == nil && bytes.Contains(bytes.ToLower(data), []byte("touchenv"))
+}
+
+func evalAIInstructions(on bool, states []aiInstrState) []aiFinding {
+	if !on {
+		return nil
+	}
+	var out []aiFinding
+	for _, s := range states {
+		if s.installed && !s.rule {
+			out = append(out, aiFinding{path: strings.Join(s.checked, ", "), sev: check.Low, instr: true,
+				what: s.agent + ": no secrets rule naming touchenv in its global instructions"})
+		}
+	}
+	return out
 }

@@ -54,7 +54,7 @@
       "allow": [],
       "lower_severity": ["cloudflared"]
     },
-    "ai-agents": { "tokens": true, "guardrails": true, "user_ignore": true },
+    "ai-agents": { "tokens": true, "guardrails": true, "instructions": true, "user_ignore": true },
     "os-updates": {
       "min_os_versions": { "macos": "15", "windows": "19045", "ubuntu": "22.04" },
       "require_auto_update": true,

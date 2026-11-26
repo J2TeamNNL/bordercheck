@@ -646,3 +646,62 @@ func TestPolicyDefaultsForKeyAndAgentChecks(t *testing.T) {
 		}
 	}
 }
+
+func TestEvalAIInstructions(t *testing.T) {
+	claude := aiInstrState{agent: "Claude Code", installed: true, checked: []string{"~/.claude/CLAUDE.md", "~/.claude/rules/*.md"}}
+	codex := aiInstrState{agent: "Codex", installed: true, rule: true, checked: []string{"~/.codex/AGENTS.md"}}
+	gone := aiInstrState{agent: "Codex", checked: []string{"~/.codex/AGENTS.md"}}
+
+	found := evalAIInstructions(true, []aiInstrState{claude, codex, gone})
+	if len(found) != 1 || !found[0].instr || found[0].sev != check.Low ||
+		found[0].String() != "~/.claude/CLAUDE.md, ~/.claude/rules/*.md  Claude Code: no secrets rule naming touchenv in its global instructions" {
+		t.Fatalf("absent: %+v", found)
+	}
+	r := evalAIAgents(found, 2)
+	if r.Status != check.Warn || r.Severity != check.Low || len(r.FixParts) != 1 || r.FixParts[0].Key != "ai.instructions.fix" ||
+		!strings.Contains(r.Fix, "touchenv doctor --fix") {
+		t.Errorf("eval: %s %s %q %q", r.Status, r.Severity, r.Summary, r.Fix)
+	}
+	r = evalAIAgents(append(found, aiFinding{path: "~/.claude.json", what: "Claude Code: Token in an HTTP header in plain text",
+		sev: check.Medium, token: true}), 2)
+	if r.Status != check.Warn || r.Severity != check.Medium || len(r.FixParts) != 2 {
+		t.Errorf("with a token: %s %s %q", r.Status, r.Severity, r.Fix)
+	}
+
+	codex.rule = false
+	if found := evalAIInstructions(true, []aiInstrState{gone, {agent: "Claude Code", installed: true, rule: true}}); found != nil {
+		t.Errorf("present or not installed: %+v", found)
+	}
+	if found := evalAIInstructions(false, []aiInstrState{claude, codex}); found != nil {
+		t.Errorf("policy off: %+v", found)
+	}
+	if !policy.Default().Checks.AIAgents.Instructions {
+		t.Error("instructions should be on by default")
+	}
+}
+
+func TestReadAIInstructions(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	t.Setenv("CODEX_HOME", "")
+	writeFile(t, home, ".claude/CLAUDE.md", "# Notes\n", 0o600)
+	writeFile(t, home, ".claude/rules/secrets.md", "Read secrets with TouchEnv run.\n", 0o600)
+	writeFile(t, home, ".codex/config.toml", "", 0o600)
+
+	got := readAIInstructions(home, runtime.GOOS)
+	if len(got) != 2 || !got[0].installed || !got[0].rule || !got[1].installed || got[1].rule {
+		t.Fatalf("home: %+v", got)
+	}
+	if want := []string{filepath.Join("~", ".claude", "CLAUDE.md"), filepath.Join("~", ".claude", "rules", "*.md")}; !slices.Equal(got[0].checked, want) {
+		t.Errorf("checked: %q, want %q", got[0].checked, want)
+	}
+
+	other := t.TempDir()
+	writeFile(t, other, "AGENTS.md", "Never copy .env files; use touchenv.\n", 0o600)
+	t.Setenv("CODEX_HOME", other)
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(other, "none"))
+	got = readAIInstructions(home, runtime.GOOS)
+	if got[0].installed || !got[1].installed || !got[1].rule {
+		t.Errorf("env dirs: %+v", got)
+	}
+}

@@ -418,6 +418,12 @@ var Catalog = map[string]Entry{
 		"from the OS keychain ([code]touchenv run[/code] on macOS). Turn " +
 		"approvals and the sandbox back on: a prompt injection in any file, web page or issue the agent reads can " +
 		"then run commands as you."),
+	"ai.instructions": pl("1 AI agent has no secrets rule naming touchenv in its global instructions.",
+		"{n} AI agents have no secrets rule naming touchenv in their global instructions."),
+	"ai.instructions.fix": s("Add a secrets rule to the agent's global instructions ([code]~/.claude/CLAUDE.md[/code], " +
+		"[code]~/.codex/AGENTS.md[/code]): run [code]touchenv doctor --fix[/code], or add these lines yourself: read " +
+		"secrets with [code]touchenv run NAME -- cmd[/code]; store a new one with [code]touchenv set NAME[/code]; never " +
+		"copy real .env files into new worktrees."),
 
 	// ---- cracked-software ----
 	"cracked.pass": s("No traces of cracked software."),

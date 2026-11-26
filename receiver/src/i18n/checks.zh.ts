@@ -338,6 +338,9 @@ export const checksZh: CheckCatalog = {
   "ai.guards": "{n} 项代理设置跳过了审批或沙箱。",
   "ai.fix":
     "不要把令牌写在 MCP 配置中：改为引用环境变量（[code]\"env\": {\"API_KEY\": \"${env:API_KEY}\"}[/code] 或代理自带的输入/密钥机制），并从系统钥匙串加载（macOS 上用 [code]touchenv run[/code]）。重新开启审批和沙箱：否则，代理读取的任何文件、网页或 issue 中的提示词注入都能以你的身份执行命令。",
+  "ai.instructions": "{n} 个 AI 代理的全局指令中没有提到 touchenv 的密钥规则。",
+  "ai.instructions.fix":
+    "在代理的全局指令中加入密钥规则（[code]~/.claude/CLAUDE.md[/code]、[code]~/.codex/AGENTS.md[/code]）：运行 [code]touchenv doctor --fix[/code]，或自行加入以下几行：用 [code]touchenv run NAME -- cmd[/code] 读取密钥；用 [code]touchenv set NAME[/code] 保存新密钥；不要把真实的 .env 文件复制到新的 worktree 中。",
 
   "cracked.pass": "未发现破解软件的痕迹。",
   "cracked.traces": "发现破解软件的痕迹（{products}），但没有发现常携带恶意软件的破解工具。破解软件得不到更新，许可证也无效。",

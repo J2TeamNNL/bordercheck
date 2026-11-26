@@ -150,6 +150,7 @@ func TestUserIgnoreOnMadeUpHome(t *testing.T) {
 	writeFile(t, home, "app/.env", "POSTGRES_PASSWORD=Xq7rT2mVb9pL\nAPI_TOKEN=Zk3nW8sQe4yU\n", 0o600)
 	writeFile(t, home, ".claude.json", `{"mcpServers": {"mcp-trinh": {"url": "https://x.example", "headers": {"Authorization": "Bearer Qw8eR4tY6uI2oP0aS9dF"}}}}`, 0o600)
 	writeFile(t, home, ".codex/config.toml", "sandbox_mode = \"danger-full-access\"\n", 0o600)
+	writeFile(t, home, ".codex/AGENTS.md", "Read secrets with touchenv run.\n", 0o600)
 	writeFile(t, home, ".ssh/aur", openSSHKey(t, "ssh-ed25519", "none"), 0o600)
 	writeFile(t, home, ".ssh/open", openSSHKey(t, "ssh-ed25519", "none"), 0o644)
 	line, _ := authorizedLine(t, "", "bob@domain.com")

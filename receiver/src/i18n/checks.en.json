@@ -22,6 +22,11 @@
     "one": "1 agent setting skips approvals or the sandbox.",
     "other": "{n} agent settings skip approvals or the sandbox."
   },
+  "ai.instructions": {
+    "one": "1 AI agent has no secrets rule naming touchenv in its global instructions.",
+    "other": "{n} AI agents have no secrets rule naming touchenv in their global instructions."
+  },
+  "ai.instructions.fix": "Add a secrets rule to the agent's global instructions ([code]~/.claude/CLAUDE.md[/code], [code]~/.codex/AGENTS.md[/code]): run [code]touchenv doctor --fix[/code], or add these lines yourself: read secrets with [code]touchenv run NAME -- cmd[/code]; store a new one with [code]touchenv set NAME[/code]; never copy real .env files into new worktrees.",
   "ai.pass": {
     "one": "1 AI agent config file checked: no plain-text tokens, guardrails on.",
     "other": "{n} AI agent config files checked: no plain-text tokens, guardrails on."

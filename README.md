@@ -47,7 +47,7 @@ at once ([signs of compromise](docs/policies.md#signs-of-compromise)).
 | `remote-access` | SSH server, screen sharing, remote management, RDP and WinRM are off (a guest account is accepted unless the policy says otherwise); remote-control apps (TeamViewer, AnyDesk, RustDesk, Chrome Remote Desktop, Splashtop, ScreenConnect, VNC servers) not running or starting by themselves, and not open to unattended access |
 | `ssh-keys` | Private keys without a passphrase or readable by others; who can log in through `authorized_keys` |
 | `tunnels` | ngrok, cloudflared, `tailscale funnel`/`serve`, VS Code tunnels, `ssh -R` and others |
-| `ai-agents` | Plain-text tokens in MCP and agent configs, and settings that skip approvals or the sandbox |
+| `ai-agents` | Plain-text tokens in MCP and agent configs, settings that skip approvals or the sandbox, and Claude Code / Codex global instructions without a secrets rule (touchenv) |
 | `cracked-software` | Traces of cracked software: Windows and Office activators, licensing servers blocked in the hosts file or the firewall (Adobe, Autodesk, CorelDRAW, IDM, Camtasia, Bandicam, Filmora…). Fails only on crack tools that commonly carry malware (KMSpico, KMSAuto, AAct…); suggests free alternatives |
 | `admin-rights` | No passwordless `sudo`; Windows UAC on and asking, built-in Administrator off; if the policy asks, that the daily account is not an administrator |
 | `os-protections` | SIP and Gatekeeper (macOS); Defender or another antivirus, tamper protection, SmartScreen, Secure Boot (Windows); Secure Boot, AppArmor or SELinux enforcing (Linux) |
